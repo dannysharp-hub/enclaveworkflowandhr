@@ -18,12 +18,14 @@ import {
   ShieldCheck,
   GraduationCap,
   Zap,
+  Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/whos-in", label: "Who's In", icon: Sun },
   { to: "/my-work", label: "My Work", icon: ClipboardList },
   { to: "/workflow", label: "Workflow", icon: Kanban },
   { to: "/jobs", label: "Jobs", icon: Wrench },
