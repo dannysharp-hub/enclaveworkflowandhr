@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import NotificationBell from "@/components/NotificationBell";
 import {
   LayoutDashboard,
   Wrench,
@@ -166,9 +167,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                "Enclave CNC"}
             </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="status-dot status-active animate-pulse-glow" />
-            <span className="text-xs text-muted-foreground font-mono">ONLINE</span>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <div className="flex items-center gap-2">
+              <div className="status-dot status-active animate-pulse-glow" />
+              <span className="text-xs text-muted-foreground font-mono">ONLINE</span>
+            </div>
           </div>
         </header>
 
