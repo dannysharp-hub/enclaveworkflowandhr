@@ -44,6 +44,7 @@ const TABS = [
   { key: "stages", label: "Stages", icon: Kanban },
   { key: "machines", label: "Machines", icon: Cpu },
   { key: "job-cards", label: "Job Cards", icon: FileText },
+  { key: "client-portal", label: "Client Portal", icon: Building2 },
   { key: "flags", label: "Feature Flags", icon: ToggleLeft },
 ] as const;
 
@@ -56,6 +57,8 @@ const FLAG_LABELS: Record<string, string> = {
   enable_drive_integration: "Drive Integration",
   enable_notifications: "Notifications",
   enable_finance: "Finance Module",
+  enable_client_portal: "Client Portal",
+  enable_smart_quoting: "Smart Quoting",
 };
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
@@ -128,6 +131,7 @@ export default function SettingsPage() {
           {tab === "stages" && <StagesTab data={stages} onRefresh={fetchAll} />}
           {tab === "machines" && <MachinesTab data={machines} departments={departments} onRefresh={fetchAll} />}
           {tab === "job-cards" && <JobCardTemplateManager />}
+          {tab === "client-portal" && <ClientPortalTab />}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
         </>
       )}
@@ -625,6 +629,117 @@ function MachinesTab({ data, departments, onRefresh }: { data: MachineConfig[]; 
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Client Portal Settings Tab ──────────────────────
+function ClientPortalTab() {
+  const { tenantId } = useAuth();
+  const [settings, setSettings] = useState({
+    enable_client_portal: false,
+    show_production_readiness: false,
+    allow_snag_submission: true,
+    allow_remote_signoff: false,
+    show_financial_info: false,
+    portal_branding: {} as any,
+  });
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await (supabase.from("client_portal_settings") as any)
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (data) {
+        setSettings({
+          enable_client_portal: data.enable_client_portal,
+          show_production_readiness: data.show_production_readiness,
+          allow_snag_submission: data.allow_snag_submission,
+          allow_remote_signoff: data.allow_remote_signoff,
+          show_financial_info: data.show_financial_info,
+          portal_branding: data.portal_branding || {},
+        });
+      }
+      setLoaded(true);
+    };
+    if (tenantId) load();
+  }, [tenantId]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data: existing } = await (supabase.from("client_portal_settings") as any)
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await (supabase.from("client_portal_settings") as any)
+          .update(settings)
+          .eq("tenant_id", tenantId);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase.from("client_portal_settings") as any)
+          .insert({ ...settings, tenant_id: tenantId });
+        if (error) throw error;
+      }
+      toast({ title: "Client Portal settings saved" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return null;
+
+  const toggles = [
+    { key: "enable_client_portal", label: "Enable Client Portal", desc: "Allow customers to access their job status online" },
+    { key: "show_production_readiness", label: "Show Production Readiness", desc: "Display simplified readiness status to clients" },
+    { key: "allow_snag_submission", label: "Allow Snag Submission", desc: "Clients can report installation snags" },
+    { key: "allow_remote_signoff", label: "Allow Remote Sign-Off", desc: "Clients can digitally sign off installs via portal" },
+    { key: "show_financial_info", label: "Show Financial Info", desc: "Display quote/invoice details to clients" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-mono text-sm font-bold text-foreground">Client Portal Configuration</h3>
+      <p className="text-xs text-muted-foreground">Control what clients can see and do in the portal. Access at <span className="font-mono text-primary">/portal/login</span></p>
+
+      <div className="glass-panel rounded-lg divide-y divide-border max-w-lg">
+        {toggles.map(t => (
+          <div key={t.key} className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">{t.label}</p>
+              <p className="text-[10px] text-muted-foreground">{t.desc}</p>
+            </div>
+            <button
+              onClick={() => setSettings(s => ({ ...s, [t.key]: !(s as any)[t.key] }))}
+              className={cn(
+                "relative w-11 h-6 rounded-full transition-colors",
+                (settings as any)[t.key] ? "bg-primary" : "bg-muted"
+              )}
+            >
+              <span className={cn(
+                "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-background shadow transition-transform",
+                (settings as any)[t.key] && "translate-x-5"
+              )} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        <Save size={14} />
+        {saving ? "Saving…" : "Save Settings"}
+      </button>
     </div>
   );
 }
