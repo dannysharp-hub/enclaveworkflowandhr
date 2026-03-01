@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -208,6 +208,20 @@ export default function StaffProfilePage() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleHolidayDecision = async (requestId: string, status: "Approved" | "Rejected") => {
+    try {
+      const { error } = await supabase
+        .from("holiday_requests")
+        .update({ status, approver_staff_id: user?.id ?? null })
+        .eq("id", requestId);
+      if (error) throw error;
+      toast({ title: status, description: `Holiday request ${status.toLowerCase()}` });
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -526,9 +540,27 @@ export default function StaffProfilePage() {
                     {h.type}{h.reason ? ` · ${h.reason}` : ""}
                   </p>
                 </div>
-                <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-mono font-medium", holidayStatusColor(h.status))}>
-                  {h.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  {isAdmin && h.status === "Pending" && (
+                    <>
+                      <button
+                        onClick={() => handleHolidayDecision(h.id, "Approved")}
+                        className="flex items-center gap-1 h-6 rounded px-2 text-[10px] font-medium bg-success/15 text-success hover:bg-success/25 transition-colors"
+                      >
+                        <Check size={10} /> Approve
+                      </button>
+                      <button
+                        onClick={() => handleHolidayDecision(h.id, "Rejected")}
+                        className="flex items-center gap-1 h-6 rounded px-2 text-[10px] font-medium bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors"
+                      >
+                        <XCircle size={10} /> Reject
+                      </button>
+                    </>
+                  )}
+                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-mono font-medium", holidayStatusColor(h.status))}>
+                    {h.status}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
