@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Hammer } from "lucide-react";
 import type { JobStatus } from "@/types";
 
 interface DbJob {
@@ -19,6 +20,7 @@ interface DbJob {
 
 export default function JobsPage() {
   const { userRole } = useAuth();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState<DbJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -82,6 +84,7 @@ export default function JobsPage() {
                   <th className="text-left p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                   <th className="text-right p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Parts</th>
                   <th className="text-right p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Sheets</th>
+                  {canManage && <th className="p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Build</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -93,6 +96,16 @@ export default function JobsPage() {
                     <td className="p-4"><JobStatusBadge status={job.status as JobStatus} /></td>
                     <td className="p-4 text-right font-mono text-sm text-foreground">{job.parts_count}</td>
                     <td className="p-4 text-right font-mono text-sm text-muted-foreground hidden md:table-cell">{job.sheets_estimated}</td>
+                    {canManage && (
+                      <td className="p-4">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${job.id}/builder`); }}
+                          className="flex items-center gap-1 h-7 px-2 rounded border border-primary/30 text-xs font-mono text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <Hammer size={12} /> Build
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
