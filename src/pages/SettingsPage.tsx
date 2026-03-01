@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check } from "lucide-react";
+import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────
 interface DepartmentConfig {
@@ -38,6 +38,7 @@ interface FeatureFlag {
 }
 
 const TABS = [
+  { key: "branding", label: "Branding", icon: Palette },
   { key: "departments", label: "Departments", icon: Building2 },
   { key: "stages", label: "Stages", icon: Kanban },
   { key: "machines", label: "Machines", icon: Cpu },
@@ -59,7 +60,7 @@ const labelClass = "block text-[10px] font-mono font-medium text-muted-foregroun
 
 export default function SettingsPage() {
   const { userRole, tenantId } = useAuth();
-  const [tab, setTab] = useState<TabKey>("departments");
+  const [tab, setTab] = useState<TabKey>("branding");
   const [departments, setDepartments] = useState<DepartmentConfig[]>([]);
   const [stages, setStages] = useState<StageConfig[]>([]);
   const [machines, setMachines] = useState<MachineConfig[]>([]);
@@ -119,12 +120,155 @@ export default function SettingsPage() {
         </div>
       ) : (
         <>
+          {tab === "branding" && <BrandingTab />}
           {tab === "departments" && <DepartmentsTab data={departments} onRefresh={fetchAll} />}
           {tab === "stages" && <StagesTab data={stages} onRefresh={fetchAll} />}
           {tab === "machines" && <MachinesTab data={machines} departments={departments} onRefresh={fetchAll} />}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
         </>
       )}
+    </div>
+  );
+}
+
+// ─── Branding Tab ────────────────────────────────────
+function BrandingTab() {
+  const { tenantId } = useAuth();
+  const [companyName, setCompanyName] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [primaryColour, setPrimaryColour] = useState("#6d28d9");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from("tenants").select("tenant_name, branding").single();
+      if (data) {
+        setCompanyName(data.tenant_name || "");
+        const b = data.branding as any;
+        if (b) {
+          setSubtitle(b.subtitle || "");
+          setPrimaryColour(b.primary_colour || "#6d28d9");
+          setLogoUrl(b.logo_url || null);
+        }
+      }
+      setLoaded(true);
+    };
+    load();
+  }, []);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${tenantId}/logo.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      setLogoUrl(urlData.publicUrl);
+      toast({ title: "Logo uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("tenants").update({
+        tenant_name: companyName,
+        branding: { subtitle, primary_colour: primaryColour, logo_url: logoUrl },
+      }).eq("id", tenantId);
+      if (error) throw error;
+      toast({ title: "Branding saved" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <div className="space-y-6">
+      <h3 className="font-mono text-sm font-bold text-foreground">Branding & Company</h3>
+
+      <div className="glass-panel rounded-lg p-6 space-y-6 max-w-lg">
+        {/* Logo */}
+        <div>
+          <label className={labelClass}>Company Logo</label>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-lg border border-border bg-card flex items-center justify-center overflow-hidden shrink-0">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <span className="font-mono text-xl font-bold text-muted-foreground">
+                  {companyName?.[0] || "?"}
+                </span>
+              )}
+            </div>
+            <div>
+              <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-xs font-medium text-secondary-foreground hover:bg-secondary/80 cursor-pointer">
+                <Upload size={14} />
+                {uploading ? "Uploading…" : "Upload Logo"}
+                <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploading} />
+              </label>
+              <p className="text-[10px] text-muted-foreground mt-1">PNG or SVG, max 2MB</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Company Name */}
+        <div>
+          <label className={labelClass}>Company Name</label>
+          <input className={inputClass} value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Enclave Cabinetry" />
+        </div>
+
+        {/* Subtitle */}
+        <div>
+          <label className={labelClass}>Subtitle / Tagline</label>
+          <input className={inputClass} value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="CABINETRY" />
+          <p className="text-[10px] text-muted-foreground mt-1">Shown below the company name in the sidebar</p>
+        </div>
+
+        {/* Primary Colour */}
+        <div>
+          <label className={labelClass}>Primary Colour</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={primaryColour}
+              onChange={e => setPrimaryColour(e.target.value)}
+              className="w-10 h-10 rounded-md border border-border cursor-pointer bg-transparent p-0.5"
+            />
+            <input
+              className={cn(inputClass, "w-32 font-mono")}
+              value={primaryColour}
+              onChange={e => setPrimaryColour(e.target.value)}
+              placeholder="#6d28d9"
+            />
+            <div className="w-24 h-10 rounded-md" style={{ backgroundColor: primaryColour }} />
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">Used for accents and active states throughout the app</p>
+        </div>
+
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          disabled={saving || !companyName.trim()}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          <Save size={14} />
+          {saving ? "Saving…" : "Save Branding"}
+        </button>
+      </div>
     </div>
   );
 }
