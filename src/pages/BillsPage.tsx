@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Plus, X, Check, Pencil, Search } from "lucide-react";
+import { Plus, X, Check, Pencil, Search, FileSpreadsheet } from "lucide-react";
 import { format } from "date-fns";
 import { exportToCsv, filterByDateRange } from "@/lib/csvExport";
 import CsvExportButton from "@/components/CsvExportButton";
@@ -168,6 +168,7 @@ export default function BillsPage() {
             <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Ex VAT</th>
             <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Paid</th>
             <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Status</th>
+            <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Pandle</th>
             <th className="px-4 py-2" />
           </tr></thead>
           <tbody>
@@ -182,6 +183,15 @@ export default function BillsPage() {
                 <td className="px-4 py-2 text-right text-success">£{Number(b.amount_paid || 0).toLocaleString()}</td>
                 <td className="px-4 py-2"><span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono font-medium", STATUS_COLORS[b.status] || "bg-muted text-muted-foreground")}>{b.status.replace("_", " ")}</span></td>
                 <td className="px-4 py-2">
+                  {b.pandle_exported ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-success/15 text-success" title={b.pandle_exported_at ? `Exported ${b.pandle_exported_at}` : undefined}>
+                      <FileSpreadsheet size={10} /> Exported
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-2">
                   <div className="flex gap-1">
                     <button onClick={() => { setEditId(b.id); setAdding(true); setForm({ bill_reference: b.bill_reference, supplier_id: b.supplier_id, job_id: b.job_id || "", issue_date: b.issue_date, due_date: b.due_date, amount_ex_vat: Number(b.amount_ex_vat), vat_amount: Number(b.vat_amount), status: b.status, category: b.category, notes: b.notes || "" }); }} className="p-1 text-muted-foreground hover:text-foreground"><Pencil size={14} /></button>
                     {b.status !== "paid" && b.status !== "cancelled" && (
@@ -191,7 +201,7 @@ export default function BillsPage() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No bills found</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">No bills found</td></tr>}
           </tbody>
         </table>
       </div>

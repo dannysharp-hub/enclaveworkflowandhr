@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Plus, X, Check, Pencil, Search } from "lucide-react";
+import { Plus, X, Check, Pencil, Search, FileSpreadsheet } from "lucide-react";
 import { format } from "date-fns";
 import { exportToCsv, filterByDateRange } from "@/lib/csvExport";
 import CsvExportButton from "@/components/CsvExportButton";
@@ -33,6 +33,8 @@ interface Invoice {
   payment_received_date: string | null;
   payment_method: string | null;
   reference: string | null;
+  pandle_exported: boolean;
+  pandle_exported_at: string | null;
 }
 
 export default function InvoicesPage() {
@@ -189,6 +191,7 @@ export default function InvoicesPage() {
             <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Ex VAT</th>
             <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Paid</th>
             <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Status</th>
+            <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Pandle</th>
             <th className="px-4 py-2" />
           </tr></thead>
           <tbody>
@@ -203,6 +206,15 @@ export default function InvoicesPage() {
                 <td className="px-4 py-2 text-right text-success">£{Number(inv.amount_paid).toLocaleString()}</td>
                 <td className="px-4 py-2"><span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono font-medium", STATUS_COLORS[inv.status] || "bg-muted text-muted-foreground")}>{inv.status.replace("_", " ")}</span></td>
                 <td className="px-4 py-2">
+                  {inv.pandle_exported ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-success/15 text-success" title={inv.pandle_exported_at ? `Exported ${inv.pandle_exported_at}` : undefined}>
+                      <FileSpreadsheet size={10} /> Exported
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-2">
                   <div className="flex gap-1">
                     <button onClick={() => { setEditId(inv.id); setAdding(true); setForm({ invoice_number: inv.invoice_number, customer_id: inv.customer_id, job_id: inv.job_id || "", issue_date: inv.issue_date, due_date: inv.due_date, amount_ex_vat: Number(inv.amount_ex_vat), vat_amount: Number(inv.vat_amount), status: inv.status, reference: inv.reference || "" }); }} className="p-1 text-muted-foreground hover:text-foreground"><Pencil size={14} /></button>
                     {inv.status !== "paid" && inv.status !== "cancelled" && (
@@ -212,7 +224,7 @@ export default function InvoicesPage() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No invoices found</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">No invoices found</td></tr>}
           </tbody>
         </table>
       </div>
