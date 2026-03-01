@@ -725,6 +725,36 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_documents: {
+        Row: {
+          category: string
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          staff_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          staff_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          staff_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       staff_skills: {
         Row: {
           assigned_by: string | null
