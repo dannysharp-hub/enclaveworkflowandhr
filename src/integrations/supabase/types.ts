@@ -812,6 +812,88 @@ export type Database = {
           },
         ]
       }
+      install_signoffs: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          follow_up_required: boolean
+          geo_location: Json | null
+          id: string
+          job_id: string
+          notes: string | null
+          photos: string[] | null
+          signature_image_reference: string | null
+          signed_at: string
+          signed_by_name: string
+          signed_by_role: string
+          snapshot_id: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          follow_up_required?: boolean
+          geo_location?: Json | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          photos?: string[] | null
+          signature_image_reference?: string | null
+          signed_at?: string
+          signed_by_name: string
+          signed_by_role?: string
+          snapshot_id?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          follow_up_required?: boolean
+          geo_location?: Json | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          photos?: string[] | null
+          signature_image_reference?: string | null
+          signed_at?: string
+          signed_by_name?: string
+          signed_by_role?: string
+          snapshot_id?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "install_signoffs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "install_signoffs_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "job_card_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "install_signoffs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount_ex_vat: number
@@ -922,6 +1004,298 @@ export type Database = {
           },
         ]
       }
+      job_card_signoffs: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          role_at_signing: string | null
+          signed_at: string
+          signed_by: string
+          snapshot_id: string
+          stage_name: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role_at_signing?: string | null
+          signed_at?: string
+          signed_by: string
+          snapshot_id: string
+          stage_name: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          role_at_signing?: string | null
+          signed_at?: string
+          signed_by?: string
+          snapshot_id?: string
+          stage_name?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_card_signoffs_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "job_card_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_card_signoffs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_card_snapshots: {
+        Row: {
+          change_summary: string | null
+          created_at: string
+          id: string
+          issued_at: string | null
+          issued_by: string | null
+          job_id: string
+          snapshot_data: Json
+          status: string
+          superseded_at: string | null
+          superseded_by: string | null
+          template_id: string | null
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          change_summary?: string | null
+          created_at?: string
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          job_id: string
+          snapshot_data?: Json
+          status?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          template_id?: string | null
+          tenant_id: string
+          version?: number
+        }
+        Update: {
+          change_summary?: string | null
+          created_at?: string
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          job_id?: string
+          snapshot_data?: Json
+          status?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          template_id?: string | null
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_card_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_card_snapshots_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "job_card_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_card_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_card_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          department: string
+          description: string | null
+          id: string
+          is_default: boolean
+          name: string
+          template_config: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          department?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          template_config?: Json
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          department?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          template_config?: Json
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_card_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_checklist_items: {
+        Row: {
+          active: boolean
+          check_type: string
+          created_at: string
+          description: string | null
+          id: string
+          label: string
+          mandatory: boolean
+          sort_order: number
+          template_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          check_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          label: string
+          mandatory?: boolean
+          sort_order?: number
+          template_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          check_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+          mandatory?: boolean
+          sort_order?: number
+          template_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_checklist_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "job_card_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_checklist_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_checklist_results: {
+        Row: {
+          checked: boolean
+          checked_at: string | null
+          checked_by: string | null
+          checklist_item_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          snapshot_id: string
+          tenant_id: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          checked?: boolean
+          checked_at?: string | null
+          checked_by?: string | null
+          checklist_item_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          snapshot_id: string
+          tenant_id: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          checked?: boolean
+          checked_at?: string | null
+          checked_by?: string | null
+          checklist_item_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          snapshot_id?: string
+          tenant_id?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_checklist_results_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "job_checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_checklist_results_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "job_card_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_checklist_results_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_financials: {
         Row: {
           created_at: string
@@ -997,6 +1371,94 @@ export type Database = {
           },
           {
             foreignKeyName: "job_financials_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_issues: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          job_id: string
+          photos: string[] | null
+          reported_at: string
+          reported_by: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          snapshot_id: string | null
+          stage_name: string | null
+          status: string
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_id: string
+          photos?: string[] | null
+          reported_at?: string
+          reported_by: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          snapshot_id?: string | null
+          stage_name?: string | null
+          status?: string
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_id?: string
+          photos?: string[] | null
+          reported_at?: string
+          reported_by?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          snapshot_id?: string | null
+          stage_name?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_issues_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_issues_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "job_card_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_issues_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1595,6 +2057,78 @@ export type Database = {
           },
           {
             foreignKeyName: "product_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_readiness_status: {
+        Row: {
+          assembly_ready: boolean
+          cnc_ready: boolean
+          created_at: string
+          edge_ready: boolean
+          id: string
+          install_ready: boolean
+          issues_open_count: number
+          job_id: string
+          last_calculated_at: string
+          materials_ready: boolean
+          overdue_dependency_count: number
+          readiness_score: number
+          readiness_status: string
+          spray_ready: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          assembly_ready?: boolean
+          cnc_ready?: boolean
+          created_at?: string
+          edge_ready?: boolean
+          id?: string
+          install_ready?: boolean
+          issues_open_count?: number
+          job_id: string
+          last_calculated_at?: string
+          materials_ready?: boolean
+          overdue_dependency_count?: number
+          readiness_score?: number
+          readiness_status?: string
+          spray_ready?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          assembly_ready?: boolean
+          cnc_ready?: boolean
+          created_at?: string
+          edge_ready?: boolean
+          id?: string
+          install_ready?: boolean
+          issues_open_count?: number
+          job_id?: string
+          last_calculated_at?: string
+          materials_ready?: boolean
+          overdue_dependency_count?: number
+          readiness_score?: number
+          readiness_status?: string
+          spray_ready?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_readiness_status_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_readiness_status_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
