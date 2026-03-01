@@ -518,6 +518,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          avatar_url: string | null
           bank_account_name: string | null
           bank_account_number: string | null
           bank_name: string | null
@@ -542,6 +543,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          avatar_url?: string | null
           bank_account_name?: string | null
           bank_account_number?: string | null
           bank_name?: string | null
@@ -566,6 +568,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          avatar_url?: string | null
           bank_account_name?: string | null
           bank_account_number?: string | null
           bank_name?: string | null

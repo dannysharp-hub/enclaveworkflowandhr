@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound, FileText, Upload, Download, Trash2, Phone, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound, FileText, Upload, Download, Trash2, Phone, MessageSquare, Send, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -27,6 +27,7 @@ interface ProfileData {
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   emergency_contact_relationship: string | null;
+  avatar_url: string | null;
   role: string;
 }
 
@@ -154,6 +155,40 @@ export default function StaffProfilePage() {
   const [editingEmergency, setEditingEmergency] = useState(false);
   const [emergencyForm, setEmergencyForm] = useState({ emergency_contact_name: "", emergency_contact_phone: "", emergency_contact_relationship: "" });
   const [savingEmergency, setSavingEmergency] = useState(false);
+
+  // Avatar upload
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Error", description: "Please select an image file", variant: "destructive" });
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const filePath = `${userId}/avatar.${ext}`;
+      // Remove old avatar files
+      const { data: existing } = await supabase.storage.from("avatars").list(userId);
+      if (existing?.length) {
+        await supabase.storage.from("avatars").remove(existing.map(f => `${userId}/${f.name}`));
+      }
+      const { error: upErr } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      const avatarUrl = urlData.publicUrl + "?t=" + Date.now();
+      await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", userId);
+      toast({ title: "Updated", description: "Profile photo updated" });
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -446,8 +481,27 @@ export default function StaffProfilePage() {
       <div className="glass-panel rounded-lg p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-              <span className="text-lg font-mono font-bold text-secondary-foreground">{initials}</span>
+            <div className="relative group">
+              <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg font-mono font-bold text-secondary-foreground">{initials}</span>
+                )}
+              </div>
+              {(isAdmin || isSelf) && (
+                <label className={cn(
+                  "absolute inset-0 flex items-center justify-center rounded-full bg-background/70 opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity",
+                  uploadingAvatar && "opacity-100"
+                )}>
+                  {uploadingAvatar ? (
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Camera size={18} className="text-foreground" />
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                </label>
+              )}
             </div>
             <div>
               <h2 className="text-xl font-mono font-bold text-foreground">{profile.full_name}</h2>
