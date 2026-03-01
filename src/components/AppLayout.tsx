@@ -19,6 +19,7 @@ import {
   GraduationCap,
   Zap,
   Sun,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +36,7 @@ const navItems = [
   { to: "/compliance", label: "Compliance", icon: ShieldCheck },
   { to: "/training", label: "Training", icon: GraduationCap },
   { to: "/skills", label: "Skills Matrix", icon: Zap },
+  { to: "/machine-auth", label: "Machine Auth", icon: ShieldAlert },
   { to: "/remnants", label: "Remnants", icon: Recycle },
   { to: "/materials", label: "Materials", icon: Package },
 ];

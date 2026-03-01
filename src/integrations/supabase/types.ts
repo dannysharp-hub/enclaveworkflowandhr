@@ -673,6 +673,44 @@ export type Database = {
           },
         ]
       }
+      stage_skill_requirements: {
+        Row: {
+          created_at: string
+          id: string
+          mandatory: boolean
+          minimum_level: string
+          skill_id: string
+          stage_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mandatory?: boolean
+          minimum_level?: string
+          skill_id: string
+          stage_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mandatory?: boolean
+          minimum_level?: string
+          skill_id?: string
+          stage_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_skill_requirements_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       toolpath_templates: {
         Row: {
           active: boolean
@@ -790,6 +828,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_staff_stage_authorisation: {
+        Args: { _staff_id: string; _stage_name: string }
+        Returns: {
+          authorised: boolean
+          missing_skills: Json
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

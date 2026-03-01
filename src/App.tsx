@@ -18,6 +18,7 @@ import RemnantsPage from "./pages/RemnantsPage";
 import MaterialsPage from "./pages/MaterialsPage";
 import JobBuilderPage from "./pages/JobBuilderPage";
 import WorkflowPage from "./pages/WorkflowPage";
+import MachineAuthPage from "./pages/MachineAuthPage";
 import MyWorkPage from "./pages/MyWorkPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
@@ -59,6 +60,7 @@ const AppRoutes = () => (
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/training" element={<TrainingPage />} />
               <Route path="/skills" element={<SkillsMatrixPage />} />
+              <Route path="/machine-auth" element={<MachineAuthPage />} />
               <Route path="/whos-in" element={<WhosInPage />} />
               <Route path="/remnants" element={<RemnantsPage />} />
               <Route path="/materials" element={<MaterialsPage />} />
