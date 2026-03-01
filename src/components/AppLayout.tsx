@@ -4,28 +4,11 @@ import NotificationBell from "@/components/NotificationBell";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useTenantBranding } from "@/hooks/useTenantBranding";
 import {
-  LayoutDashboard,
-  Wrench,
-  Users,
-  CalendarDays,
-  FileText,
-  Recycle,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  X,
-  LogOut,
-  Kanban,
-  ClipboardList,
-  Package,
-  ShieldCheck,
-  GraduationCap,
-  Zap,
-  Sun,
-  ShieldAlert,
-  ClipboardCheck,
-  Palmtree,
-  Settings,
+  LayoutDashboard, Wrench, Users, CalendarDays, FileText, Recycle,
+  ChevronLeft, ChevronRight, Menu, X, LogOut, Kanban, ClipboardList,
+  Package, ShieldCheck, GraduationCap, Zap, Sun, ShieldAlert,
+  ClipboardCheck, Palmtree, Settings, ChevronDown,
+  BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +19,13 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   featureFlag?: string;
+}
+
+interface NavGroup {
+  label: string;
+  icon: LucideIcon;
+  featureFlag?: string;
+  items: NavItem[];
 }
 
 const navItems: NavItem[] = [
@@ -57,9 +47,25 @@ const navItems: NavItem[] = [
   { to: "/materials", label: "Materials", icon: Package },
 ];
 
+const financeGroup: NavGroup = {
+  label: "Finance",
+  icon: BadgePoundSterling,
+  featureFlag: "enable_finance",
+  items: [
+    { to: "/finance", label: "Dashboard", icon: BadgePoundSterling },
+    { to: "/finance/invoices", label: "Invoices", icon: Receipt },
+    { to: "/finance/bills", label: "Bills", icon: Wallet },
+    { to: "/finance/wages", label: "Wages", icon: Clock },
+    { to: "/finance/overheads", label: "Overheads", icon: Building },
+    { to: "/finance/customers", label: "Customers", icon: Users },
+    { to: "/finance/suppliers", label: "Suppliers", icon: Truck },
+  ],
+};
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [financeOpen, setFinanceOpen] = useState(false);
   const location = useLocation();
   const { profile, userRole, signOut } = useAuth();
   const { flags } = useFeatureFlags();
@@ -160,6 +166,54 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </NavLink>
             );
           })}
+
+          {/* Finance group */}
+          {(!financeGroup.featureFlag || flags[financeGroup.featureFlag]) && (
+            <>
+              <div className="my-2 border-t border-border" />
+              <button
+                onClick={() => setFinanceOpen(!financeOpen)}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all w-full",
+                  location.pathname.startsWith("/finance")
+                    ? "bg-primary/10 text-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <financeGroup.icon size={18} className={location.pathname.startsWith("/finance") ? "text-primary" : ""} />
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 text-left">{financeGroup.label}</span>
+                    <ChevronDown size={14} className={cn("transition-transform", financeOpen && "rotate-180")} />
+                  </>
+                )}
+              </button>
+              {(financeOpen || location.pathname.startsWith("/finance")) && !collapsed && (
+                <div className="ml-4 space-y-0.5">
+                  {financeGroup.items.map((item) => {
+                    const isActive = location.pathname === item.to;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md px-3 py-2 text-xs font-medium transition-all",
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                      >
+                        <item.icon size={14} className={isActive ? "text-primary" : ""} />
+                        <span>{item.label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
           {userRole === "admin" && (
             <>
               <div className="my-2 border-t border-border" />
