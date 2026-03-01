@@ -178,6 +178,274 @@ export type Database = {
           },
         ]
       }
+      cashflow_adjustments: {
+        Row: {
+          active: boolean
+          amount: number
+          created_at: string
+          description: string
+          end_date: string | null
+          event_date: string
+          event_type: string
+          id: string
+          recurring: string
+          scenario_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount?: number
+          created_at?: string
+          description?: string
+          end_date?: string | null
+          event_date: string
+          event_type?: string
+          id?: string
+          recurring?: string
+          scenario_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          created_at?: string
+          description?: string
+          end_date?: string | null
+          event_date?: string
+          event_type?: string
+          id?: string
+          recurring?: string
+          scenario_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashflow_adjustments_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_scenarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_adjustments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cashflow_events: {
+        Row: {
+          amount: number
+          confidence: string
+          counterparty_name: string | null
+          description: string
+          event_date: string
+          event_type: string
+          generated_at: string
+          id: string
+          job_id: string | null
+          scenario_id: string
+          source_id: string | null
+          source_type: string
+          tenant_id: string
+        }
+        Insert: {
+          amount?: number
+          confidence?: string
+          counterparty_name?: string | null
+          description?: string
+          event_date: string
+          event_type: string
+          generated_at?: string
+          id?: string
+          job_id?: string | null
+          scenario_id: string
+          source_id?: string | null
+          source_type: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          confidence?: string
+          counterparty_name?: string | null
+          description?: string
+          event_date?: string
+          event_type?: string
+          generated_at?: string
+          id?: string
+          job_id?: string | null
+          scenario_id?: string
+          source_id?: string | null
+          source_type?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashflow_events_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_scenarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cashflow_rules: {
+        Row: {
+          active: boolean
+          applies_to: string
+          created_at: string
+          id: string
+          match_value: string | null
+          offset_days: number
+          probability_percent: number | null
+          rule_type: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          applies_to?: string
+          created_at?: string
+          id?: string
+          match_value?: string | null
+          offset_days?: number
+          probability_percent?: number | null
+          rule_type?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          applies_to?: string
+          created_at?: string
+          id?: string
+          match_value?: string | null
+          offset_days?: number
+          probability_percent?: number | null
+          rule_type?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashflow_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cashflow_scenarios: {
+        Row: {
+          active: boolean
+          assumptions_json: Json
+          created_at: string
+          created_by_staff_id: string | null
+          id: string
+          is_default: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          assumptions_json?: Json
+          created_at?: string
+          created_by_staff_id?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          assumptions_json?: Json
+          created_at?: string
+          created_by_staff_id?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashflow_scenarios_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cashflow_settings: {
+        Row: {
+          alert_horizon_days: number
+          auto_calculate_opening: boolean
+          created_at: string
+          default_pay_cycle: string
+          default_scenario_id: string | null
+          id: string
+          minimum_cash_buffer_amount: number
+          opening_balance: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          alert_horizon_days?: number
+          auto_calculate_opening?: boolean
+          created_at?: string
+          default_pay_cycle?: string
+          default_scenario_id?: string | null
+          id?: string
+          minimum_cash_buffer_amount?: number
+          opening_balance?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          alert_horizon_days?: number
+          auto_calculate_opening?: boolean
+          created_at?: string
+          default_pay_cycle?: string
+          default_scenario_id?: string | null
+          id?: string
+          minimum_cash_buffer_amount?: number
+          opening_balance?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashflow_settings_default_scenario_id_fkey"
+            columns: ["default_scenario_id"]
+            isOneToOne: false
+            referencedRelation: "cashflow_scenarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashflow_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           active: boolean
@@ -729,6 +997,60 @@ export type Database = {
           },
           {
             foreignKeyName: "job_financials_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_payment_schedules: {
+        Row: {
+          amount: number
+          created_at: string
+          expected_date: string
+          id: string
+          job_id: string
+          milestone: string
+          notes: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          expected_date: string
+          id?: string
+          job_id: string
+          milestone?: string
+          notes?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          expected_date?: string
+          id?: string
+          job_id?: string
+          milestone?: string
+          notes?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_payment_schedules_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_payment_schedules_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
