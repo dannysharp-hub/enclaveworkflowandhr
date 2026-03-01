@@ -23,6 +23,7 @@ import MachineAuthPage from "./pages/MachineAuthPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import MyWorkPage from "./pages/MyWorkPage";
 import LoginPage from "./pages/LoginPage";
+import HolidayCalendarPage from "./pages/HolidayCalendarPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const AppRoutes = () => (
               <Route path="/staff" element={<StaffPage />} />
               <Route path="/staff/:userId" element={<StaffProfilePage />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/holiday-calendar" element={<HolidayCalendarPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/training" element={<TrainingPage />} />
