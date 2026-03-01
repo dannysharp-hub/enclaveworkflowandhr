@@ -12,12 +12,16 @@ import {
   Menu,
   X,
   LogOut,
+  Kanban,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/my-work", label: "My Work", icon: ClipboardList },
+  { to: "/workflow", label: "Workflow", icon: Kanban },
   { to: "/jobs", label: "Jobs", icon: Wrench },
   { to: "/staff", label: "Staff", icon: Users },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
