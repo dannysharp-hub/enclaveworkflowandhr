@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound, FileText, Upload, Download, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -61,6 +61,16 @@ interface HolidayRequest {
   created_at: string;
 }
 
+interface StaffDocument {
+  id: string;
+  file_name: string;
+  file_path: string;
+  category: string;
+  created_at: string;
+}
+
+const DOC_CATEGORIES = ["Contract", "ID", "Certification", "Right to Work", "DBS Check", "Other"] as const;
+
 const HOLIDAY_TYPES = ["Holiday", "Sick", "Unpaid", "Appointment"] as const;
 
 const holidayStatusColor = (status: string) => {
@@ -108,6 +118,7 @@ export default function StaffProfilePage() {
   const [skills, setSkills] = useState<StaffSkill[]>([]);
   const [training, setTraining] = useState<TrainingRecord[]>([]);
   const [holidays, setHolidays] = useState<HolidayRequest[]>([]);
+  const [documents, setDocuments] = useState<StaffDocument[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Holiday request form
@@ -138,13 +149,14 @@ export default function StaffProfilePage() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [profileRes, rolesRes, reviewsRes, skillsRes, trainingRes, holidaysRes] = await Promise.all([
+    const [profileRes, rolesRes, reviewsRes, skillsRes, trainingRes, holidaysRes, docsRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", userId!).single(),
       supabase.from("user_roles").select("role").eq("user_id", userId!).single(),
       supabase.from("reviews").select("id, title, review_type, due_date, status, outcome").eq("staff_id", userId!).order("due_date", { ascending: false }),
       supabase.from("staff_skills").select("id, level, certification_expiry_date, skill:skills(name, category)").eq("staff_id", userId!),
       supabase.from("training_records").select("id, title, training_type, completed_date, expiry_date").eq("staff_id", userId!).order("completed_date", { ascending: false }),
       supabase.from("holiday_requests").select("id, start_date, end_date, type, reason, status, created_at").eq("staff_id", userId!).order("start_date", { ascending: false }),
+      supabase.from("staff_documents").select("id, file_name, file_path, category, created_at").eq("staff_id", userId!).order("created_at", { ascending: false }),
     ]);
 
     if (profileRes.data) {
@@ -166,7 +178,70 @@ export default function StaffProfilePage() {
     setSkills((skillsRes.data as any) ?? []);
     setTraining((trainingRes.data as any) ?? []);
     setHolidays((holidaysRes.data as any) ?? []);
+    setDocuments((docsRes.data as any) ?? []);
     setLoading(false);
+  };
+
+  // Document upload/delete
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docCategory, setDocCategory] = useState<string>("Other");
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userId || !user) return;
+    setUploadingDoc(true);
+    try {
+      const filePath = `${userId}/${Date.now()}_${file.name}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("staff-documents")
+        .upload(filePath, file);
+      if (uploadErr) throw uploadErr;
+
+      const { error: insertErr } = await supabase.from("staff_documents").insert({
+        staff_id: userId,
+        file_name: file.name,
+        file_path: filePath,
+        category: docCategory,
+        uploaded_by: user.id,
+      });
+      if (insertErr) throw insertErr;
+
+      toast({ title: "Uploaded", description: `${file.name} uploaded` });
+      setDocCategory("Other");
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDocDownload = async (doc: StaffDocument) => {
+    const { data, error } = await supabase.storage
+      .from("staff-documents")
+      .download(doc.file_path);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = doc.file_name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDocDelete = async (doc: StaffDocument) => {
+    try {
+      await supabase.storage.from("staff-documents").remove([doc.file_path]);
+      await supabase.from("staff_documents").delete().eq("id", doc.id);
+      toast({ title: "Deleted", description: `${doc.file_name} removed` });
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const handleSubmitHoliday = async (e: React.FormEvent) => {
@@ -622,6 +697,65 @@ export default function StaffProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Staff Documents */}
+      {canView && (
+        <div className="glass-panel rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText size={16} className="text-primary" />
+              <h3 className="text-sm font-mono font-bold text-foreground">Documents</h3>
+              <span className="text-xs text-muted-foreground">{documents.length} files</span>
+            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={docCategory}
+                  onChange={e => setDocCategory(e.target.value)}
+                  className="h-7 rounded border border-input bg-card px-2 text-[10px] text-foreground appearance-none"
+                >
+                  {DOC_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <label className="flex items-center gap-1.5 h-7 rounded px-2 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer">
+                  <Upload size={12} />
+                  {uploadingDoc ? "Uploading..." : "Upload"}
+                  <input type="file" className="hidden" onChange={handleDocUpload} disabled={uploadingDoc} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt" />
+                </label>
+              </div>
+            )}
+          </div>
+
+          {documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No documents uploaded.</p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map(doc => (
+                <div key={doc.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText size={14} className="text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground truncate">{doc.file_name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {doc.category} · {format(new Date(doc.created_at), "dd MMM yyyy")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => handleDocDownload(doc)} className="p-1.5 rounded text-muted-foreground hover:text-foreground transition-colors">
+                      <Download size={13} />
+                    </button>
+                    {isAdmin && (
+                      <button onClick={() => handleDocDelete(doc)} className="p-1.5 rounded text-muted-foreground hover:text-destructive transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
