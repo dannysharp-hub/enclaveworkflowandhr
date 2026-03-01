@@ -38,6 +38,7 @@ import PandleExportPage from "./pages/PandleExportPage";
 import CashflowForecastPage from "./pages/CashflowForecastPage";
 import ProductionControlPage from "./pages/ProductionControlPage";
 import InstallSignOffPage from "./pages/InstallSignOffPage";
+import ReportsPage from "./pages/ReportsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -87,6 +88,7 @@ const AppRoutes = () => (
               <Route path="/remnants" element={<FeatureGate flag="enable_remnants" featureName="Remnants"><RemnantsPage /></FeatureGate>} />
               <Route path="/materials" element={<MaterialsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
               <Route path="/finance" element={<FeatureGate flag="enable_finance" featureName="Finance"><FinanceDashboardPage /></FeatureGate>} />
               <Route path="/finance/invoices" element={<FeatureGate flag="enable_finance" featureName="Finance"><InvoicesPage /></FeatureGate>} />
               <Route path="/finance/bills" element={<FeatureGate flag="enable_finance" featureName="Finance"><BillsPage /></FeatureGate>} />
