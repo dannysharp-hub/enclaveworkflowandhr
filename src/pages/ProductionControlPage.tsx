@@ -5,12 +5,17 @@ import { useNavigate } from "react-router-dom";
 import { updateAllJobReadiness, type ReadinessResult } from "@/lib/readinessEngine";
 import ReadinessBadge from "@/components/ReadinessBadge";
 import JobStatusBadge from "@/components/JobStatusBadge";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import {
   Activity, RefreshCw, AlertTriangle, ShieldCheck, ShieldAlert, XCircle,
-  Calendar, Wrench, Filter, ChevronDown,
+  Calendar, Filter, ChevronDown, Gauge, Layers, Clock, ArrowRight,
+  TrendingUp, Cpu,
 } from "lucide-react";
 import type { JobStatus } from "@/types";
+import { format, differenceInDays } from "date-fns";
+
+// ── Types ──
 
 interface JobWithReadiness {
   id: string;
@@ -25,36 +30,35 @@ interface JobWithReadiness {
   issues_count: number;
 }
 
+interface MachineConfig {
+  id: string;
+  name: string;
+  department: string;
+  default_available_hours_per_day: number;
+  active: boolean;
+}
+
 const STATUS_ORDER: Record<string, number> = { not_ready: 0, at_risk: 1, ready: 2, production_safe: 3 };
 
-function StatCard({ label, value, color, icon: Icon }: { label: string; value: number; color: string; icon: any }) {
-  return (
-    <div className="p-4 rounded-lg border border-border bg-card">
-      <div className="flex items-center justify-between mb-1">
-        <Icon size={16} className={color} />
-        <span className={cn("text-2xl font-mono font-bold", color)}>{value}</span>
-      </div>
-      <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{label}</p>
-    </div>
-  );
-}
+// ── Main Component ──
 
 export default function ProductionControlPage() {
   const { userRole } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobWithReadiness[]>([]);
+  const [machines, setMachines] = useState<MachineConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterDept, setFilterDept] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
 
   const load = useCallback(async () => {
-    const [jobsRes, readinessRes, stagesRes, issuesRes] = await Promise.all([
+    const [jobsRes, readinessRes, stagesRes, issuesRes, machinesRes] = await Promise.all([
       supabase.from("jobs").select("*").neq("status", "complete").order("created_date", { ascending: false }),
       (supabase.from("production_readiness_status") as any).select("*"),
       supabase.from("job_stages").select("job_id, stage_name, status, due_date"),
       (supabase.from("job_issues") as any).select("job_id, status").eq("status", "open"),
+      supabase.from("machine_config").select("*").eq("active", true),
     ]);
 
     const readinessMap = new Map<string, any>();
@@ -80,6 +84,7 @@ export default function ProductionControlPage() {
     }));
 
     setJobs(combined);
+    setMachines(machinesRes.data ?? []);
     setLoading(false);
   }, []);
 
@@ -92,45 +97,76 @@ export default function ProductionControlPage() {
     setRefreshing(false);
   };
 
-  // Derive stats
-  const stats = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
-    return {
-      total: jobs.length,
-      notReady: jobs.filter(j => j.readiness?.readiness_status === "not_ready").length,
-      atRisk: jobs.filter(j => j.readiness?.readiness_status === "at_risk").length,
-      ready: jobs.filter(j => j.readiness?.readiness_status === "ready").length,
-      safe: jobs.filter(j => j.readiness?.readiness_status === "production_safe").length,
-      noScore: jobs.filter(j => !j.readiness).length,
-      overdue: jobs.filter(j => j.stages.some(s => s.due_date && s.due_date < today && s.status !== "Done")).length,
-      installThisWeek: jobs.filter(j => j.stages.some(s => s.stage_name === "Install" && s.due_date && s.due_date >= today && s.due_date <= weekEnd)).length,
-      totalIssues: jobs.reduce((s, j) => s + j.issues_count, 0),
-    };
-  }, [jobs]);
+  const today = new Date().toISOString().split("T")[0];
+  const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
 
-  // Filter
+  // ── All stages flattened ──
+  const allStages = useMemo(() => jobs.flatMap(j => j.stages.map(s => ({ ...s, jobId: j.id, jobCode: j.job_id }))), [jobs]);
+
+  // ── Stats ──
+  const stats = useMemo(() => ({
+    total: jobs.length,
+    notReady: jobs.filter(j => j.readiness?.readiness_status === "not_ready").length,
+    atRisk: jobs.filter(j => j.readiness?.readiness_status === "at_risk").length,
+    ready: jobs.filter(j => j.readiness?.readiness_status === "ready").length,
+    safe: jobs.filter(j => j.readiness?.readiness_status === "production_safe").length,
+    overdue: jobs.filter(j => j.stages.some(s => s.due_date && s.due_date < today && s.status !== "Done")).length,
+    installThisWeek: jobs.filter(j => j.stages.some(s => s.stage_name === "Install" && s.due_date && s.due_date >= today && s.due_date <= weekEnd)).length,
+    totalIssues: jobs.reduce((s, j) => s + j.issues_count, 0),
+  }), [jobs, today, weekEnd]);
+
+  // ── Stage bottleneck analysis ──
+  const stageBottlenecks = useMemo(() => {
+    const stageNames = [...new Set(allStages.map(s => s.stage_name))];
+    return stageNames.map(name => {
+      const stagesForName = allStages.filter(s => s.stage_name === name);
+      const total = stagesForName.length;
+      const inProgress = stagesForName.filter(s => s.status === "In Progress").length;
+      const waiting = stagesForName.filter(s => s.status === "Not Started").length;
+      const done = stagesForName.filter(s => s.status === "Done").length;
+      const overdue = stagesForName.filter(s => s.due_date && s.due_date < today && s.status !== "Done").length;
+      const utilPct = total > 0 ? Math.round(((inProgress + done) / total) * 100) : 0;
+      return { name, total, inProgress, waiting, done, overdue, utilPct };
+    }).sort((a, b) => b.waiting - a.waiting);
+  }, [allStages, today]);
+
+  // ── Machine utilisation ──
+  const machineUtil = useMemo(() => {
+    return machines.map(m => {
+      const deptStages = allStages.filter(s => s.stage_name === m.department || s.stage_name === m.name);
+      const active = deptStages.filter(s => s.status === "In Progress").length;
+      const queued = deptStages.filter(s => s.status === "Not Started").length;
+      const hoursPerDay = m.default_available_hours_per_day;
+      // Simple utilisation: active jobs / capacity (1 job per hour approx)
+      const utilPct = hoursPerDay > 0 ? Math.min(100, Math.round((active / hoursPerDay) * 100)) : 0;
+      return { ...m, active, queued, utilPct };
+    });
+  }, [machines, allStages]);
+
+  // ── Filtered jobs ──
   const filtered = useMemo(() => {
     let list = [...jobs];
     if (filterStatus !== "all") {
       if (filterStatus === "no_score") list = list.filter(j => !j.readiness);
       else list = list.filter(j => j.readiness?.readiness_status === filterStatus);
     }
-    if (filterDept !== "all") {
-      list = list.filter(j => j.stages.some(s => s.stage_name === filterDept));
-    }
-    // Sort: at_risk first, then not_ready, ready, safe
     list.sort((a, b) => {
       const aS = STATUS_ORDER[a.readiness?.readiness_status || "not_ready"] ?? 0;
       const bS = STATUS_ORDER[b.readiness?.readiness_status || "not_ready"] ?? 0;
       return aS - bS;
     });
     return list;
-  }, [jobs, filterStatus, filterDept]);
+  }, [jobs, filterStatus]);
 
-  const today = new Date().toISOString().split("T")[0];
-
-  if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">Loading production data…</div>;
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-slide-in">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => <div key={i} className="rounded-lg border border-border bg-card p-4 h-20 animate-pulse" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -139,9 +175,11 @@ export default function ProductionControlPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Activity size={20} className="text-primary" />
-            <h2 className="text-2xl font-mono font-bold text-foreground">Production Control</h2>
+            <h1 className="text-2xl font-mono font-bold text-foreground">Production Control</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{stats.total} active jobs · {stats.totalIssues} open issues</p>
+          <p className="text-sm text-muted-foreground">
+            {stats.total} active jobs · {stats.totalIssues} open issues · {stats.overdue} with overdue stages
+          </p>
         </div>
         <button onClick={refresh} disabled={refreshing} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
           <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
@@ -149,14 +187,98 @@ export default function ProductionControlPage() {
         </button>
       </div>
 
-      {/* Stats Row */}
+      {/* Readiness Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="Production Safe" value={stats.safe} color="text-emerald-500" icon={ShieldCheck} />
-        <StatCard label="Ready" value={stats.ready} color="text-primary" icon={ShieldCheck} />
-        <StatCard label="At Risk" value={stats.atRisk} color="text-amber-500" icon={AlertTriangle} />
-        <StatCard label="Not Ready" value={stats.notReady} color="text-destructive" icon={XCircle} />
-        <StatCard label="Overdue Stages" value={stats.overdue} color="text-destructive" icon={ShieldAlert} />
-        <StatCard label="Install This Week" value={stats.installThisWeek} color="text-primary" icon={Calendar} />
+        <KPICard label="Production Safe" value={stats.safe} icon={ShieldCheck} variant="success" />
+        <KPICard label="Ready" value={stats.ready} icon={ShieldCheck} variant="primary" />
+        <KPICard label="At Risk" value={stats.atRisk} icon={AlertTriangle} variant="warning" />
+        <KPICard label="Not Ready" value={stats.notReady} icon={XCircle} variant="danger" />
+        <KPICard label="Overdue Stages" value={stats.overdue} icon={ShieldAlert} variant="danger" />
+        <KPICard label="Install This Week" value={stats.installThisWeek} icon={Calendar} variant="primary" />
+      </div>
+
+      {/* Two-column: Bottlenecks + Machine Utilisation */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Stage Bottleneck Analysis */}
+        <div className="glass-panel rounded-lg">
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <h2 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <Layers size={14} className="text-muted-foreground" /> STAGE PIPELINE
+            </h2>
+            <span className="text-[10px] font-mono text-muted-foreground">{stageBottlenecks.length} stages</span>
+          </div>
+          <div className="divide-y divide-border">
+            {stageBottlenecks.map(s => (
+              <div key={s.name} className="p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-medium text-foreground">{s.name}</span>
+                  <div className="flex items-center gap-3 text-[10px] font-mono">
+                    {s.overdue > 0 && (
+                      <span className="text-destructive flex items-center gap-0.5">
+                        <Clock size={10} /> {s.overdue} overdue
+                      </span>
+                    )}
+                    <span className="text-primary">{s.inProgress} active</span>
+                    <span className="text-muted-foreground">{s.waiting} queued</span>
+                    <span className="text-muted-foreground">{s.done} done</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Progress value={s.utilPct} className="h-1.5 flex-1" />
+                  <span className="text-[10px] font-mono text-muted-foreground w-8 text-right">{s.utilPct}%</span>
+                </div>
+              </div>
+            ))}
+            {stageBottlenecks.length === 0 && (
+              <div className="p-6 text-center text-sm text-muted-foreground">No stage data</div>
+            )}
+          </div>
+        </div>
+
+        {/* Machine Utilisation */}
+        <div className="glass-panel rounded-lg">
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <h2 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <Cpu size={14} className="text-muted-foreground" /> MACHINE UTILISATION
+            </h2>
+            <span className="text-[10px] font-mono text-muted-foreground">{machines.length} machines</span>
+          </div>
+          {machineUtil.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No machines configured. Add machines in Settings.
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {machineUtil.map(m => (
+                <div key={m.id} className="p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-mono font-medium text-foreground">{m.name}</span>
+                      <span className="text-[10px] text-muted-foreground ml-2">{m.department}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] font-mono">
+                      <span className="text-primary">{m.active} active</span>
+                      <span className="text-muted-foreground">{m.queued} queued</span>
+                      <span className="text-muted-foreground">{m.default_available_hours_per_day}h/day</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Progress
+                      value={m.utilPct}
+                      className={cn("h-1.5 flex-1", m.utilPct > 85 && "[&>div]:bg-destructive")}
+                    />
+                    <span className={cn(
+                      "text-[10px] font-mono w-8 text-right font-bold",
+                      m.utilPct > 85 ? "text-destructive" : m.utilPct > 60 ? "text-warning" : "text-primary"
+                    )}>
+                      {m.utilPct}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -164,27 +286,17 @@ export default function ProductionControlPage() {
         <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-mono text-foreground hover:bg-secondary/50 transition-colors">
           <Filter size={12} /> Filters <ChevronDown size={12} className={cn("transition-transform", showFilters && "rotate-180")} />
         </button>
-
         {showFilters && (
-          <>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="all">All Readiness</option>
-              <option value="production_safe">Production Safe</option>
-              <option value="ready">Ready</option>
-              <option value="at_risk">At Risk</option>
-              <option value="not_ready">Not Ready</option>
-              <option value="no_score">Not Calculated</option>
-            </select>
-            <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="all">All Departments</option>
-              <option value="CNC">CNC</option>
-              <option value="Edgebanding">Edgebanding</option>
-              <option value="Assembly">Assembly</option>
-              <option value="Spray">Spray</option>
-              <option value="Install">Install</option>
-            </select>
-          </>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+            <option value="all">All Readiness</option>
+            <option value="production_safe">Production Safe</option>
+            <option value="ready">Ready</option>
+            <option value="at_risk">At Risk</option>
+            <option value="not_ready">Not Ready</option>
+            <option value="no_score">Not Calculated</option>
+          </select>
         )}
+        <span className="text-[10px] font-mono text-muted-foreground ml-auto">{filtered.length} jobs shown</span>
       </div>
 
       {/* Jobs Table */}
@@ -192,7 +304,7 @@ export default function ProductionControlPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border">
+              <tr className="border-b border-border bg-muted/30">
                 <th className="text-left p-3 text-[10px] font-mono font-medium text-muted-foreground uppercase">Job</th>
                 <th className="text-left p-3 text-[10px] font-mono font-medium text-muted-foreground uppercase">Name</th>
                 <th className="text-left p-3 text-[10px] font-mono font-medium text-muted-foreground uppercase">Status</th>
@@ -200,16 +312,16 @@ export default function ProductionControlPage() {
                 <th className="text-left p-3 text-[10px] font-mono font-medium text-muted-foreground uppercase hidden lg:table-cell">Stages</th>
                 <th className="text-center p-3 text-[10px] font-mono font-medium text-muted-foreground uppercase">Issues</th>
                 <th className="text-left p-3 text-[10px] font-mono font-medium text-muted-foreground uppercase hidden md:table-cell">Blockers</th>
+                <th className="p-3 w-8" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map(job => {
                 const r = job.readiness;
-                const overdueStages = job.stages.filter(s => s.due_date && s.due_date < today && s.status !== "Done");
                 return (
-                  <tr key={job.id} className="hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => navigate(`/jobs/${job.id}/builder`)}>
+                  <tr key={job.id} className="hover:bg-secondary/20 transition-colors cursor-pointer group" onClick={() => navigate(`/jobs/${job.id}/builder`)}>
                     <td className="p-3 font-mono text-sm text-primary">{job.job_id}</td>
-                    <td className="p-3 text-sm font-medium text-foreground">{job.job_name}</td>
+                    <td className="p-3 text-sm font-medium text-foreground max-w-[200px] truncate">{job.job_name}</td>
                     <td className="p-3"><JobStatusBadge status={job.status as JobStatus} /></td>
                     <td className="p-3">
                       {r ? (
@@ -226,9 +338,9 @@ export default function ProductionControlPage() {
                           return (
                             <span key={s.stage_name} className={cn(
                               "text-[9px] font-mono px-1.5 py-0.5 rounded-full border",
-                              isDone ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                              isDone ? "bg-primary/10 text-primary border-primary/20" :
                               isOverdue ? "bg-destructive/10 text-destructive border-destructive/20" :
-                              s.status === "In Progress" ? "bg-primary/10 text-primary border-primary/20" :
+                              s.status === "In Progress" ? "bg-warning/10 text-warning border-warning/20" :
                               "bg-muted/50 text-muted-foreground border-border"
                             )}>
                               {s.stage_name}
@@ -250,7 +362,7 @@ export default function ProductionControlPage() {
                       {r && (r as any).blockers?.length > 0 ? (
                         <div className="flex flex-wrap gap-1 max-w-[250px]">
                           {((r as any).blockers || []).slice(0, 2).map((b: string, i: number) => (
-                            <span key={i} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 truncate max-w-[120px]">{b}</span>
+                            <span key={i} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-warning/10 text-warning truncate max-w-[120px]">{b}</span>
                           ))}
                           {((r as any).blockers || []).length > 2 && (
                             <span className="text-[9px] text-muted-foreground">+{(r as any).blockers.length - 2}</span>
@@ -259,6 +371,9 @@ export default function ProductionControlPage() {
                       ) : (
                         <span className="text-[10px] text-muted-foreground">—</span>
                       )}
+                    </td>
+                    <td className="p-3">
+                      <ArrowRight size={12} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </td>
                   </tr>
                 );
@@ -270,6 +385,29 @@ export default function ProductionControlPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Sub-components ──
+
+function KPICard({ label, value, icon: Icon, variant }: {
+  label: string; value: number; icon: any;
+  variant: "success" | "primary" | "warning" | "danger";
+}) {
+  const colors = {
+    success: "text-primary",
+    primary: "text-primary",
+    warning: "text-warning",
+    danger: "text-destructive",
+  };
+  return (
+    <div className="p-4 rounded-lg border border-border bg-card">
+      <div className="flex items-center justify-between mb-1">
+        <Icon size={16} className={colors[variant]} />
+        <span className={cn("text-2xl font-mono font-bold", colors[variant])}>{value}</span>
+      </div>
+      <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{label}</p>
     </div>
   );
 }
