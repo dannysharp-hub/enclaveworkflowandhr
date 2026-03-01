@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Wrench, Users, CalendarDays, FileText, Recycle,
   ChevronLeft, ChevronRight, Menu, X, LogOut, Kanban, ClipboardList,
   Package, ShieldCheck, GraduationCap, Zap, Sun, ShieldAlert,
-  ClipboardCheck, Palmtree, Settings, ChevronDown, Activity,
+  ClipboardCheck, Palmtree, Settings, ChevronDown, Activity, BarChart3,
   BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
   { to: "/reviews", label: "Reviews", icon: ClipboardCheck },
   { to: "/remnants", label: "Remnants", icon: Recycle, featureFlag: "enable_remnants" },
   { to: "/materials", label: "Materials", icon: Package },
+  { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
 
 const financeGroup: NavGroup = {
