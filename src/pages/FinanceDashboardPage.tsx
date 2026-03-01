@@ -4,8 +4,9 @@ import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, subMonths, addDays } from "date-fns";
 import {
   TrendingUp, TrendingDown, DollarSign, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Receipt, Wallet, BadgePoundSterling, BarChart3,
+  ArrowUpRight, ArrowDownRight, Receipt, Wallet, BadgePoundSterling, BarChart3, Download,
 } from "lucide-react";
+import { exportToCsv } from "@/lib/csvExport";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 type DateRange = "this_month" | "last_month" | "custom";
@@ -149,6 +150,15 @@ export default function FinanceDashboardPage() {
           <h2 className="text-2xl font-mono font-bold text-foreground">Finance Dashboard</h2>
           <p className="text-sm text-muted-foreground">{format(from, "d MMM yyyy")} — {format(to, "d MMM yyyy")}</p>
         </div>
+        <div className="flex items-center gap-3">
+        <button
+          onClick={() => {
+            exportToCsv("job_profitability", ["Job ID","Job Name","Revenue","Total Cost","Profit","Margin %"], jobProfitData.map(j => [j.job_id, j.job_name, j.revenue, j.totalCost, j.profit, j.margin.toFixed(1)]));
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        >
+          <Download size={14} /> Export Profitability
+        </button>
         <div className="flex gap-1 bg-muted rounded-lg p-1">
           {(["this_month", "last_month"] as DateRange[]).map(r => (
             <button
@@ -162,6 +172,7 @@ export default function FinanceDashboardPage() {
               {r === "this_month" ? "This Month" : "Last Month"}
             </button>
           ))}
+        </div>
         </div>
       </div>
 

@@ -5,6 +5,8 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Plus, X, Check, Pencil, Search } from "lucide-react";
 import { format } from "date-fns";
+import { exportToCsv, filterByDateRange } from "@/lib/csvExport";
+import CsvExportButton from "@/components/CsvExportButton";
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase tracking-wider";
@@ -119,7 +121,13 @@ export default function InvoicesPage() {
     <div className="space-y-6 animate-slide-in">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-mono font-bold text-foreground">Invoices</h2>
-        {!adding && <button onClick={() => { setAdding(true); setEditId(null); resetForm(); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> New Invoice</button>}
+        <div className="flex gap-2">
+          <CsvExportButton onExport={(from, to) => {
+            const data = filterByDateRange(invoices, "issue_date", from, to);
+            exportToCsv("invoices", ["Invoice #","Customer","Job","Issue Date","Due Date","Amount Ex VAT","VAT","Paid","Status"], data.map(i => [i.invoice_number, custName(i.customer_id), jobCode(i.job_id), i.issue_date, i.due_date, i.amount_ex_vat, i.vat_amount, i.amount_paid, i.status]));
+          }} />
+          {!adding && <button onClick={() => { setAdding(true); setEditId(null); resetForm(); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> New Invoice</button>}
+        </div>
       </div>
 
       {/* Filters */}

@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Plus, X, Check, Pencil } from "lucide-react";
+import { exportToCsv } from "@/lib/csvExport";
+import CsvExportButton from "@/components/CsvExportButton";
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase tracking-wider";
@@ -79,7 +81,12 @@ export default function OverheadsPage() {
           <h2 className="text-2xl font-mono font-bold text-foreground">Overheads</h2>
           <p className="text-sm text-muted-foreground">Total monthly: £{totalMonthly.toLocaleString("en-GB", { maximumFractionDigits: 0 })}</p>
         </div>
-        {!adding && <button onClick={() => { setAdding(true); setEditId(null); resetForm(); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> Add Overhead</button>}
+        <div className="flex gap-2">
+          <CsvExportButton label="Export CSV" onExport={() => {
+            exportToCsv("overheads", ["Name","Category","Frequency","Amount","Monthly Equivalent","Next Due","Active"], overheads.map(o => [o.name, o.category, o.frequency, Number(o.amount), monthlyEquivalent(o).toFixed(2), o.next_due_date, o.active ? "Yes" : "No"]));
+          }} />
+          {!adding && <button onClick={() => { setAdding(true); setEditId(null); resetForm(); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> Add Overhead</button>}
+        </div>
       </div>
 
       {adding && (
