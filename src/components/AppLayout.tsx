@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Wrench, Users, CalendarDays, FileText, Recycle,
   ChevronLeft, ChevronRight, Menu, X, LogOut, Kanban, ClipboardList,
   Package, ShieldCheck, GraduationCap, Zap, Sun, ShieldAlert,
-  ClipboardCheck, Palmtree, Settings, ChevronDown,
+  ClipboardCheck, Palmtree, Settings, ChevronDown, Activity,
   BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,7 @@ const navItems: NavItem[] = [
   { to: "/my-work", label: "My Work", icon: ClipboardList },
   { to: "/workflow", label: "Workflow", icon: Kanban },
   { to: "/jobs", label: "Jobs", icon: Wrench },
+  { to: "/production", label: "Production", icon: Activity },
   { to: "/staff", label: "Staff", icon: Users },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/holiday-calendar", label: "Holiday Cal", icon: Palmtree },

@@ -1,0 +1,1 @@
+ALTER TABLE public.production_readiness_status ADD COLUMN IF NOT EXISTS blockers jsonb NOT NULL DEFAULT '[]'::jsonb;

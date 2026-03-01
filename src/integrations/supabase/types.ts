@@ -2067,6 +2067,7 @@ export type Database = {
       production_readiness_status: {
         Row: {
           assembly_ready: boolean
+          blockers: Json
           cnc_ready: boolean
           created_at: string
           edge_ready: boolean
@@ -2085,6 +2086,7 @@ export type Database = {
         }
         Insert: {
           assembly_ready?: boolean
+          blockers?: Json
           cnc_ready?: boolean
           created_at?: string
           edge_ready?: boolean
@@ -2103,6 +2105,7 @@ export type Database = {
         }
         Update: {
           assembly_ready?: boolean
+          blockers?: Json
           cnc_ready?: boolean
           created_at?: string
           edge_ready?: boolean
