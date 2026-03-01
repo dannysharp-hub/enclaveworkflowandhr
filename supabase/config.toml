@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.onboard-tenant]
 verify_jwt = false
+
+[functions.due-date-alerts]
+verify_jwt = false
