@@ -1,7 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import JobStatusBadge from "@/components/JobStatusBadge";
-import { Plus, Search, Filter } from "lucide-react";
+import JobDialog from "@/components/JobDialog";
+import { Plus, Search } from "lucide-react";
 import type { JobStatus } from "@/types";
 
 interface DbJob {
@@ -16,31 +18,27 @@ interface DbJob {
 }
 
 export default function JobsPage() {
+  const { userRole } = useAuth();
   const [jobs, setJobs] = useState<DbJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editJob, setEditJob] = useState<DbJob | null>(null);
 
-  useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase
-        .from("jobs")
-        .select("*")
-        .order("created_date", { ascending: false });
-      setJobs(data ?? []);
-      setLoading(false);
-    };
-    fetch();
+  const canManage = userRole === "admin" || userRole === "engineer" || userRole === "supervisor";
+
+  const fetchJobs = useCallback(async () => {
+    const { data } = await supabase.from("jobs").select("*").order("created_date", { ascending: false });
+    setJobs(data ?? []);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return jobs;
     const q = search.toLowerCase();
-    return jobs.filter(
-      j =>
-        j.job_id.toLowerCase().includes(q) ||
-        j.job_name.toLowerCase().includes(q) ||
-        j.status.toLowerCase().includes(q)
-    );
+    return jobs.filter(j => j.job_id.toLowerCase().includes(q) || j.job_name.toLowerCase().includes(q) || j.status.toLowerCase().includes(q));
   }, [jobs, search]);
 
   return (
@@ -52,22 +50,17 @@ export default function JobsPage() {
             {jobs.length} job{jobs.length !== 1 ? "s" : ""} · {jobs.filter(j => j.status !== "complete").length} active
           </p>
         </div>
-        <button className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-          <Plus size={16} />
-          New Job
-        </button>
+        {canManage && (
+          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            <Plus size={16} /> New Job
+          </button>
+        )}
       </div>
 
       <div className="flex gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full h-10 rounded-md border border-input bg-card pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+          <input type="text" placeholder="Search jobs..." value={search} onChange={e => setSearch(e.target.value)} className="w-full h-10 rounded-md border border-input bg-card pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
         </div>
       </div>
 
@@ -93,7 +86,7 @@ export default function JobsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map(job => (
-                  <tr key={job.id} className="hover:bg-secondary/30 transition-colors cursor-pointer">
+                  <tr key={job.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => canManage && setEditJob(job)}>
                     <td className="p-4 font-mono text-sm text-primary">{job.job_id}</td>
                     <td className="p-4 text-sm font-medium text-foreground">{job.job_name}</td>
                     <td className="p-4 text-sm text-muted-foreground hidden sm:table-cell">{job.created_date}</td>
@@ -107,6 +100,9 @@ export default function JobsPage() {
           </div>
         )}
       </div>
+
+      <JobDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={fetchJobs} />
+      {editJob && <JobDialog open={!!editJob} onOpenChange={o => { if (!o) setEditJob(null); }} onSuccess={fetchJobs} job={editJob} />}
     </div>
   );
 }

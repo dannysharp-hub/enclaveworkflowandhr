@@ -1,5 +1,7 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import EventDialog from "@/components/EventDialog";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
@@ -26,37 +28,39 @@ const eventTypeColors: Record<string, string> = {
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function CalendarPage() {
+  const { userRole } = useAuth();
   const [events, setEvents] = useState<DbEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState<DbEvent | null>(null);
 
-  useEffect(() => {
-    const fetch = async () => {
-      const start = weekStart.toISOString();
-      const end = addDays(weekStart, 7).toISOString();
-      const { data } = await supabase
-        .from("calendar_events")
-        .select("*")
-        .gte("start_datetime", start)
-        .lte("start_datetime", end)
-        .order("start_datetime");
-      setEvents(data ?? []);
-      setLoading(false);
-    };
-    fetch();
+  const canManage = userRole === "admin" || userRole === "supervisor" || userRole === "office";
+
+  const fetchEvents = useCallback(async () => {
+    const start = weekStart.toISOString();
+    const end = addDays(weekStart, 7).toISOString();
+    const { data } = await supabase
+      .from("calendar_events")
+      .select("*")
+      .gte("start_datetime", start)
+      .lte("start_datetime", end)
+      .order("start_datetime");
+    setEvents(data ?? []);
+    setLoading(false);
   }, [weekStart]);
 
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+
   const weekDates = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, i) => {
-        const d = addDays(weekStart, i);
-        return { day: days[i], date: d.getDate(), full: d, iso: format(d, "yyyy-MM-dd") };
-      }),
+    () => Array.from({ length: 7 }, (_, i) => {
+      const d = addDays(weekStart, i);
+      return { day: days[i], date: d.getDate(), full: d, iso: format(d, "yyyy-MM-dd") };
+    }),
     [weekStart]
   );
 
   const today = new Date();
-
   const prevWeek = () => setWeekStart(addDays(weekStart, -7));
   const nextWeek = () => setWeekStart(addDays(weekStart, 7));
 
@@ -67,10 +71,11 @@ export default function CalendarPage() {
           <h2 className="text-2xl font-mono font-bold text-foreground">Calendar</h2>
           <p className="text-sm text-muted-foreground">Schedule, holidays and production events</p>
         </div>
-        <button className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-          <Plus size={16} />
-          New Event
-        </button>
+        {canManage && (
+          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            <Plus size={16} /> New Event
+          </button>
+        )}
       </div>
 
       <div className="flex items-center justify-between glass-panel rounded-lg px-4 py-3">
@@ -103,6 +108,7 @@ export default function CalendarPage() {
                     {dayEvents.map(event => (
                       <div
                         key={event.id}
+                        onClick={() => canManage && setEditEvent(event)}
                         className={cn(
                           "rounded-md border-l-2 p-2 text-[10px] leading-tight cursor-pointer",
                           eventTypeColors[event.event_type] || "bg-muted border-muted-foreground"
@@ -126,7 +132,7 @@ export default function CalendarPage() {
             ) : (
               <div className="divide-y divide-border">
                 {events.map(event => (
-                  <div key={event.id} className="p-4 flex items-center gap-3">
+                  <div key={event.id} className="p-4 flex items-center gap-3 cursor-pointer" onClick={() => canManage && setEditEvent(event)}>
                     <div className={cn("w-2 h-8 rounded-full shrink-0", eventTypeColors[event.event_type]?.split(" ")[0])} />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">{event.title}</p>
@@ -141,6 +147,9 @@ export default function CalendarPage() {
           </div>
         </>
       )}
+
+      <EventDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={fetchEvents} />
+      {editEvent && <EventDialog open={!!editEvent} onOpenChange={o => { if (!o) setEditEvent(null); }} onSuccess={fetchEvents} event={editEvent} />}
     </div>
   );
 }
