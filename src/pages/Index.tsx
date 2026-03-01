@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Wrench, CalendarDays, Recycle, AlertTriangle, ShieldCheck, GraduationCap, Users, Clock, TrendingDown, ClipboardCheck } from "lucide-react";
+import { Wrench, CalendarDays, Recycle, AlertTriangle, ShieldCheck, GraduationCap, Users, Clock, TrendingDown, ClipboardCheck, Receipt } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import type { JobStatus } from "@/types";
 
 function daysUntilExpiry(d: string | null): number | null {
@@ -14,6 +15,7 @@ function daysUntilExpiry(d: string | null): number | null {
 }
 
 export default function Dashboard() {
+  const { flags } = useFeatureFlags();
   const [stats, setStats] = useState({ activeJobs: 0, inProgressStages: 0, pendingHolidays: 0, availableRemnants: 0 });
   const [jobs, setJobs] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
@@ -22,11 +24,13 @@ export default function Dashboard() {
   const [receipts, setReceipts] = useState<any[]>([]);
   const [training, setTraining] = useState<any[]>([]);
   const [reviewsData, setReviewsData] = useState<any[]>([]);
+  const [overdueInvoices, setOverdueInvoices] = useState<any[]>([]);
+  const [overdueBills, setOverdueBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      const [jobsRes, stagesRes, holidaysRes, remnantsRes, filesRes, profilesRes, receiptsRes, trainingRes, reviewsRes] = await Promise.all([
+      const baseFetches = await Promise.all([
         supabase.from("jobs").select("*").neq("status", "complete").order("created_date", { ascending: false }),
         supabase.from("job_stages").select("*").eq("status", "In Progress"),
         supabase.from("holiday_requests").select("*").order("created_at", { ascending: false }),
@@ -37,6 +41,17 @@ export default function Dashboard() {
         supabase.from("training_records").select("*"),
         supabase.from("reviews").select("*"),
       ]);
+      const [jobsRes, stagesRes, holidaysRes, remnantsRes, filesRes, profilesRes, receiptsRes, trainingRes, reviewsRes] = baseFetches;
+
+      const today = new Date().toISOString().split("T")[0];
+      if (flags.enable_finance) {
+        const [invRes, billRes] = await Promise.all([
+          supabase.from("invoices").select("id, invoice_number, amount_ex_vat, vat_amount, amount_paid, status, due_date").neq("status", "paid").neq("status", "cancelled"),
+          supabase.from("bills").select("id, bill_reference, amount_ex_vat, vat_amount, amount_paid, status, due_date").neq("status", "paid").neq("status", "cancelled"),
+        ]);
+        setOverdueInvoices((invRes.data ?? []).filter((i: any) => i.due_date < today));
+        setOverdueBills((billRes.data ?? []).filter((b: any) => b.due_date < today));
+      }
 
       setJobs(jobsRes.data ?? []);
       setHolidays(holidaysRes.data ?? []);
@@ -54,7 +69,7 @@ export default function Dashboard() {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [flags.enable_finance]);
 
   // === HR Metrics ===
   const hrMetrics = useMemo(() => {
@@ -205,6 +220,27 @@ export default function Dashboard() {
             {reviewMetrics.upcoming > 0 && <> · <span className="font-medium text-warning">{reviewMetrics.upcoming} due within 14 days</span></>}
           </span>
           <Link to="/reviews" className="ml-auto text-xs text-primary hover:underline font-medium">View →</Link>
+        </div>
+      )}
+
+      {/* Overdue Invoices & Bills */}
+      {(overdueInvoices.length > 0 || overdueBills.length > 0) && (
+        <div className="rounded-lg px-4 py-3 flex items-center gap-3 bg-destructive/10 border border-destructive/20">
+          <Receipt size={16} className="text-destructive" />
+          <span className="text-sm text-foreground">
+            {overdueInvoices.length > 0 && (
+              <span className="font-medium text-destructive">
+                {overdueInvoices.length} overdue invoice{overdueInvoices.length !== 1 ? "s" : ""} (£{overdueInvoices.reduce((s, i) => s + (Number(i.amount_ex_vat) + Number(i.vat_amount) - Number(i.amount_paid || 0)), 0).toLocaleString()})
+              </span>
+            )}
+            {overdueInvoices.length > 0 && overdueBills.length > 0 && " · "}
+            {overdueBills.length > 0 && (
+              <span className="font-medium text-warning">
+                {overdueBills.length} overdue bill{overdueBills.length !== 1 ? "s" : ""} (£{overdueBills.reduce((s, b) => s + (Number(b.amount_ex_vat) + Number(b.vat_amount) - Number(b.amount_paid || 0)), 0).toLocaleString()})
+              </span>
+            )}
+          </span>
+          <Link to="/finance" className="ml-auto text-xs text-primary hover:underline font-medium">Finance →</Link>
         </div>
       )}
 
