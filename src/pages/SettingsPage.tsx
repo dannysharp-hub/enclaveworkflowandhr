@@ -4,7 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload } from "lucide-react";
+import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload, FileText } from "lucide-react";
+import JobCardTemplateManager from "@/components/JobCardTemplateManager";
 
 // ─── Types ────────────────────────────────────────────
 interface DepartmentConfig {
@@ -42,6 +43,7 @@ const TABS = [
   { key: "departments", label: "Departments", icon: Building2 },
   { key: "stages", label: "Stages", icon: Kanban },
   { key: "machines", label: "Machines", icon: Cpu },
+  { key: "job-cards", label: "Job Cards", icon: FileText },
   { key: "flags", label: "Feature Flags", icon: ToggleLeft },
 ] as const;
 
@@ -125,6 +127,7 @@ export default function SettingsPage() {
           {tab === "departments" && <DepartmentsTab data={departments} onRefresh={fetchAll} />}
           {tab === "stages" && <StagesTab data={stages} onRefresh={fetchAll} />}
           {tab === "machines" && <MachinesTab data={machines} departments={departments} onRefresh={fetchAll} />}
+          {tab === "job-cards" && <JobCardTemplateManager />}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
         </>
       )}
