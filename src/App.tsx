@@ -40,9 +40,13 @@ import ProductionControlPage from "./pages/ProductionControlPage";
 import InstallSignOffPage from "./pages/InstallSignOffPage";
 import ReportsPage from "./pages/ReportsPage";
 import SmartQuotingPage from "./pages/SmartQuotingPage";
+import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
+import SupplierPerformancePage from "./pages/SupplierPerformancePage";
 import ClientPortalLoginPage from "./pages/portal/ClientPortalLoginPage";
 import ClientPortalDashboardPage from "./pages/portal/ClientPortalDashboardPage";
 import ClientPortalJobPage from "./pages/portal/ClientPortalJobPage";
+import SupplierPortalLoginPage from "./pages/portal/SupplierPortalLoginPage";
+import SupplierPortalDashboardPage from "./pages/portal/SupplierPortalDashboardPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +73,9 @@ const AppRoutes = () => (
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
     <Route path="/portal/job/:jobId" element={<ClientPortalJobPage />} />
+    {/* Supplier Portal routes */}
+    <Route path="/supplier/login" element={<SupplierPortalLoginPage />} />
+    <Route path="/supplier/dashboard" element={<SupplierPortalDashboardPage />} />
     <Route
       path="/*"
       element={
@@ -108,6 +115,8 @@ const AppRoutes = () => (
               <Route path="/finance/pandle" element={<FeatureGate flag="enable_finance" featureName="Finance"><PandlePage /></FeatureGate>} />
               <Route path="/finance/pandle/export" element={<FeatureGate flag="enable_finance" featureName="Finance"><PandleExportPage /></FeatureGate>} />
               <Route path="/finance/forecast" element={<FeatureGate flag="enable_finance" featureName="Finance"><CashflowForecastPage /></FeatureGate>} />
+              <Route path="/purchasing" element={<PurchaseOrdersPage />} />
+              <Route path="/purchasing/performance" element={<SupplierPerformancePage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>

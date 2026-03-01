@@ -2575,6 +2575,220 @@ export type Database = {
           },
         ]
       }
+      purchase_order_items: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          job_cost_category: string
+          po_id: string
+          quantity: number
+          received_quantity: number
+          status: string
+          tenant_id: string
+          total_ex_vat: number
+          unit_cost_ex_vat: number
+          updated_at: string
+          vat_rate: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          job_cost_category?: string
+          po_id: string
+          quantity?: number
+          received_quantity?: number
+          status?: string
+          tenant_id: string
+          total_ex_vat?: number
+          unit_cost_ex_vat?: number
+          updated_at?: string
+          vat_rate?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          job_cost_category?: string
+          po_id?: string
+          quantity?: number
+          received_quantity?: number
+          status?: string
+          tenant_id?: string
+          total_ex_vat?: number
+          unit_cost_ex_vat?: number
+          updated_at?: string
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          confirmed_delivery_date: string | null
+          created_at: string
+          created_by_staff_id: string | null
+          delivery_address: string | null
+          delivery_note_reference: string | null
+          expected_delivery_date: string | null
+          id: string
+          job_id: string | null
+          linked_bill_id: string | null
+          notes: string | null
+          order_date: string
+          po_number: string
+          status: string
+          supplier_id: string
+          tenant_id: string
+          total_ex_vat: number
+          total_inc_vat: number
+          tracking_reference: string | null
+          updated_at: string
+          vat_amount: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          confirmed_delivery_date?: string | null
+          created_at?: string
+          created_by_staff_id?: string | null
+          delivery_address?: string | null
+          delivery_note_reference?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          job_id?: string | null
+          linked_bill_id?: string | null
+          notes?: string | null
+          order_date?: string
+          po_number: string
+          status?: string
+          supplier_id: string
+          tenant_id: string
+          total_ex_vat?: number
+          total_inc_vat?: number
+          tracking_reference?: string | null
+          updated_at?: string
+          vat_amount?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          confirmed_delivery_date?: string | null
+          created_at?: string
+          created_by_staff_id?: string | null
+          delivery_address?: string | null
+          delivery_note_reference?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          job_id?: string | null
+          linked_bill_id?: string | null
+          notes?: string | null
+          order_date?: string
+          po_number?: string
+          status?: string
+          supplier_id?: string
+          tenant_id?: string
+          total_ex_vat?: number
+          total_inc_vat?: number
+          tracking_reference?: string | null
+          updated_at?: string
+          vat_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_linked_bill_id_fkey"
+            columns: ["linked_bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchasing_settings: {
+        Row: {
+          approver_role: string | null
+          auto_approve_under_amount: boolean | null
+          created_at: string
+          default_delivery_address: string | null
+          id: string
+          po_number_next_seq: number | null
+          po_number_prefix: string | null
+          require_po_approval_over_amount: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          approver_role?: string | null
+          auto_approve_under_amount?: boolean | null
+          created_at?: string
+          default_delivery_address?: string | null
+          id?: string
+          po_number_next_seq?: number | null
+          po_number_prefix?: string | null
+          require_po_approval_over_amount?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          approver_role?: string | null
+          auto_approve_under_amount?: boolean | null
+          created_at?: string
+          default_delivery_address?: string | null
+          id?: string
+          po_number_next_seq?: number | null
+          po_number_prefix?: string | null
+          require_po_approval_over_amount?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchasing_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_templates: {
         Row: {
           active: boolean
@@ -3132,6 +3346,234 @@ export type Database = {
           },
           {
             foreignKeyName: "stage_skill_requirements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_access_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          po_id: string | null
+          revoked: boolean
+          supplier_id: string
+          supplier_user_id: string
+          tenant_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          po_id?: string | null
+          revoked?: boolean
+          supplier_id: string
+          supplier_user_id: string
+          tenant_id: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          po_id?: string | null
+          revoked?: boolean
+          supplier_id?: string
+          supplier_user_id?: string
+          tenant_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_access_tokens_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_access_tokens_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_access_tokens_supplier_user_id_fkey"
+            columns: ["supplier_user_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_access_tokens_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          po_id: string | null
+          supplier_user_id: string
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          po_id?: string | null
+          supplier_user_id: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          po_id?: string | null
+          supplier_user_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_activity_log_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_activity_log_supplier_user_id_fkey"
+            columns: ["supplier_user_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_activity_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_performance: {
+        Row: {
+          average_delivery_delay_days: number
+          average_order_value: number
+          discrepancy_rate_percent: number
+          id: string
+          last_calculated_at: string
+          on_time_delivery_percent: number
+          supplier_id: string
+          tenant_id: string
+          total_pos: number
+        }
+        Insert: {
+          average_delivery_delay_days?: number
+          average_order_value?: number
+          discrepancy_rate_percent?: number
+          id?: string
+          last_calculated_at?: string
+          on_time_delivery_percent?: number
+          supplier_id: string
+          tenant_id: string
+          total_pos?: number
+        }
+        Update: {
+          average_delivery_delay_days?: number
+          average_order_value?: number
+          discrepancy_rate_percent?: number
+          id?: string
+          last_calculated_at?: string
+          on_time_delivery_percent?: number
+          supplier_id?: string
+          tenant_id?: string
+          total_pos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_performance_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_performance_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_users: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          portal_access_enabled: boolean
+          supplier_id: string
+          supplier_role: string
+          tenant_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          portal_access_enabled?: boolean
+          supplier_id: string
+          supplier_role?: string
+          tenant_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          portal_access_enabled?: boolean
+          supplier_id?: string
+          supplier_role?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_users_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_users_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
