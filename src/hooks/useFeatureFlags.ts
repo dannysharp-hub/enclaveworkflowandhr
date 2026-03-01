@@ -9,6 +9,8 @@ export interface FeatureFlags {
   enable_drive_integration: boolean;
   enable_notifications: boolean;
   enable_finance: boolean;
+  enable_client_portal: boolean;
+  enable_smart_quoting: boolean;
   [key: string]: boolean;
 }
 
@@ -19,6 +21,8 @@ const DEFAULTS: FeatureFlags = {
   enable_drive_integration: false,
   enable_notifications: false,
   enable_finance: false,
+  enable_client_portal: false,
+  enable_smart_quoting: false,
 };
 
 export function useFeatureFlags() {

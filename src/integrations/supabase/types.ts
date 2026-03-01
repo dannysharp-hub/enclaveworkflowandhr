@@ -446,6 +446,272 @@ export type Database = {
           },
         ]
       }
+      client_access_tokens: {
+        Row: {
+          client_user_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          job_id: string | null
+          revoked: boolean
+          tenant_id: string
+          token: string
+        }
+        Insert: {
+          client_user_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          job_id?: string | null
+          revoked?: boolean
+          tenant_id: string
+          token?: string
+        }
+        Update: {
+          client_user_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          job_id?: string | null
+          revoked?: boolean
+          tenant_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_access_tokens_client_user_id_fkey"
+            columns: ["client_user_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_access_tokens_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_access_tokens_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_activity_log: {
+        Row: {
+          action: string
+          client_user_id: string
+          created_at: string
+          id: string
+          job_id: string | null
+          metadata: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          client_user_id: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          metadata?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          client_user_id?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          metadata?: Json | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_activity_log_client_user_id_fkey"
+            columns: ["client_user_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_activity_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_activity_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_job_documents: {
+        Row: {
+          file_asset_id: string
+          id: string
+          job_id: string
+          shared_at: string
+          shared_by: string | null
+          tenant_id: string
+          visible_to_client: boolean
+        }
+        Insert: {
+          file_asset_id: string
+          id?: string
+          job_id: string
+          shared_at?: string
+          shared_by?: string | null
+          tenant_id: string
+          visible_to_client?: boolean
+        }
+        Update: {
+          file_asset_id?: string
+          id?: string
+          job_id?: string
+          shared_at?: string
+          shared_by?: string | null
+          tenant_id?: string
+          visible_to_client?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_job_documents_file_asset_id_fkey"
+            columns: ["file_asset_id"]
+            isOneToOne: false
+            referencedRelation: "file_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_job_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_job_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_portal_settings: {
+        Row: {
+          allow_remote_signoff: boolean
+          allow_snag_submission: boolean
+          created_at: string
+          enable_client_portal: boolean
+          id: string
+          portal_branding: Json
+          show_financial_info: boolean
+          show_production_readiness: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          allow_remote_signoff?: boolean
+          allow_snag_submission?: boolean
+          created_at?: string
+          enable_client_portal?: boolean
+          id?: string
+          portal_branding?: Json
+          show_financial_info?: boolean
+          show_production_readiness?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          allow_remote_signoff?: boolean
+          allow_snag_submission?: boolean
+          created_at?: string
+          enable_client_portal?: boolean
+          id?: string
+          portal_branding?: Json
+          show_financial_info?: boolean
+          show_production_readiness?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_users: {
+        Row: {
+          active: boolean
+          client_role: string
+          created_at: string
+          customer_id: string
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          portal_access_enabled: boolean
+          tenant_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          client_role?: string
+          created_at?: string
+          customer_id: string
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          portal_access_enabled?: boolean
+          tenant_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          client_role?: string
+          created_at?: string
+          customer_id?: string
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          portal_access_enabled?: boolean
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           active: boolean
@@ -1520,6 +1786,87 @@ export type Database = {
           },
         ]
       }
+      job_performance_snapshots: {
+        Row: {
+          assembly_hours: number
+          cnc_hours: number
+          completed_at: string
+          created_at: string
+          external_cost: number
+          gross_profit: number
+          id: string
+          install_hours: number
+          job_id: string
+          job_type: string
+          labour_cost: number
+          margin_percent: number
+          material_cost: number
+          sheets_scrapped: number
+          sheets_used: number
+          tenant_id: string
+          total_labour_hours: number
+          total_machine_hours: number
+          total_revenue_ex_vat: number
+        }
+        Insert: {
+          assembly_hours?: number
+          cnc_hours?: number
+          completed_at?: string
+          created_at?: string
+          external_cost?: number
+          gross_profit?: number
+          id?: string
+          install_hours?: number
+          job_id: string
+          job_type?: string
+          labour_cost?: number
+          margin_percent?: number
+          material_cost?: number
+          sheets_scrapped?: number
+          sheets_used?: number
+          tenant_id: string
+          total_labour_hours?: number
+          total_machine_hours?: number
+          total_revenue_ex_vat?: number
+        }
+        Update: {
+          assembly_hours?: number
+          cnc_hours?: number
+          completed_at?: string
+          created_at?: string
+          external_cost?: number
+          gross_profit?: number
+          id?: string
+          install_hours?: number
+          job_id?: string
+          job_type?: string
+          labour_cost?: number
+          margin_percent?: number
+          material_cost?: number
+          sheets_scrapped?: number
+          sheets_used?: number
+          tenant_id?: string
+          total_labour_hours?: number
+          total_machine_hours?: number
+          total_revenue_ex_vat?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_performance_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_performance_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_stages: {
         Row: {
           assigned_staff_ids: string[] | null
@@ -2228,6 +2575,59 @@ export type Database = {
           },
         ]
       }
+      quote_templates: {
+        Row: {
+          active: boolean
+          base_labour_markup_percent: number
+          base_material_markup_percent: number
+          base_overhead_percent: number
+          created_at: string
+          hourly_rate: number
+          id: string
+          job_type: string
+          name: string
+          target_margin_percent: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          base_labour_markup_percent?: number
+          base_material_markup_percent?: number
+          base_overhead_percent?: number
+          created_at?: string
+          hourly_rate?: number
+          id?: string
+          job_type?: string
+          name: string
+          target_margin_percent?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          base_labour_markup_percent?: number
+          base_material_markup_percent?: number
+          base_overhead_percent?: number
+          created_at?: string
+          hourly_rate?: number
+          id?: string
+          job_type?: string
+          name?: string
+          target_margin_percent?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       remnants: {
         Row: {
           colour_name: string
@@ -2397,6 +2797,122 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "skills_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      smart_quotes: {
+        Row: {
+          assembly_complexity: string
+          converted_job_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          estimated_cnc_sheets: number
+          estimated_install_days: number
+          estimated_sheets: number
+          external_estimate: number
+          historical_confidence: number | null
+          id: string
+          job_type: string
+          labour_estimate: number
+          margin_sensitivity: Json
+          material_estimate: number
+          overhead_estimate: number
+          special_factors: Json
+          status: string
+          suggested_deposit: number
+          suggested_quote_value: number
+          target_margin_percent: number
+          template_id: string | null
+          tenant_id: string
+          title: string
+          updated_at: string
+          use_historical_data: boolean
+        }
+        Insert: {
+          assembly_complexity?: string
+          converted_job_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          estimated_cnc_sheets?: number
+          estimated_install_days?: number
+          estimated_sheets?: number
+          external_estimate?: number
+          historical_confidence?: number | null
+          id?: string
+          job_type?: string
+          labour_estimate?: number
+          margin_sensitivity?: Json
+          material_estimate?: number
+          overhead_estimate?: number
+          special_factors?: Json
+          status?: string
+          suggested_deposit?: number
+          suggested_quote_value?: number
+          target_margin_percent?: number
+          template_id?: string | null
+          tenant_id: string
+          title: string
+          updated_at?: string
+          use_historical_data?: boolean
+        }
+        Update: {
+          assembly_complexity?: string
+          converted_job_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          estimated_cnc_sheets?: number
+          estimated_install_days?: number
+          estimated_sheets?: number
+          external_estimate?: number
+          historical_confidence?: number | null
+          id?: string
+          job_type?: string
+          labour_estimate?: number
+          margin_sensitivity?: Json
+          material_estimate?: number
+          overhead_estimate?: number
+          special_factors?: Json
+          status?: string
+          suggested_deposit?: number
+          suggested_quote_value?: number
+          target_margin_percent?: number
+          template_id?: string | null
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          use_historical_data?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "smart_quotes_converted_job_id_fkey"
+            columns: ["converted_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "smart_quotes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "smart_quotes_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "quote_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "smart_quotes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

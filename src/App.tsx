@@ -39,6 +39,10 @@ import CashflowForecastPage from "./pages/CashflowForecastPage";
 import ProductionControlPage from "./pages/ProductionControlPage";
 import InstallSignOffPage from "./pages/InstallSignOffPage";
 import ReportsPage from "./pages/ReportsPage";
+import SmartQuotingPage from "./pages/SmartQuotingPage";
+import ClientPortalLoginPage from "./pages/portal/ClientPortalLoginPage";
+import ClientPortalDashboardPage from "./pages/portal/ClientPortalDashboardPage";
+import ClientPortalJobPage from "./pages/portal/ClientPortalJobPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +65,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<LoginPage />} />
+    {/* Client Portal routes (separate from main app) */}
+    <Route path="/portal/login" element={<ClientPortalLoginPage />} />
+    <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
+    <Route path="/portal/job/:jobId" element={<ClientPortalJobPage />} />
     <Route
       path="/*"
       element={
@@ -89,6 +97,7 @@ const AppRoutes = () => (
               <Route path="/materials" element={<MaterialsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/quoting" element={<FeatureGate flag="enable_smart_quoting" featureName="Smart Quoting"><SmartQuotingPage /></FeatureGate>} />
               <Route path="/finance" element={<FeatureGate flag="enable_finance" featureName="Finance"><FinanceDashboardPage /></FeatureGate>} />
               <Route path="/finance/invoices" element={<FeatureGate flag="enable_finance" featureName="Finance"><InvoicesPage /></FeatureGate>} />
               <Route path="/finance/bills" element={<FeatureGate flag="enable_finance" featureName="Finance"><BillsPage /></FeatureGate>} />
