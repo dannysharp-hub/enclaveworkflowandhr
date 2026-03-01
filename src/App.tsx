@@ -35,6 +35,7 @@ import CustomersPage from "./pages/CustomersPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import PandlePage from "./pages/PandlePage";
 import PandleExportPage from "./pages/PandleExportPage";
+import CashflowForecastPage from "./pages/CashflowForecastPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -91,6 +92,7 @@ const AppRoutes = () => (
               <Route path="/finance/suppliers" element={<FeatureGate flag="enable_finance" featureName="Finance"><SuppliersPage /></FeatureGate>} />
               <Route path="/finance/pandle" element={<FeatureGate flag="enable_finance" featureName="Finance"><PandlePage /></FeatureGate>} />
               <Route path="/finance/pandle/export" element={<FeatureGate flag="enable_finance" featureName="Finance"><PandleExportPage /></FeatureGate>} />
+              <Route path="/finance/forecast" element={<FeatureGate flag="enable_finance" featureName="Finance"><CashflowForecastPage /></FeatureGate>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>
