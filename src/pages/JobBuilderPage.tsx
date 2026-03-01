@@ -8,6 +8,8 @@ import CsvImportDialog from "@/components/CsvImportDialog";
 import PartRow from "@/components/PartRow";
 import { CsvPart } from "@/lib/csvParser";
 import { generateVCarveExportPack } from "@/lib/vcarveExport";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import JobFinancePanel from "@/components/JobFinancePanel";
 
 interface PartData {
   id?: string;
@@ -35,6 +37,7 @@ export default function JobBuilderPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const { userRole } = useAuth();
+  const { flags } = useFeatureFlags();
   const canEdit = ["admin", "engineer", "supervisor"].includes(userRole || "");
 
   const [job, setJob] = useState<JobInfo | null>(null);
@@ -333,6 +336,11 @@ export default function JobBuilderPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Finance Panel */}
+      {flags.enable_finance && job && (
+        <JobFinancePanel jobId={job.id} jobCode={job.job_id} />
       )}
 
       <CsvImportDialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen} onImport={handleCsvImport} />
