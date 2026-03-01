@@ -71,6 +71,50 @@ export type Database = {
           },
         ]
       }
+      department_config: {
+        Row: {
+          active: boolean
+          coverage_warning_mode: string
+          created_at: string
+          id: string
+          maximum_staff_off_per_day: number
+          minimum_staff_required_per_day: number
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          coverage_warning_mode?: string
+          created_at?: string
+          id?: string
+          maximum_staff_off_per_day?: number
+          minimum_staff_required_per_day?: number
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          coverage_warning_mode?: string
+          created_at?: string
+          id?: string
+          maximum_staff_off_per_day?: number
+          minimum_staff_required_per_day?: number
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       file_assets: {
         Row: {
           acknowledgement_type: string | null
@@ -370,6 +414,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_config: {
+        Row: {
+          active: boolean
+          created_at: string
+          default_available_hours_per_day: number
+          department: string
+          id: string
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          default_available_hours_per_day?: number
+          department?: string
+          id?: string
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          default_available_hours_per_day?: number
+          department?: string
+          id?: string
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_config_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1015,6 +1100,47 @@ export type Database = {
           },
         ]
       }
+      stage_config: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          order_index: number
+          required_skills: string[] | null
+          stage_name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          order_index?: number
+          required_skills?: string[] | null
+          stage_name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          order_index?: number
+          required_skills?: string[] | null
+          stage_name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stage_skill_requirements: {
         Row: {
           created_at: string
@@ -1056,6 +1182,41 @@ export type Database = {
           },
           {
             foreignKeyName: "stage_skill_requirements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_feature_flags: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          flag_name: string
+          id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          flag_name: string
+          id?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          flag_name?: string
+          id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_feature_flags_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
