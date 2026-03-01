@@ -29,6 +29,9 @@ export type Database = {
           job_id: string | null
           last_synced_at: string | null
           notes: string | null
+          pandle_export_batch_id: string | null
+          pandle_exported: boolean
+          pandle_exported_at: string | null
           payment_date: string | null
           status: string
           supplier_id: string
@@ -51,6 +54,9 @@ export type Database = {
           job_id?: string | null
           last_synced_at?: string | null
           notes?: string | null
+          pandle_export_batch_id?: string | null
+          pandle_exported?: boolean
+          pandle_exported_at?: string | null
           payment_date?: string | null
           status?: string
           supplier_id: string
@@ -73,6 +79,9 @@ export type Database = {
           job_id?: string | null
           last_synced_at?: string | null
           notes?: string | null
+          pandle_export_batch_id?: string | null
+          pandle_exported?: boolean
+          pandle_exported_at?: string | null
           payment_date?: string | null
           status?: string
           supplier_id?: string
@@ -87,6 +96,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_pandle_export_batch_id_fkey"
+            columns: ["pandle_export_batch_id"]
+            isOneToOne: false
+            referencedRelation: "export_batches"
             referencedColumns: ["id"]
           },
           {
@@ -243,6 +259,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "department_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      export_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_range_end: string | null
+          date_range_start: string | null
+          export_type: string
+          export_types: string[]
+          id: string
+          record_count: number
+          status_filter: string | null
+          tenant_id: string
+          total_value: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          export_type: string
+          export_types?: string[]
+          id?: string
+          record_count?: number
+          status_filter?: string | null
+          tenant_id: string
+          total_value?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
+          export_type?: string
+          export_types?: string[]
+          id?: string
+          record_count?: number
+          status_filter?: string | null
+          tenant_id?: string
+          total_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_batches_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -493,6 +559,9 @@ export type Database = {
           issue_date: string
           job_id: string | null
           last_synced_at: string | null
+          pandle_export_batch_id: string | null
+          pandle_exported: boolean
+          pandle_exported_at: string | null
           payment_method: string | null
           payment_received_date: string | null
           reference: string | null
@@ -516,6 +585,9 @@ export type Database = {
           issue_date?: string
           job_id?: string | null
           last_synced_at?: string | null
+          pandle_export_batch_id?: string | null
+          pandle_exported?: boolean
+          pandle_exported_at?: string | null
           payment_method?: string | null
           payment_received_date?: string | null
           reference?: string | null
@@ -539,6 +611,9 @@ export type Database = {
           issue_date?: string
           job_id?: string | null
           last_synced_at?: string | null
+          pandle_export_batch_id?: string | null
+          pandle_exported?: boolean
+          pandle_exported_at?: string | null
           payment_method?: string | null
           payment_received_date?: string | null
           reference?: string | null
@@ -561,6 +636,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_pandle_export_batch_id_fkey"
+            columns: ["pandle_export_batch_id"]
+            isOneToOne: false
+            referencedRelation: "export_batches"
             referencedColumns: ["id"]
           },
           {
@@ -873,6 +955,44 @@ export type Database = {
           },
         ]
       }
+      nominal_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          internal_category: string
+          mapping_type: string
+          pandle_nominal_code: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          internal_category: string
+          mapping_type?: string
+          pandle_nominal_code: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          internal_category?: string
+          mapping_type?: string
+          pandle_nominal_code?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nominal_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -962,6 +1082,56 @@ export type Database = {
             foreignKeyName: "overheads_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pandle_settings: {
+        Row: {
+          auto_mark_exported: boolean
+          connector_enabled: boolean
+          created_at: string
+          default_purchase_nominal_code: string
+          default_sales_nominal_code: string
+          default_vat_code_purchases: string
+          default_vat_code_sales: string
+          export_currency: string
+          id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_mark_exported?: boolean
+          connector_enabled?: boolean
+          created_at?: string
+          default_purchase_nominal_code?: string
+          default_sales_nominal_code?: string
+          default_vat_code_purchases?: string
+          default_vat_code_sales?: string
+          export_currency?: string
+          id?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_mark_exported?: boolean
+          connector_enabled?: boolean
+          created_at?: string
+          default_purchase_nominal_code?: string
+          default_sales_nominal_code?: string
+          default_vat_code_purchases?: string
+          default_vat_code_sales?: string
+          export_currency?: string
+          id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pandle_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -1842,6 +2012,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_roles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vat_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          internal_vat_rate: number
+          pandle_vat_code: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          internal_vat_rate: number
+          pandle_vat_code: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          internal_vat_rate?: number
+          pandle_vat_code?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vat_mappings_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
