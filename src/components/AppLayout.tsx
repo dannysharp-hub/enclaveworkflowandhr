@@ -22,6 +22,7 @@ import {
   Sun,
   ShieldAlert,
   ClipboardCheck,
+  Palmtree,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +35,7 @@ const navItems = [
   { to: "/jobs", label: "Jobs", icon: Wrench },
   { to: "/staff", label: "Staff", icon: Users },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
+  { to: "/holiday-calendar", label: "Holiday Cal", icon: Palmtree },
   { to: "/documents", label: "Documents", icon: FileText },
   { to: "/compliance", label: "Compliance", icon: ShieldCheck },
   { to: "/training", label: "Training", icon: GraduationCap },
