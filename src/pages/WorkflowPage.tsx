@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import { GripVertical, User, Calendar } from "lucide-react";
+import { GripVertical, User, Calendar, ShieldAlert } from "lucide-react";
 
 interface Stage {
   id: string;
@@ -75,6 +75,33 @@ export default function WorkflowPage() {
     if (!result.destination || !canManage) return;
     const newStatus = result.destination.droppableId;
     const stageId = result.draggableId;
+    const stage = stages.find(s => s.id === stageId);
+    if (!stage) return;
+
+    // Check machine auth when moving to "In Progress"
+    if (newStatus === "In Progress" && stage.assigned_staff_ids && stage.assigned_staff_ids.length > 0) {
+      const warnings: string[] = [];
+      for (const staffId of stage.assigned_staff_ids) {
+        const { data } = await supabase.rpc("check_staff_stage_authorisation", {
+          _staff_id: staffId,
+          _stage_name: stage.stage_name,
+        });
+        const row = data?.[0];
+        if (row && !row.authorised) {
+          const missing = (row.missing_skills as any[]) ?? [];
+          const staffName = profiles[staffId]?.split(" ")[0] || "Staff";
+          const skillNames = missing.map((m: any) => `${m.skill_name} (needs ${m.required})`).join(", ");
+          warnings.push(`${staffName}: missing ${skillNames}`);
+        }
+      }
+      if (warnings.length > 0) {
+        toast({
+          title: "⚠️ Machine Auth Warning",
+          description: warnings.join(" · "),
+          variant: "destructive",
+        });
+      }
+    }
 
     // Optimistic update
     setStages(prev =>
