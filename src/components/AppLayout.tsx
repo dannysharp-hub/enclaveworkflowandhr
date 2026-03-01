@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { useTenantBranding } from "@/hooks/useTenantBranding";
 import {
   LayoutDashboard,
   Wrench,
@@ -62,6 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { profile, userRole, signOut } = useAuth();
   const { flags } = useFeatureFlags();
+  const { branding } = useTenantBranding();
 
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map((n: string) => n[0]).join("")
@@ -97,18 +99,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex h-16 items-center justify-between px-4 border-b border-border">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-                <span className="font-mono text-sm font-bold text-primary-foreground">E</span>
+              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center overflow-hidden shrink-0">
+                {branding.logoUrl ? (
+                  <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="font-mono text-sm font-bold text-primary-foreground">
+                    {branding.companyName?.[0] || "E"}
+                  </span>
+                )}
               </div>
               <div>
-                <p className="font-mono text-sm font-bold text-foreground leading-none">ENCLAVE</p>
-                <p className="text-[10px] text-muted-foreground tracking-widest">CABINETRY</p>
+                <p className="font-mono text-sm font-bold text-foreground leading-none">{branding.companyName}</p>
+                <p className="text-[10px] text-muted-foreground tracking-widest">{branding.subtitle}</p>
               </div>
             </div>
           )}
           {collapsed && (
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center mx-auto">
-              <span className="font-mono text-sm font-bold text-primary-foreground">E</span>
+            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center mx-auto overflow-hidden">
+              {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <span className="font-mono text-sm font-bold text-primary-foreground">
+                  {branding.companyName?.[0] || "E"}
+                </span>
+              )}
             </div>
           )}
           <button
@@ -206,7 +220,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <h1 className="font-mono text-lg font-bold text-foreground">
               {navItems.find(n => n.to === "/" && location.pathname === "/")?.label ||
                navItems.find(n => n.to !== "/" && location.pathname.startsWith(n.to))?.label ||
-               "Enclave CNC"}
+               branding.companyName || "Enclave CNC"}
             </h1>
           </div>
           <div className="flex items-center gap-3">
