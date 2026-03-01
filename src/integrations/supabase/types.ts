@@ -634,6 +634,59 @@ export type Database = {
           },
         ]
       }
+      training_records: {
+        Row: {
+          completed_date: string
+          created_at: string
+          created_by: string | null
+          expiry_date: string | null
+          id: string
+          linked_document_id: string | null
+          notes: string | null
+          staff_id: string
+          title: string
+          trainer_name: string | null
+          training_type: string
+          updated_at: string
+        }
+        Insert: {
+          completed_date?: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          linked_document_id?: string | null
+          notes?: string | null
+          staff_id: string
+          title: string
+          trainer_name?: string | null
+          training_type?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_date?: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          linked_document_id?: string | null
+          notes?: string | null
+          staff_id?: string
+          title?: string
+          trainer_name?: string | null
+          training_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_records_linked_document_id_fkey"
+            columns: ["linked_document_id"]
+            isOneToOne: false
+            referencedRelation: "file_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
