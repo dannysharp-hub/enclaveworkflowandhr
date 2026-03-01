@@ -11,8 +11,10 @@ import {
   ChevronRight,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -27,6 +29,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { profile, userRole, signOut } = useAuth();
+
+  const initials = profile?.full_name
+    ? profile.full_name.split(" ").map((n: string) => n[0]).join("")
+    : "??";
+  const displayName = profile?.full_name || "Loading...";
+  const displayRole = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "";
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -102,19 +111,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Footer */}
-        {!collapsed && (
-          <div className="p-4 border-t border-border">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                <span className="text-xs font-mono font-bold text-secondary-foreground">JW</span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">James Whitfield</p>
-                <p className="text-[10px] text-muted-foreground">Admin</p>
-              </div>
+        <div className="p-4 border-t border-border">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+              <span className="text-xs font-mono font-bold text-secondary-foreground">{collapsed ? initials[0] : initials}</span>
             </div>
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+                <p className="text-[10px] text-muted-foreground">{displayRole}</p>
+              </div>
+            )}
+            {!collapsed && (
+              <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors" title="Sign out">
+                <LogOut size={14} />
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </aside>
 
       {/* Main content */}
