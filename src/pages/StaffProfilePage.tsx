@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound, FileText, Upload, Download, Trash2, Phone } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound, FileText, Upload, Download, Trash2, Phone, MessageSquare, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -122,7 +122,12 @@ export default function StaffProfilePage() {
   const [training, setTraining] = useState<TrainingRecord[]>([]);
   const [holidays, setHolidays] = useState<HolidayRequest[]>([]);
   const [documents, setDocuments] = useState<StaffDocument[]>([]);
+  const [notes, setNotes] = useState<{ id: string; content: string; author_id: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Notes
+  const [newNote, setNewNote] = useState("");
+  const [postingNote, setPostingNote] = useState(false);
 
   // Holiday request form
   const [showHolidayForm, setShowHolidayForm] = useState(false);
@@ -157,7 +162,7 @@ export default function StaffProfilePage() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [profileRes, rolesRes, reviewsRes, skillsRes, trainingRes, holidaysRes, docsRes] = await Promise.all([
+    const [profileRes, rolesRes, reviewsRes, skillsRes, trainingRes, holidaysRes, docsRes, notesRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", userId!).single(),
       supabase.from("user_roles").select("role").eq("user_id", userId!).single(),
       supabase.from("reviews").select("id, title, review_type, due_date, status, outcome").eq("staff_id", userId!).order("due_date", { ascending: false }),
@@ -165,6 +170,7 @@ export default function StaffProfilePage() {
       supabase.from("training_records").select("id, title, training_type, completed_date, expiry_date").eq("staff_id", userId!).order("completed_date", { ascending: false }),
       supabase.from("holiday_requests").select("id, start_date, end_date, type, reason, status, created_at").eq("staff_id", userId!).order("start_date", { ascending: false }),
       supabase.from("staff_documents").select("id, file_name, file_path, category, created_at").eq("staff_id", userId!).order("created_at", { ascending: false }),
+      supabase.from("staff_notes").select("id, content, author_id, created_at").eq("staff_id", userId!).order("created_at", { ascending: false }),
     ]);
 
     if (profileRes.data) {
@@ -192,7 +198,36 @@ export default function StaffProfilePage() {
     setTraining((trainingRes.data as any) ?? []);
     setHolidays((holidaysRes.data as any) ?? []);
     setDocuments((docsRes.data as any) ?? []);
+    setNotes((notesRes.data as any) ?? []);
     setLoading(false);
+  };
+
+  const handlePostNote = async () => {
+    if (!newNote.trim() || !userId || !user) return;
+    setPostingNote(true);
+    try {
+      const { error } = await supabase.from("staff_notes").insert({
+        staff_id: userId,
+        author_id: user.id,
+        content: newNote.trim(),
+      });
+      if (error) throw error;
+      setNewNote("");
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setPostingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      await supabase.from("staff_notes").delete().eq("id", noteId);
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   // Document upload/delete
@@ -839,6 +874,55 @@ export default function StaffProfilePage() {
                         <Trash2 size={13} />
                       </button>
                     )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Admin Notes */}
+      {isAdmin && (
+        <div className="glass-panel rounded-lg p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare size={16} className="text-primary" />
+            <h3 className="text-sm font-mono font-bold text-foreground">Internal Notes</h3>
+            <span className="text-xs text-muted-foreground ml-auto">{notes.length} notes</span>
+          </div>
+
+          <div className="flex items-start gap-2 mb-4">
+            <textarea
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              maxLength={1000}
+              rows={2}
+              placeholder="Add a private note..."
+              className={inputClass + " resize-none h-auto py-2"}
+            />
+            <button
+              onClick={handlePostNote}
+              disabled={postingNote || !newNote.trim()}
+              className="shrink-0 h-9 w-9 rounded-md bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Send size={14} />
+            </button>
+          </div>
+
+          {notes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No notes yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {notes.map(n => (
+                <div key={n.id} className="rounded-md border border-border p-3 bg-card/50">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{n.content}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      {format(new Date(n.created_at), "dd MMM yyyy · HH:mm")}
+                    </span>
+                    <button onClick={() => handleDeleteNote(n.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </div>
               ))}
