@@ -8,6 +8,7 @@ export interface FeatureFlags {
   enable_hr_cases: boolean;
   enable_drive_integration: boolean;
   enable_notifications: boolean;
+  enable_finance: boolean;
   [key: string]: boolean;
 }
 
@@ -17,6 +18,7 @@ const DEFAULTS: FeatureFlags = {
   enable_hr_cases: false,
   enable_drive_integration: false,
   enable_notifications: false,
+  enable_finance: false,
 };
 
 export function useFeatureFlags() {

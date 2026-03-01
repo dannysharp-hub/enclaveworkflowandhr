@@ -14,6 +14,97 @@ export type Database = {
   }
   public: {
     Tables: {
+      bills: {
+        Row: {
+          amount_ex_vat: number
+          amount_paid: number
+          bill_reference: string
+          category: string
+          created_at: string
+          due_date: string
+          external_id: string | null
+          external_system: string | null
+          id: string
+          issue_date: string
+          job_id: string | null
+          last_synced_at: string | null
+          notes: string | null
+          payment_date: string | null
+          status: string
+          supplier_id: string
+          sync_status: string
+          tenant_id: string
+          updated_at: string
+          vat_amount: number
+        }
+        Insert: {
+          amount_ex_vat?: number
+          amount_paid?: number
+          bill_reference: string
+          category?: string
+          created_at?: string
+          due_date: string
+          external_id?: string | null
+          external_system?: string | null
+          id?: string
+          issue_date?: string
+          job_id?: string | null
+          last_synced_at?: string | null
+          notes?: string | null
+          payment_date?: string | null
+          status?: string
+          supplier_id: string
+          sync_status?: string
+          tenant_id?: string
+          updated_at?: string
+          vat_amount?: number
+        }
+        Update: {
+          amount_ex_vat?: number
+          amount_paid?: number
+          bill_reference?: string
+          category?: string
+          created_at?: string
+          due_date?: string
+          external_id?: string | null
+          external_system?: string | null
+          id?: string
+          issue_date?: string
+          job_id?: string | null
+          last_synced_at?: string | null
+          notes?: string | null
+          payment_date?: string | null
+          status?: string
+          supplier_id?: string
+          sync_status?: string
+          tenant_id?: string
+          updated_at?: string
+          vat_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           assigned_staff_ids: string[] | null
@@ -64,6 +155,50 @@ export type Database = {
           },
           {
             foreignKeyName: "calendar_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          active: boolean
+          billing_address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          billing_address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          billing_address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -246,6 +381,50 @@ export type Database = {
           },
         ]
       }
+      finance_audit_log: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          entity_id: string
+          entity_type: string
+          field_changed: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          tenant_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          entity_id: string
+          entity_type: string
+          field_changed: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          tenant_id?: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          entity_id?: string
+          entity_type?: string
+          field_changed?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holiday_requests: {
         Row: {
           approver_staff_id: string | null
@@ -292,6 +471,182 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "holiday_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount_ex_vat: number
+          amount_paid: number
+          created_at: string
+          created_by_staff_id: string | null
+          customer_id: string
+          due_date: string
+          external_id: string | null
+          external_system: string | null
+          id: string
+          invoice_number: string
+          issue_date: string
+          job_id: string | null
+          last_synced_at: string | null
+          payment_method: string | null
+          payment_received_date: string | null
+          reference: string | null
+          status: string
+          sync_status: string
+          tenant_id: string
+          updated_at: string
+          vat_amount: number
+        }
+        Insert: {
+          amount_ex_vat?: number
+          amount_paid?: number
+          created_at?: string
+          created_by_staff_id?: string | null
+          customer_id: string
+          due_date: string
+          external_id?: string | null
+          external_system?: string | null
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          job_id?: string | null
+          last_synced_at?: string | null
+          payment_method?: string | null
+          payment_received_date?: string | null
+          reference?: string | null
+          status?: string
+          sync_status?: string
+          tenant_id?: string
+          updated_at?: string
+          vat_amount?: number
+        }
+        Update: {
+          amount_ex_vat?: number
+          amount_paid?: number
+          created_at?: string
+          created_by_staff_id?: string | null
+          customer_id?: string
+          due_date?: string
+          external_id?: string | null
+          external_system?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          job_id?: string | null
+          last_synced_at?: string | null
+          payment_method?: string | null
+          payment_received_date?: string | null
+          reference?: string | null
+          status?: string
+          sync_status?: string
+          tenant_id?: string
+          updated_at?: string
+          vat_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_financials: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          deposit_received: number
+          deposit_required: number
+          expected_invoice_date: string | null
+          expected_payment_date: string | null
+          id: string
+          job_id: string
+          labour_cost_override: number | null
+          material_cost_override: number | null
+          notes: string | null
+          overhead_allocation_override: number | null
+          quote_value_ex_vat: number
+          revenue_status: string
+          tenant_id: string
+          updated_at: string
+          vat_rate: number
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          deposit_received?: number
+          deposit_required?: number
+          expected_invoice_date?: string | null
+          expected_payment_date?: string | null
+          id?: string
+          job_id: string
+          labour_cost_override?: number | null
+          material_cost_override?: number | null
+          notes?: string | null
+          overhead_allocation_override?: number | null
+          quote_value_ex_vat?: number
+          revenue_status?: string
+          tenant_id?: string
+          updated_at?: string
+          vat_rate?: number
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          deposit_received?: number
+          deposit_required?: number
+          expected_invoice_date?: string | null
+          expected_payment_date?: string | null
+          id?: string
+          job_id?: string
+          labour_cost_override?: number | null
+          material_cost_override?: number | null
+          notes?: string | null
+          overhead_allocation_override?: number | null
+          quote_value_ex_vat?: number
+          revenue_status?: string
+          tenant_id?: string
+          updated_at?: string
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_financials_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_financials_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_financials_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -555,6 +910,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      overheads: {
+        Row: {
+          active: boolean
+          amount: number
+          autopopulate_future: boolean
+          category: string
+          created_at: string
+          frequency: string
+          id: string
+          name: string
+          next_due_date: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount?: number
+          autopopulate_future?: boolean
+          category?: string
+          created_at?: string
+          frequency?: string
+          id?: string
+          name: string
+          next_due_date?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          autopopulate_future?: boolean
+          category?: string
+          created_at?: string
+          frequency?: string
+          id?: string
+          name?: string
+          next_due_date?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overheads_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1189,6 +1594,50 @@ export type Database = {
           },
         ]
       }
+      suppliers: {
+        Row: {
+          active: boolean
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_feature_flags: {
         Row: {
           created_at: string
@@ -1393,6 +1842,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_roles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wage_plans: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          tenant_id: string
+          total_wages_actual: number | null
+          total_wages_expected: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          tenant_id?: string
+          total_wages_actual?: number | null
+          total_wages_expected?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          tenant_id?: string
+          total_wages_actual?: number | null
+          total_wages_expected?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wage_plans_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

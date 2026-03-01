@@ -53,6 +53,7 @@ const FLAG_LABELS: Record<string, string> = {
   enable_hr_cases: "HR Cases",
   enable_drive_integration: "Drive Integration",
   enable_notifications: "Notifications",
+  enable_finance: "Finance Module",
 };
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
