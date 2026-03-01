@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Kanban, ClipboardList,
   Package, ShieldCheck, GraduationCap, Zap, Sun, ShieldAlert,
   ClipboardCheck, Palmtree, Settings, ChevronDown,
-  BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download,
+  BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,6 +61,7 @@ const financeGroup: NavGroup = {
     { to: "/finance/suppliers", label: "Suppliers", icon: Truck },
     { to: "/finance/pandle", label: "Pandle", icon: FileSpreadsheet },
     { to: "/finance/pandle/export", label: "Pandle Export", icon: Download },
+    { to: "/finance/forecast", label: "Forecast", icon: TrendingUp },
   ],
 };
 
