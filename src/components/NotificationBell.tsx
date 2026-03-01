@@ -29,7 +29,7 @@ export default function NotificationBell() {
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(30);
     const items = (data ?? []) as Notification[];
     setNotifications(items);
     setUnreadCount(items.filter(n => !n.read).length);
@@ -37,11 +37,31 @@ export default function NotificationBell() {
 
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
-  // Poll every 60s
+  // Realtime subscription for new notifications
   useEffect(() => {
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+    if (!user) return;
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newNotif = payload.new as Notification;
+          setNotifications(prev => [newNotif, ...prev].slice(0, 30));
+          setUnreadCount(prev => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const markRead = async (id: string) => {
     await supabase.from("notifications").update({ read: true }).eq("id", id);
@@ -74,6 +94,15 @@ export default function NotificationBell() {
     return `${Math.floor(hrs / 24)}d`;
   };
 
+  const typeColour = (type: string) => {
+    switch (type) {
+      case "warning": return "bg-warning";
+      case "error": return "bg-destructive";
+      case "success": return "bg-primary";
+      default: return "bg-primary";
+    }
+  };
+
   return (
     <div className="relative">
       <button
@@ -82,7 +111,7 @@ export default function NotificationBell() {
       >
         <Bell size={16} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-[10px] font-mono font-bold text-destructive-foreground px-1">
+          <span className="absolute -top-1 -right-1 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-[10px] font-mono font-bold text-destructive-foreground px-1 animate-pulse">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -91,7 +120,7 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 w-80 z-50 rounded-lg border border-border bg-card shadow-xl">
+          <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 rounded-lg border border-border bg-card shadow-xl">
             <div className="flex items-center justify-between p-3 border-b border-border">
               <h3 className="font-mono text-xs font-bold text-foreground">NOTIFICATIONS</h3>
               <div className="flex items-center gap-2">
@@ -105,7 +134,7 @@ export default function NotificationBell() {
                 </button>
               </div>
             </div>
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-96 overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">No notifications</div>
               ) : (
@@ -119,7 +148,7 @@ export default function NotificationBell() {
                     )}
                   >
                     <div className="flex items-start gap-2">
-                      {!n.read && <div className="mt-1.5 w-2 h-2 rounded-full bg-primary shrink-0" />}
+                      {!n.read && <div className={cn("mt-1.5 w-2 h-2 rounded-full shrink-0", typeColour(n.type))} />}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <p className={cn("text-xs font-medium truncate", !n.read ? "text-foreground" : "text-muted-foreground")}>
