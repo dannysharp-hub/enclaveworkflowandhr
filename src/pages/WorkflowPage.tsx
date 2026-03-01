@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStageConfig } from "@/hooks/useStageConfig";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import { GripVertical, User, Calendar, ShieldAlert } from "lucide-react";
+import { GripVertical, User, Calendar } from "lucide-react";
 
 interface Stage {
   id: string;
@@ -30,23 +31,35 @@ const STATUS_HEADER_COLORS: Record<string, string> = {
   "Blocked": "text-destructive",
   "Done": "text-success",
 };
-const STAGE_BADGE: Record<string, string> = {
-  Design: "bg-info/15 text-info",
-  Programming: "bg-accent/15 text-accent",
-  CNC: "bg-primary/15 text-primary",
-  Edgebanding: "bg-warning/15 text-warning",
-  Assembly: "bg-success/15 text-success",
-  Spray: "bg-destructive/15 text-destructive",
-  Install: "bg-muted text-muted-foreground",
-};
+
+// Dynamic badge colours based on index
+const BADGE_PALETTE = [
+  "bg-info/15 text-info",
+  "bg-accent/15 text-accent",
+  "bg-primary/15 text-primary",
+  "bg-warning/15 text-warning",
+  "bg-success/15 text-success",
+  "bg-destructive/15 text-destructive",
+  "bg-muted text-muted-foreground",
+];
 
 export default function WorkflowPage() {
   const { userRole } = useAuth();
-  const [stages, setStages] = useState<Stage[]>([]);
+  const { stages: stageConfig, loading: stagesLoading } = useStageConfig();
+  const [jobStages, setJobStages] = useState<Stage[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const canManage = userRole === "admin" || userRole === "supervisor" || userRole === "engineer";
+
+  // Build a badge map from stage_config
+  const stageBadge = useMemo(() => {
+    const map: Record<string, string> = {};
+    stageConfig.forEach((sc, i) => {
+      map[sc.stage_name] = BADGE_PALETTE[i % BADGE_PALETTE.length];
+    });
+    return map;
+  }, [stageConfig]);
 
   const fetchData = useCallback(async () => {
     const [stagesRes, jobsRes, profilesRes] = await Promise.all([
@@ -60,7 +73,7 @@ export default function WorkflowPage() {
     (profilesRes.data ?? []).forEach(p => { profMap[p.user_id] = p.full_name; });
     setProfiles(profMap);
 
-    setStages(
+    setJobStages(
       (stagesRes.data ?? []).map(s => ({
         ...s,
         job_display: jobMap.get(s.job_id) || s.job_id,
@@ -75,7 +88,7 @@ export default function WorkflowPage() {
     if (!result.destination || !canManage) return;
     const newStatus = result.destination.droppableId;
     const stageId = result.draggableId;
-    const stage = stages.find(s => s.id === stageId);
+    const stage = jobStages.find(s => s.id === stageId);
     if (!stage) return;
 
     // Check machine auth when moving to "In Progress"
@@ -104,7 +117,7 @@ export default function WorkflowPage() {
     }
 
     // Optimistic update
-    setStages(prev =>
+    setJobStages(prev =>
       prev.map(s => (s.id === stageId ? { ...s, status: newStatus } : s))
     );
 
@@ -121,13 +134,15 @@ export default function WorkflowPage() {
 
   const grouped = STATUSES.reduce(
     (acc, status) => {
-      acc[status] = stages.filter(s => s.status === status);
+      acc[status] = jobStages.filter(s => s.status === status);
       return acc;
     },
     {} as Record<string, Stage[]>
   );
 
-  if (loading) {
+  const isLoading = loading || stagesLoading;
+
+  if (isLoading) {
     return (
       <div className="space-y-6 animate-slide-in">
         <h2 className="text-2xl font-mono font-bold text-foreground">Workflow Board</h2>
@@ -145,7 +160,8 @@ export default function WorkflowPage() {
       <div>
         <h2 className="text-2xl font-mono font-bold text-foreground">Workflow Board</h2>
         <p className="text-sm text-muted-foreground">
-          {stages.length} stage{stages.length !== 1 ? "s" : ""} across {new Set(stages.map(s => s.job_id)).size} job{new Set(stages.map(s => s.job_id)).size !== 1 ? "s" : ""}
+          {jobStages.length} stage{jobStages.length !== 1 ? "s" : ""} across {new Set(jobStages.map(s => s.job_id)).size} job{new Set(jobStages.map(s => s.job_id)).size !== 1 ? "s" : ""}
+          {stageConfig.length > 0 && ` · ${stageConfig.length} configured stage type${stageConfig.length !== 1 ? "s" : ""}`}
           {!canManage && " · View only"}
         </p>
       </div>
@@ -199,7 +215,7 @@ export default function WorkflowPage() {
                               <div className="flex-1 min-w-0">
                                 <span className={cn(
                                   "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium mb-1.5",
-                                  STAGE_BADGE[stage.stage_name] || "bg-muted text-muted-foreground"
+                                  stageBadge[stage.stage_name] || "bg-muted text-muted-foreground"
                                 )}>
                                   {stage.stage_name}
                                 </span>
