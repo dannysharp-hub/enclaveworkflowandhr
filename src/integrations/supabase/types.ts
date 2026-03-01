@@ -593,6 +593,86 @@ export type Database = {
           },
         ]
       }
+      skills: {
+        Row: {
+          active: boolean
+          category: string
+          created_at: string
+          default_expiry_period_months: number | null
+          description: string | null
+          id: string
+          name: string
+          requires_certification: boolean
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          default_expiry_period_months?: number | null
+          description?: string | null
+          id?: string
+          name: string
+          requires_certification?: boolean
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          default_expiry_period_months?: number | null
+          description?: string | null
+          id?: string
+          name?: string
+          requires_certification?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      staff_skills: {
+        Row: {
+          assigned_by: string | null
+          certification_expiry_date: string | null
+          created_at: string
+          id: string
+          level: string
+          notes: string | null
+          skill_id: string
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          certification_expiry_date?: string | null
+          created_at?: string
+          id?: string
+          level?: string
+          notes?: string | null
+          skill_id: string
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_by?: string | null
+          certification_expiry_date?: string | null
+          created_at?: string
+          id?: string
+          level?: string
+          notes?: string | null
+          skill_id?: string
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       toolpath_templates: {
         Row: {
           active: boolean

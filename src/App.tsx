@@ -12,6 +12,7 @@ import CalendarPage from "./pages/CalendarPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import CompliancePage from "./pages/CompliancePage";
 import TrainingPage from "./pages/TrainingPage";
+import SkillsMatrixPage from "./pages/SkillsMatrixPage";
 import RemnantsPage from "./pages/RemnantsPage";
 import MaterialsPage from "./pages/MaterialsPage";
 import JobBuilderPage from "./pages/JobBuilderPage";
@@ -56,6 +57,7 @@ const AppRoutes = () => (
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/training" element={<TrainingPage />} />
+              <Route path="/skills" element={<SkillsMatrixPage />} />
               <Route path="/remnants" element={<RemnantsPage />} />
               <Route path="/materials" element={<MaterialsPage />} />
               <Route path="*" element={<NotFound />} />
