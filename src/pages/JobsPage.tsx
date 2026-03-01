@@ -4,7 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search, Hammer } from "lucide-react";
+import { Plus, Search, Hammer, AlertTriangle } from "lucide-react";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { cn } from "@/lib/utils";
 import type { JobStatus } from "@/types";
 
 interface DbJob {
@@ -20,8 +22,10 @@ interface DbJob {
 
 export default function JobsPage() {
   const { userRole } = useAuth();
+  const { flags } = useFeatureFlags();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<DbJob[]>([]);
+  const [jobOverdues, setJobOverdues] = useState<Map<string, { overdueInvoices: number; overdueBills: number }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -32,8 +36,29 @@ export default function JobsPage() {
   const fetchJobs = useCallback(async () => {
     const { data } = await supabase.from("jobs").select("*").order("created_date", { ascending: false });
     setJobs(data ?? []);
+
+    if (flags.enable_finance) {
+      const today = new Date().toISOString().split("T")[0];
+      const [invRes, billRes] = await Promise.all([
+        supabase.from("invoices").select("id, job_id, due_date, status").neq("status", "paid").neq("status", "cancelled").not("job_id", "is", null),
+        supabase.from("bills").select("id, job_id, due_date, status").neq("status", "paid").neq("status", "cancelled").not("job_id", "is", null),
+      ]);
+      const map = new Map<string, { overdueInvoices: number; overdueBills: number }>();
+      (invRes.data ?? []).filter((i: any) => i.due_date < today).forEach((i: any) => {
+        const existing = map.get(i.job_id) || { overdueInvoices: 0, overdueBills: 0 };
+        existing.overdueInvoices++;
+        map.set(i.job_id, existing);
+      });
+      (billRes.data ?? []).filter((b: any) => b.due_date < today).forEach((b: any) => {
+        const existing = map.get(b.job_id) || { overdueInvoices: 0, overdueBills: 0 };
+        existing.overdueBills++;
+        map.set(b.job_id, existing);
+      });
+      setJobOverdues(map);
+    }
+
     setLoading(false);
-  }, []);
+  }, [flags.enable_finance]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
@@ -88,9 +113,23 @@ export default function JobsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map(job => (
+                {filtered.map(job => {
+                  const overdue = jobOverdues.get(job.id);
+                  return (
                   <tr key={job.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => canManage && setEditJob(job)}>
-                    <td className="p-4 font-mono text-sm text-primary">{job.job_id}</td>
+                    <td className="p-4 font-mono text-sm text-primary">
+                      <div className="flex items-center gap-2">
+                        {job.job_id}
+                        {overdue && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive text-[10px] font-mono font-medium">
+                            <AlertTriangle size={10} />
+                            {overdue.overdueInvoices > 0 && `${overdue.overdueInvoices} inv`}
+                            {overdue.overdueInvoices > 0 && overdue.overdueBills > 0 && " · "}
+                            {overdue.overdueBills > 0 && `${overdue.overdueBills} bill`}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-4 text-sm font-medium text-foreground">{job.job_name}</td>
                     <td className="p-4 text-sm text-muted-foreground hidden sm:table-cell">{job.created_date}</td>
                     <td className="p-4"><JobStatusBadge status={job.status as JobStatus} /></td>
@@ -107,7 +146,8 @@ export default function JobsPage() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
