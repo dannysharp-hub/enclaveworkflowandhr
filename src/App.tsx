@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
+import FeatureGate from "@/components/FeatureGate";
 import Index from "./pages/Index";
 import JobsPage from "./pages/JobsPage";
 import StaffPage from "./pages/StaffPage";
@@ -69,7 +70,7 @@ const AppRoutes = () => (
               <Route path="/machine-auth" element={<MachineAuthPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/whos-in" element={<WhosInPage />} />
-              <Route path="/remnants" element={<RemnantsPage />} />
+              <Route path="/remnants" element={<FeatureGate flag="enable_remnants" featureName="Remnants"><RemnantsPage /></FeatureGate>} />
               <Route path="/materials" element={<MaterialsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFound />} />

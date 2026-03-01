@@ -18,7 +18,8 @@ interface ExportPart {
 export async function generateVCarveExportPack(
   jobId: string,
   jobCode: string,
-  parts: ExportPart[]
+  parts: ExportPart[],
+  tenantId?: string | null
 ): Promise<void> {
   const zip = new JSZip();
 
@@ -61,6 +62,7 @@ export async function generateVCarveExportPack(
   // Add a summary manifest
   const manifest = {
     job_id: jobCode,
+    tenant_id: tenantId || undefined,
     exported_at: new Date().toISOString(),
     total_parts: parts.reduce((s, p) => s + p.quantity, 0),
     unique_parts: parts.length,
