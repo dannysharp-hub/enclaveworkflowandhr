@@ -11,6 +11,7 @@ import { generateVCarveExportPack } from "@/lib/vcarveExport";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import JobFinancePanel from "@/components/JobFinancePanel";
 import JobIssuesPanel from "@/components/JobIssuesPanel";
+import JobCardPanel from "@/components/JobCardPanel";
 
 interface PartData {
   id?: string;
@@ -338,6 +339,9 @@ export default function JobBuilderPage() {
           )}
         </div>
       )}
+
+      {/* Job Cards Panel */}
+      {job && <JobCardPanel jobId={job.id} jobCode={job.job_id} readOnly={!canEdit} />}
 
       {/* Issues Panel */}
       {job && <JobIssuesPanel jobId={job.id} jobCode={job.job_id} readOnly={!canEdit} />}
