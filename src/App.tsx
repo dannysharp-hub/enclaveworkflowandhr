@@ -37,6 +37,7 @@ import PandlePage from "./pages/PandlePage";
 import PandleExportPage from "./pages/PandleExportPage";
 import CashflowForecastPage from "./pages/CashflowForecastPage";
 import ProductionControlPage from "./pages/ProductionControlPage";
+import InstallSignOffPage from "./pages/InstallSignOffPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -71,6 +72,7 @@ const AppRoutes = () => (
               <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:jobId/builder" element={<JobBuilderPage />} />
               <Route path="/production" element={<ProductionControlPage />} />
+              <Route path="/jobs/:jobId/install-signoff" element={<InstallSignOffPage />} />
               <Route path="/staff" element={<StaffPage />} />
               <Route path="/staff/:userId" element={<StaffProfilePage />} />
               <Route path="/calendar" element={<CalendarPage />} />
