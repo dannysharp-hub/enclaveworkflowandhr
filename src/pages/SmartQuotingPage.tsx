@@ -52,6 +52,7 @@ export default function SmartQuotingPage() {
   const [quotes, setQuotes] = useState<SmartQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [converting, setConverting] = useState<string | null>(null);
 
   const canManage = userRole === "admin" || userRole === "office" || userRole === "engineer";
 
@@ -76,6 +77,44 @@ export default function SmartQuotingPage() {
       </div>
     );
   }
+
+
+  const handleConvertToJob = async (quote: SmartQuote) => {
+    if (converting) return;
+    setConverting(quote.id);
+    try {
+      // Create the job
+      const jobId = `SQ-${Date.now().toString(36).toUpperCase()}`;
+      const { data: newJob, error: jobErr } = await supabase.from("jobs").insert({
+        job_id: jobId,
+        job_name: quote.title,
+        status: "Not Started",
+      }).select("id").single();
+      if (jobErr) throw jobErr;
+
+      // Create job financial
+      const { error: finErr } = await supabase.from("job_financials").insert({
+        job_id: newJob.id,
+        quote_value_ex_vat: quote.suggested_quote_value,
+        deposit_required: Number(quote.suggested_quote_value) * 0.3,
+        revenue_status: "quoted",
+      });
+      if (finErr) throw finErr;
+
+      // Mark quote as converted
+      await (supabase.from("smart_quotes") as any).update({
+        status: "converted",
+        converted_job_id: newJob.id,
+      }).eq("id", quote.id);
+
+      toast({ title: "Job created", description: `${jobId} created from quote` });
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setConverting(null);
+    }
+  };
 
   const totalQuoteValue = quotes.reduce((s, q) => s + Number(q.suggested_quote_value), 0);
   const convertedCount = quotes.filter(q => q.converted_job_id).length;
@@ -151,6 +190,7 @@ export default function SmartQuotingPage() {
                   <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground">MARGIN</th>
                   <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground">CONFIDENCE</th>
                   <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground">STATUS</th>
+                  <th className="px-4 py-2 font-mono text-[10px] text-muted-foreground">ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,6 +225,24 @@ export default function SmartQuotingPage() {
                       )}>
                         {q.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      {q.status !== "converted" && canManage && (
+                        <button
+                          onClick={() => handleConvertToJob(q)}
+                          className="flex items-center gap-1 text-[10px] font-mono text-primary hover:text-primary/80"
+                        >
+                          <ArrowRight size={12} /> Convert
+                        </button>
+                      )}
+                      {q.converted_job_id && (
+                        <button
+                          onClick={() => navigate(`/jobs`)}
+                          className="text-[10px] font-mono text-primary hover:text-primary/80"
+                        >
+                          View Job
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
