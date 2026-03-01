@@ -3,13 +3,14 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package } from "lucide-react";
+import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package, ClipboardCheck } from "lucide-react";
 import CsvImportDialog from "@/components/CsvImportDialog";
 import PartRow from "@/components/PartRow";
 import { CsvPart } from "@/lib/csvParser";
 import { generateVCarveExportPack } from "@/lib/vcarveExport";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import JobFinancePanel from "@/components/JobFinancePanel";
+import JobIssuesPanel from "@/components/JobIssuesPanel";
 
 interface PartData {
   id?: string;
@@ -338,9 +339,20 @@ export default function JobBuilderPage() {
         </div>
       )}
 
+      {/* Issues Panel */}
+      {job && <JobIssuesPanel jobId={job.id} jobCode={job.job_id} readOnly={!canEdit} />}
+
       {/* Finance Panel */}
       {flags.enable_finance && job && (
         <JobFinancePanel jobId={job.id} jobCode={job.job_id} />
+      )}
+
+      {/* Install Sign-Off Link */}
+      {canEdit && job && (
+        <button onClick={() => navigate(`/jobs/${job.id}/install-signoff`)}
+          className="flex items-center gap-2 px-4 py-3 rounded-md border border-border text-sm font-medium text-foreground hover:bg-secondary/50 transition-colors w-full justify-center">
+          <ClipboardCheck size={16} /> Complete Install Sign-Off
+        </button>
       )}
 
       <CsvImportDialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen} onImport={handleCsvImport} />
