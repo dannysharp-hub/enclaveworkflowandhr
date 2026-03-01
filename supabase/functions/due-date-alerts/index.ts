@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     const todayStr = today.toISOString().split("T")[0];
     const alertDateStr = alertDate.toISOString().split("T")[0];
 
-    // Get unpaid invoices due within 7 days
+    // ── 1. Unpaid invoices due within 7 days ──
     const { data: invoices } = await supabase
       .from("invoices")
       .select("id, invoice_number, amount_ex_vat, due_date, tenant_id, customer_id")
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       .gte("due_date", todayStr)
       .lte("due_date", alertDateStr);
 
-    // Get unpaid bills due within 7 days
+    // ── 2. Unpaid bills due within 7 days ──
     const { data: bills } = await supabase
       .from("bills")
       .select("id, bill_reference, amount_ex_vat, due_date, tenant_id, supplier_id")
@@ -41,10 +41,31 @@ Deno.serve(async (req) => {
       .gte("due_date", todayStr)
       .lte("due_date", alertDateStr);
 
-    // Collect tenant IDs from both
+    // ── 3. Overdue job stages ──
+    const { data: overdueStages } = await supabase
+      .from("job_stages")
+      .select("id, stage_name, due_date, job_id, tenant_id, status")
+      .neq("status", "Done")
+      .lt("due_date", todayStr);
+
+    // ── 4. Stages due within 2 days (upcoming) ──
+    const twoDays = new Date(today);
+    twoDays.setDate(twoDays.getDate() + 2);
+    const twoDaysStr = twoDays.toISOString().split("T")[0];
+
+    const { data: upcomingStages } = await supabase
+      .from("job_stages")
+      .select("id, stage_name, due_date, job_id, tenant_id, status")
+      .neq("status", "Done")
+      .gte("due_date", todayStr)
+      .lte("due_date", twoDaysStr);
+
+    // Collect tenant IDs
     const tenantIds = new Set<string>();
     (invoices ?? []).forEach((i) => tenantIds.add(i.tenant_id));
     (bills ?? []).forEach((b) => tenantIds.add(b.tenant_id));
+    (overdueStages ?? []).forEach((s) => tenantIds.add(s.tenant_id));
+    (upcomingStages ?? []).forEach((s) => tenantIds.add(s.tenant_id));
 
     if (tenantIds.size === 0) {
       return new Response(
@@ -53,11 +74,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get admin/office users for each tenant
+    // Get admin/office/supervisor users for each tenant
     const { data: roles } = await supabase
       .from("user_roles")
       .select("user_id, tenant_id, role")
-      .in("role", ["admin", "office"])
+      .in("role", ["admin", "office", "supervisor"])
       .in("tenant_id", Array.from(tenantIds));
 
     const tenantUsers = new Map<string, string[]>();
@@ -67,12 +88,26 @@ Deno.serve(async (req) => {
       tenantUsers.set(r.tenant_id, list);
     });
 
-    // Check existing notifications to avoid duplicates (same day)
+    // Get job codes for stage alerts
+    const stageJobIds = new Set<string>();
+    (overdueStages ?? []).forEach((s) => stageJobIds.add(s.job_id));
+    (upcomingStages ?? []).forEach((s) => stageJobIds.add(s.job_id));
+
+    let jobMap = new Map<string, string>();
+    if (stageJobIds.size > 0) {
+      const { data: jobs } = await supabase
+        .from("jobs")
+        .select("id, job_id")
+        .in("id", Array.from(stageJobIds));
+      (jobs ?? []).forEach((j: any) => jobMap.set(j.id, j.job_id));
+    }
+
+    // Check existing notifications to avoid duplicates today
     const { data: existingNotifs } = await supabase
       .from("notifications")
       .select("link")
       .gte("created_at", todayStr + "T00:00:00Z")
-      .like("title", "%due%");
+      .or("title.ilike.%due%,title.ilike.%overdue%");
 
     const existingLinks = new Set(
       (existingNotifs ?? []).map((n) => n.link).filter(Boolean)
@@ -98,11 +133,18 @@ Deno.serve(async (req) => {
       return diff === 0 ? "today" : diff === 1 ? "tomorrow" : `in ${diff} days`;
     };
 
-    // Invoice notifications
-    for (const inv of invoices ?? []) {
-      const link = `/invoices?highlight=${inv.id}`;
-      if (existingLinks.has(link)) continue;
+    const daysOverdue = (dueDate: string) => {
+      const due = new Date(dueDate);
+      const diff = Math.ceil(
+        (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return diff === 1 ? "1 day" : `${diff} days`;
+    };
 
+    // ── Invoice notifications ──
+    for (const inv of invoices ?? []) {
+      const link = `/finance/invoices?highlight=${inv.id}`;
+      if (existingLinks.has(link)) continue;
       const users = tenantUsers.get(inv.tenant_id) || [];
       for (const userId of users) {
         notifications.push({
@@ -116,11 +158,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Bill notifications
+    // ── Bill notifications ──
     for (const bill of bills ?? []) {
-      const link = `/bills?highlight=${bill.id}`;
+      const link = `/finance/bills?highlight=${bill.id}`;
       if (existingLinks.has(link)) continue;
-
       const users = tenantUsers.get(bill.tenant_id) || [];
       for (const userId of users) {
         notifications.push({
@@ -134,7 +175,43 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Insert notifications in batches
+    // ── Overdue stage notifications ──
+    for (const stage of overdueStages ?? []) {
+      const jobCode = jobMap.get(stage.job_id) || "Unknown";
+      const link = `/jobs/${stage.job_id}/builder`;
+      if (existingLinks.has(link + `#overdue-${stage.id}`)) continue;
+      const users = tenantUsers.get(stage.tenant_id) || [];
+      for (const userId of users) {
+        notifications.push({
+          user_id: userId,
+          tenant_id: stage.tenant_id,
+          title: `${jobCode} — ${stage.stage_name} overdue by ${daysOverdue(stage.due_date!)}`,
+          message: `Stage "${stage.stage_name}" on job ${jobCode} was due ${stage.due_date}. Current status: ${stage.status}.`,
+          type: "warning",
+          link: link + `#overdue-${stage.id}`,
+        });
+      }
+    }
+
+    // ── Upcoming stage notifications ──
+    for (const stage of upcomingStages ?? []) {
+      const jobCode = jobMap.get(stage.job_id) || "Unknown";
+      const link = `/jobs/${stage.job_id}/builder`;
+      if (existingLinks.has(link + `#upcoming-${stage.id}`)) continue;
+      const users = tenantUsers.get(stage.tenant_id) || [];
+      for (const userId of users) {
+        notifications.push({
+          user_id: userId,
+          tenant_id: stage.tenant_id,
+          title: `${jobCode} — ${stage.stage_name} due ${daysUntil(stage.due_date!)}`,
+          message: `Stage "${stage.stage_name}" on job ${jobCode} is due ${stage.due_date}.`,
+          type: "info",
+          link: link + `#upcoming-${stage.id}`,
+        });
+      }
+    }
+
+    // Insert notifications in batch
     let created = 0;
     if (notifications.length > 0) {
       const { error } = await supabase.from("notifications").insert(notifications);
@@ -147,6 +224,8 @@ Deno.serve(async (req) => {
         message: `Created ${created} due-date alerts`,
         invoices_checked: (invoices ?? []).length,
         bills_checked: (bills ?? []).length,
+        overdue_stages: (overdueStages ?? []).length,
+        upcoming_stages: (upcomingStages ?? []).length,
         created,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
