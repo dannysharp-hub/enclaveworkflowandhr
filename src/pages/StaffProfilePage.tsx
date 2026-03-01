@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -225,6 +225,33 @@ export default function StaffProfilePage() {
     }
   };
 
+  // Password reset
+  const [showResetPw, setShowResetPw] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [resettingPw, setResettingPw] = useState(false);
+
+  const handleResetPassword = async () => {
+    if (newPassword.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    if (!profile) return;
+    setResettingPw(true);
+    try {
+      const res = await supabase.functions.invoke("manage-staff?action=reset-password", {
+        body: { user_id: profile.user_id, password: newPassword },
+      });
+      if (res.data?.error) throw new Error(res.data.error);
+      toast({ title: "Password Reset", description: `Password updated for ${profile.full_name}` });
+      setNewPassword("");
+      setShowResetPw(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setResettingPw(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 animate-slide-in">
@@ -313,6 +340,35 @@ export default function StaffProfilePage() {
             <span className="text-sm text-foreground font-mono">{profile.holiday_balance_days} / {profile.holiday_allowance_days} days</span>
           </div>
         </div>
+
+        {/* Admin: Password Reset */}
+        {isAdmin && (
+          <div className="mt-4 pt-4 border-t border-border">
+            {!showResetPw ? (
+              <button onClick={() => setShowResetPw(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <KeyRound size={12} /> Reset Password
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="password"
+                  minLength={6}
+                  maxLength={72}
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="New password (min 6 chars)"
+                  className={inputClass + " max-w-xs"}
+                />
+                <button onClick={handleResetPassword} disabled={resettingPw} className="h-9 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
+                  {resettingPw ? "Resetting..." : "Confirm"}
+                </button>
+                <button onClick={() => { setShowResetPw(false); setNewPassword(""); }} className="h-9 rounded-md border border-border px-3 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sensitive Details */}
