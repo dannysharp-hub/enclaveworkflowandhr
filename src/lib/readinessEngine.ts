@@ -106,8 +106,7 @@ export async function calculateReadiness(jobId: string): Promise<ReadinessResult
 
 // ─── Persist readiness to DB ──────────────────────────────
 export async function persistReadiness(result: ReadinessResult) {
-  const { blockers, ...data } = result;
-  const payload = { ...data, last_calculated_at: new Date().toISOString() };
+  const payload = { ...result, last_calculated_at: new Date().toISOString() };
 
   // Upsert by job_id (unique constraint)
   const { data: existing } = await (supabase.from("production_readiness_status") as any)
