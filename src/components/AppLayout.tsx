@@ -15,6 +15,7 @@ import {
   Kanban,
   ClipboardList,
   Package,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +28,7 @@ const navItems = [
   { to: "/staff", label: "Staff", icon: Users },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/documents", label: "Documents", icon: FileText },
+  { to: "/compliance", label: "Compliance", icon: ShieldCheck },
   { to: "/remnants", label: "Remnants", icon: Recycle },
   { to: "/materials", label: "Materials", icon: Package },
 ];
