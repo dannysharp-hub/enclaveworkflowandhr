@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -51,6 +51,27 @@ interface TrainingRecord {
   expiry_date: string | null;
 }
 
+interface HolidayRequest {
+  id: string;
+  start_date: string;
+  end_date: string;
+  type: string;
+  reason: string | null;
+  status: string;
+  created_at: string;
+}
+
+const HOLIDAY_TYPES = ["Holiday", "Sick", "Unpaid", "Appointment"] as const;
+
+const holidayStatusColor = (status: string) => {
+  switch (status) {
+    case "Approved": return "bg-success/15 text-success";
+    case "Rejected": return "bg-destructive/15 text-destructive";
+    case "Cancelled": return "bg-muted text-muted-foreground";
+    default: return "bg-warning/15 text-warning";
+  }
+};
+
 const mask = (val: string | null) => {
   if (!val) return "—";
   if (val.length <= 4) return "••••";
@@ -86,7 +107,13 @@ export default function StaffProfilePage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [skills, setSkills] = useState<StaffSkill[]>([]);
   const [training, setTraining] = useState<TrainingRecord[]>([]);
+  const [holidays, setHolidays] = useState<HolidayRequest[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Holiday request form
+  const [showHolidayForm, setShowHolidayForm] = useState(false);
+  const [holidayForm, setHolidayForm] = useState({ start_date: "", end_date: "", type: "Holiday", reason: "" });
+  const [submittingHoliday, setSubmittingHoliday] = useState(false);
 
   // Sensitive field reveal state
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -111,12 +138,13 @@ export default function StaffProfilePage() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [profileRes, rolesRes, reviewsRes, skillsRes, trainingRes] = await Promise.all([
+    const [profileRes, rolesRes, reviewsRes, skillsRes, trainingRes, holidaysRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", userId!).single(),
       supabase.from("user_roles").select("role").eq("user_id", userId!).single(),
       supabase.from("reviews").select("id, title, review_type, due_date, status, outcome").eq("staff_id", userId!).order("due_date", { ascending: false }),
       supabase.from("staff_skills").select("id, level, certification_expiry_date, skill:skills(name, category)").eq("staff_id", userId!),
       supabase.from("training_records").select("id, title, training_type, completed_date, expiry_date").eq("staff_id", userId!).order("completed_date", { ascending: false }),
+      supabase.from("holiday_requests").select("id, start_date, end_date, type, reason, status, created_at").eq("staff_id", userId!).order("start_date", { ascending: false }),
     ]);
 
     if (profileRes.data) {
@@ -137,7 +165,32 @@ export default function StaffProfilePage() {
     setReviews((reviewsRes.data as any) ?? []);
     setSkills((skillsRes.data as any) ?? []);
     setTraining((trainingRes.data as any) ?? []);
+    setHolidays((holidaysRes.data as any) ?? []);
     setLoading(false);
+  };
+
+  const handleSubmitHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId) return;
+    setSubmittingHoliday(true);
+    try {
+      const { error } = await supabase.from("holiday_requests").insert({
+        staff_id: userId,
+        start_date: holidayForm.start_date,
+        end_date: holidayForm.end_date,
+        type: holidayForm.type,
+        reason: holidayForm.reason || null,
+      });
+      if (error) throw error;
+      toast({ title: "Submitted", description: "Holiday request submitted for approval" });
+      setHolidayForm({ start_date: "", end_date: "", type: "Holiday", reason: "" });
+      setShowHolidayForm(false);
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmittingHoliday(false);
+    }
   };
 
   const handleSavePii = async () => {
@@ -403,6 +456,79 @@ export default function StaffProfilePage() {
                     Expires {format(new Date(t.expiry_date), "dd MMM yyyy")}
                   </span>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Holiday Requests */}
+      <div className="glass-panel rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Palmtree size={16} className="text-primary" />
+            <h3 className="text-sm font-mono font-bold text-foreground">Holiday Requests</h3>
+            <span className="text-xs text-muted-foreground">{holidays.length} requests</span>
+          </div>
+          {isSelf && !showHolidayForm && (
+            <button onClick={() => setShowHolidayForm(true)} className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors">
+              <Plus size={12} /> New Request
+            </button>
+          )}
+        </div>
+
+        {showHolidayForm && (
+          <form onSubmit={handleSubmitHoliday} className="mb-4 p-4 rounded-md border border-border bg-card/50 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Start Date</label>
+                <input type="date" required value={holidayForm.start_date} onChange={e => setHolidayForm(f => ({ ...f, start_date: e.target.value }))} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>End Date</label>
+                <input type="date" required value={holidayForm.end_date} onChange={e => setHolidayForm(f => ({ ...f, end_date: e.target.value }))} className={inputClass} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Type</label>
+                <select value={holidayForm.type} onChange={e => setHolidayForm(f => ({ ...f, type: e.target.value }))} className={inputClass + " appearance-none"}>
+                  {HOLIDAY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Reason (optional)</label>
+                <input type="text" maxLength={200} value={holidayForm.reason} onChange={e => setHolidayForm(f => ({ ...f, reason: e.target.value }))} className={inputClass} placeholder="e.g. Family holiday" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button type="submit" disabled={submittingHoliday} className="h-8 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {submittingHoliday ? "Submitting..." : "Submit Request"}
+              </button>
+              <button type="button" onClick={() => setShowHolidayForm(false)} className="h-8 rounded-md border border-border px-4 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        {holidays.length === 0 && !showHolidayForm ? (
+          <p className="text-sm text-muted-foreground">No holiday requests.</p>
+        ) : (
+          <div className="space-y-2">
+            {holidays.map(h => (
+              <div key={h.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div>
+                  <p className="text-sm text-foreground">
+                    {format(new Date(h.start_date), "dd MMM")} – {format(new Date(h.end_date), "dd MMM yyyy")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {h.type}{h.reason ? ` · ${h.reason}` : ""}
+                  </p>
+                </div>
+                <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-mono font-medium", holidayStatusColor(h.status))}>
+                  {h.status}
+                </span>
               </div>
             ))}
           </div>
