@@ -4,6 +4,8 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Plus, X, Check, Pencil, Search } from "lucide-react";
 import { format } from "date-fns";
+import { exportToCsv, filterByDateRange } from "@/lib/csvExport";
+import CsvExportButton from "@/components/CsvExportButton";
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase tracking-wider";
@@ -101,7 +103,13 @@ export default function BillsPage() {
     <div className="space-y-6 animate-slide-in">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-mono font-bold text-foreground">Bills</h2>
-        {!adding && <button onClick={() => { setAdding(true); setEditId(null); resetForm(); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> New Bill</button>}
+        <div className="flex gap-2">
+          <CsvExportButton onExport={(from, to) => {
+            const data = filterByDateRange(bills, "issue_date", from, to);
+            exportToCsv("bills", ["Reference","Supplier","Job","Category","Issue Date","Due Date","Amount Ex VAT","VAT","Paid","Status"], data.map(b => [b.bill_reference, supplierName(b.supplier_id), jobCode(b.job_id), b.category, b.issue_date, b.due_date, b.amount_ex_vat, b.vat_amount, b.amount_paid, b.status]));
+          }} />
+          {!adding && <button onClick={() => { setAdding(true); setEditId(null); resetForm(); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> New Bill</button>}
+        </div>
       </div>
 
       <div className="flex gap-3">
