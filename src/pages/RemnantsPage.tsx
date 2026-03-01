@@ -1,5 +1,7 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import RemnantDialog from "@/components/RemnantDialog";
 import { Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,31 +27,27 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function RemnantsPage() {
+  const { userRole } = useAuth();
   const [remnants, setRemnants] = useState<DbRemnant[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editRemnant, setEditRemnant] = useState<DbRemnant | null>(null);
 
-  useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase
-        .from("remnants")
-        .select("*")
-        .order("created_date", { ascending: false });
-      setRemnants(data ?? []);
-      setLoading(false);
-    };
-    fetch();
+  const canManage = userRole === "admin" || userRole === "engineer" || userRole === "supervisor" || userRole === "operator";
+
+  const fetchRemnants = useCallback(async () => {
+    const { data } = await supabase.from("remnants").select("*").order("created_date", { ascending: false });
+    setRemnants(data ?? []);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { fetchRemnants(); }, [fetchRemnants]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return remnants;
     const q = search.toLowerCase();
-    return remnants.filter(
-      r =>
-        r.colour_name.toLowerCase().includes(q) ||
-        r.material_code.toLowerCase().includes(q) ||
-        r.location.toLowerCase().includes(q)
-    );
+    return remnants.filter(r => r.colour_name.toLowerCase().includes(q) || r.material_code.toLowerCase().includes(q) || r.location.toLowerCase().includes(q));
   }, [remnants, search]);
 
   const available = remnants.filter(r => r.status === "available");
@@ -64,10 +62,11 @@ export default function RemnantsPage() {
           <h2 className="text-2xl font-mono font-bold text-foreground">Remnants</h2>
           <p className="text-sm text-muted-foreground">Offcut tracking and reuse</p>
         </div>
-        <button className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-          <Plus size={16} />
-          Add Remnant
-        </button>
+        {canManage && (
+          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            <Plus size={16} /> Add Remnant
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -91,13 +90,7 @@ export default function RemnantsPage() {
 
       <div className="relative max-w-sm">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search remnants..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full h-10 rounded-md border border-input bg-card pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        />
+        <input type="text" placeholder="Search remnants..." value={search} onChange={e => setSearch(e.target.value)} className="w-full h-10 rounded-md border border-input bg-card pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
       </div>
 
       {loading ? (
@@ -109,27 +102,17 @@ export default function RemnantsPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(rem => (
-            <div key={rem.id} className="glass-panel rounded-lg p-4 hover:border-primary/20 transition-all cursor-pointer">
+            <div key={rem.id} className="glass-panel rounded-lg p-4 hover:border-primary/20 transition-all cursor-pointer" onClick={() => canManage && setEditRemnant(rem)}>
               <div className="relative w-full h-24 bg-secondary/50 rounded-md mb-3 flex items-center justify-center overflow-hidden">
-                <div
-                  className="bg-primary/20 border border-primary/40 rounded-sm"
-                  style={{
-                    width: `${Math.min(90, (rem.length_mm / 2440) * 100)}%`,
-                    height: `${Math.min(90, (rem.width_mm / 1220) * 100)}%`,
-                  }}
-                />
-                <span className="absolute text-[10px] font-mono text-muted-foreground bottom-1 right-2">
-                  {rem.length_mm}×{rem.width_mm}
-                </span>
+                <div className="bg-primary/20 border border-primary/40 rounded-sm" style={{ width: `${Math.min(90, (rem.length_mm / 2440) * 100)}%`, height: `${Math.min(90, (rem.width_mm / 1220) * 100)}%` }} />
+                <span className="absolute text-[10px] font-mono text-muted-foreground bottom-1 right-2">{rem.length_mm}×{rem.width_mm}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-foreground">{rem.colour_name}</p>
                   <p className="text-xs text-muted-foreground font-mono">{rem.material_code} · {rem.thickness_mm}mm</p>
                 </div>
-                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium", statusStyles[rem.status] || "bg-muted text-muted-foreground")}>
-                  {rem.status}
-                </span>
+                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium", statusStyles[rem.status] || "bg-muted text-muted-foreground")}>{rem.status}</span>
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span>📍 {rem.location}</span>
@@ -139,6 +122,9 @@ export default function RemnantsPage() {
           ))}
         </div>
       )}
+
+      <RemnantDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={fetchRemnants} />
+      {editRemnant && <RemnantDialog open={!!editRemnant} onOpenChange={o => { if (!o) setEditRemnant(null); }} onSuccess={fetchRemnants} remnant={editRemnant} />}
     </div>
   );
 }
