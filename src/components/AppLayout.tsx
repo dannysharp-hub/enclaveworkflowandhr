@@ -20,6 +20,7 @@ import {
   Zap,
   Sun,
   ShieldAlert,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,6 +38,7 @@ const navItems = [
   { to: "/training", label: "Training", icon: GraduationCap },
   { to: "/skills", label: "Skills Matrix", icon: Zap },
   { to: "/machine-auth", label: "Machine Auth", icon: ShieldAlert },
+  { to: "/reviews", label: "Reviews", icon: ClipboardCheck },
   { to: "/remnants", label: "Remnants", icon: Recycle },
   { to: "/materials", label: "Materials", icon: Package },
 ];

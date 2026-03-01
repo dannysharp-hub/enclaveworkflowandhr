@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Wrench, CalendarDays, Recycle, AlertTriangle, ShieldCheck, GraduationCap, Users, Clock, TrendingDown } from "lucide-react";
+import { Wrench, CalendarDays, Recycle, AlertTriangle, ShieldCheck, GraduationCap, Users, Clock, TrendingDown, ClipboardCheck } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import { Link } from "react-router-dom";
@@ -21,11 +21,12 @@ export default function Dashboard() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [training, setTraining] = useState<any[]>([]);
+  const [reviewsData, setReviewsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      const [jobsRes, stagesRes, holidaysRes, remnantsRes, filesRes, profilesRes, receiptsRes, trainingRes] = await Promise.all([
+      const [jobsRes, stagesRes, holidaysRes, remnantsRes, filesRes, profilesRes, receiptsRes, trainingRes, reviewsRes] = await Promise.all([
         supabase.from("jobs").select("*").neq("status", "complete").order("created_date", { ascending: false }),
         supabase.from("job_stages").select("*").eq("status", "In Progress"),
         supabase.from("holiday_requests").select("*").order("created_at", { ascending: false }),
@@ -34,6 +35,7 @@ export default function Dashboard() {
         supabase.from("profiles").select("user_id, full_name, department, active").eq("active", true),
         supabase.from("file_read_receipts").select("*"),
         supabase.from("training_records").select("*"),
+        supabase.from("reviews").select("*"),
       ]);
 
       setJobs(jobsRes.data ?? []);
@@ -42,6 +44,7 @@ export default function Dashboard() {
       setProfiles(profilesRes.data ?? []);
       setReceipts(receiptsRes.data ?? []);
       setTraining(trainingRes.data ?? []);
+      setReviewsData(reviewsRes.data ?? []);
       setStats({
         activeJobs: jobsRes.data?.length ?? 0,
         inProgressStages: stagesRes.data?.length ?? 0,
@@ -110,6 +113,18 @@ export default function Dashboard() {
     return { absenceRate, absentToday, deptCoverage, expiringCerts, expiredCerts, compliancePct };
   }, [holidays, profiles, training, files, receipts]);
 
+  // Review metrics
+  const reviewMetrics = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const overdue = reviewsData.filter(r => r.status === "Scheduled" && r.due_date < today).length;
+    const upcoming = reviewsData.filter(r => {
+      if (r.status !== "Scheduled") return false;
+      const d = Math.ceil((new Date(r.due_date).getTime() - Date.now()) / 86400000);
+      return d >= 0 && d <= 14;
+    }).length;
+    return { overdue, upcoming };
+  }, [reviewsData]);
+
   if (loading) {
     return (
       <div className="space-y-6 animate-slide-in">
@@ -135,7 +150,7 @@ export default function Dashboard() {
         <StatCard title="Absence Rate" value={`${hrMetrics.absenceRate}%`} subtitle={`${hrMetrics.absentToday} off today`} icon={<TrendingDown size={18} />} variant={hrMetrics.absenceRate > 20 ? "warning" : "default"} />
         <StatCard title="Compliance" value={`${hrMetrics.compliancePct}%`} subtitle="Document acknowledgement" icon={<ShieldCheck size={18} />} variant={hrMetrics.compliancePct < 80 ? "warning" : "primary"} />
         <StatCard title="Cert Expiries" value={hrMetrics.expiringCerts + hrMetrics.expiredCerts} subtitle={hrMetrics.expiredCerts > 0 ? `${hrMetrics.expiredCerts} expired` : "Within 90 days"} icon={<GraduationCap size={18} />} variant={hrMetrics.expiredCerts > 0 ? "warning" : "default"} />
-        <StatCard title="Staff Active" value={profiles.length} subtitle={`${hrMetrics.absentToday} absent`} icon={<Users size={18} />} variant="accent" />
+        <StatCard title="Reviews Due" value={reviewMetrics.overdue + reviewMetrics.upcoming} subtitle={reviewMetrics.overdue > 0 ? `${reviewMetrics.overdue} overdue` : "Upcoming 14 days"} icon={<ClipboardCheck size={18} />} variant={reviewMetrics.overdue > 0 ? "warning" : "default"} />
       </div>
 
       {/* Department Coverage */}
@@ -178,6 +193,18 @@ export default function Dashboard() {
             {hrMetrics.expiringCerts > 0 && <span className="font-medium text-warning">{hrMetrics.expiringCerts} expiring within 90 days</span>}
           </span>
           <Link to="/training" className="ml-auto text-xs text-primary hover:underline font-medium">View →</Link>
+        </div>
+      )}
+
+      {/* Overdue Reviews */}
+      {reviewMetrics.overdue > 0 && (
+        <div className="rounded-lg px-4 py-3 flex items-center gap-3 bg-destructive/10 border border-destructive/20">
+          <ClipboardCheck size={16} className="text-destructive" />
+          <span className="text-sm text-foreground">
+            <span className="font-medium text-destructive">{reviewMetrics.overdue} overdue review{reviewMetrics.overdue !== 1 ? "s" : ""}</span>
+            {reviewMetrics.upcoming > 0 && <> · <span className="font-medium text-warning">{reviewMetrics.upcoming} due within 14 days</span></>}
+          </span>
+          <Link to="/reviews" className="ml-auto text-xs text-primary hover:underline font-medium">View →</Link>
         </div>
       )}
 
