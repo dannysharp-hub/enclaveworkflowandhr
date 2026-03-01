@@ -32,6 +32,8 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
     customer_id: "",
     revenue_status: "quoted",
     notes: "",
+    deposit_required: "",
+    deposit_received: "",
   });
 
   const load = useCallback(async () => {
@@ -58,6 +60,8 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
         customer_id: jf.customer_id || "",
         revenue_status: jf.revenue_status || "quoted",
         notes: jf.notes || "",
+        deposit_required: jf.deposit_required != null ? String(jf.deposit_required) : "",
+        deposit_received: jf.deposit_received != null ? String(jf.deposit_received) : "",
       });
     }
     setLoading(false);
@@ -77,6 +81,8 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
         customer_id: form.customer_id || null,
         revenue_status: form.revenue_status,
         notes: form.notes || null,
+        deposit_required: form.deposit_required ? parseFloat(form.deposit_required) : 0,
+        deposit_received: form.deposit_received ? parseFloat(form.deposit_received) : 0,
       };
       if (financials) {
         const { error } = await supabase.from("job_financials").update(payload).eq("id", financials.id);
@@ -104,6 +110,9 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
   const invoicedTotal = invoices.reduce((s, i) => s + Number(i.amount_ex_vat || 0), 0);
   const paidTotal = invoices.reduce((s, i) => s + Number(i.amount_paid || 0), 0);
   const billsPaidTotal = bills.reduce((s, b) => s + Number(b.amount_paid || 0), 0);
+  const depositRequired = form.deposit_required ? parseFloat(form.deposit_required) : 0;
+  const depositReceived = form.deposit_received ? parseFloat(form.deposit_received) : 0;
+  const depositRemaining = depositRequired - depositReceived;
 
   const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
@@ -197,6 +206,49 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
           </div>
         </div>
       )}
+
+      {/* Deposit Tracking */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5">
+          <DollarSign size={13} className="text-primary" />
+          <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Deposit Tracking</span>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {canEdit ? (
+            <>
+              <div>
+                <label className={labelClass}>Deposit Required</label>
+                <input type="number" step="0.01" className={inputClass} value={form.deposit_required} onChange={e => setForm(f => ({ ...f, deposit_required: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div>
+                <label className={labelClass}>Deposit Received</label>
+                <input type="number" step="0.01" className={inputClass} value={form.deposit_received} onChange={e => setForm(f => ({ ...f, deposit_received: e.target.value }))} placeholder="0.00" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-muted/30 rounded-lg p-3">
+                <p className="text-[10px] font-mono text-muted-foreground uppercase">Required</p>
+                <p className="text-lg font-mono font-bold text-foreground">{fmt(depositRequired)}</p>
+              </div>
+              <div className="bg-muted/30 rounded-lg p-3">
+                <p className="text-[10px] font-mono text-muted-foreground uppercase">Received</p>
+                <p className="text-lg font-mono font-bold text-success">{fmt(depositReceived)}</p>
+              </div>
+            </>
+          )}
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] font-mono text-muted-foreground uppercase">Remaining</p>
+            <p className={cn("text-lg font-mono font-bold", depositRemaining <= 0 ? "text-success" : "text-warning")}>{fmt(depositRemaining)}</p>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-[10px] font-mono text-muted-foreground uppercase">Status</p>
+            <p className={cn("text-sm font-mono font-bold mt-1", depositRequired === 0 ? "text-muted-foreground" : depositReceived >= depositRequired ? "text-success" : depositReceived > 0 ? "text-warning" : "text-destructive")}>
+              {depositRequired === 0 ? "N/A" : depositReceived >= depositRequired ? "Paid" : depositReceived > 0 ? "Partial" : "Unpaid"}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Linked invoices & bills */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
