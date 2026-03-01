@@ -3,10 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
+import ReadinessBadge from "@/components/ReadinessBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search, Hammer, AlertTriangle } from "lucide-react";
+import { Plus, Search, Hammer, AlertTriangle, RefreshCw } from "lucide-react";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { cn } from "@/lib/utils";
+import { updateAllJobReadiness, type ReadinessResult } from "@/lib/readinessEngine";
 import type { JobStatus } from "@/types";
 
 interface DbJob {
@@ -26,7 +28,9 @@ export default function JobsPage() {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<DbJob[]>([]);
   const [jobOverdues, setJobOverdues] = useState<Map<string, { overdueInvoices: number; overdueBills: number }>>(new Map());
+  const [readiness, setReadiness] = useState<Map<string, ReadinessResult>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [refreshingReadiness, setRefreshingReadiness] = useState(false);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editJob, setEditJob] = useState<DbJob | null>(null);
@@ -36,6 +40,12 @@ export default function JobsPage() {
   const fetchJobs = useCallback(async () => {
     const { data } = await supabase.from("jobs").select("*").order("created_date", { ascending: false });
     setJobs(data ?? []);
+
+    // Load cached readiness
+    const { data: rData } = await (supabase.from("production_readiness_status") as any).select("*");
+    const rMap = new Map<string, ReadinessResult>();
+    (rData ?? []).forEach((r: any) => rMap.set(r.job_id, r));
+    setReadiness(rMap);
 
     if (flags.enable_finance) {
       const today = new Date().toISOString().split("T")[0];
@@ -60,6 +70,16 @@ export default function JobsPage() {
     setLoading(false);
   }, [flags.enable_finance]);
 
+  const refreshReadiness = useCallback(async () => {
+    setRefreshingReadiness(true);
+    try {
+      const results = await updateAllJobReadiness();
+      const rMap = new Map<string, ReadinessResult>();
+      results.forEach(r => rMap.set(r.job_id, r));
+      setReadiness(rMap);
+    } finally { setRefreshingReadiness(false); }
+  }, []);
+
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
   const filtered = useMemo(() => {
@@ -77,11 +97,17 @@ export default function JobsPage() {
             {jobs.length} job{jobs.length !== 1 ? "s" : ""} · {jobs.filter(j => j.status !== "complete").length} active
           </p>
         </div>
-        {canManage && (
-          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-            <Plus size={16} /> New Job
+        <div className="flex gap-2">
+          {canManage && (
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              <Plus size={16} /> New Job
+            </button>
+          )}
+          <button onClick={refreshReadiness} disabled={refreshingReadiness} className="flex items-center gap-2 rounded-md border border-border px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50">
+            <RefreshCw size={14} className={refreshingReadiness ? "animate-spin" : ""} />
+            {refreshingReadiness ? "Calculating…" : "Readiness"}
           </button>
-        )}
+        </div>
       </div>
 
       <div className="flex gap-3">
@@ -107,6 +133,7 @@ export default function JobsPage() {
                   <th className="text-left p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Name</th>
                   <th className="text-left p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Date</th>
                   <th className="text-left p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                  <th className="text-left p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Readiness</th>
                   <th className="text-right p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Parts</th>
                   <th className="text-right p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Sheets</th>
                   {canManage && <th className="p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Build</th>}
@@ -115,6 +142,7 @@ export default function JobsPage() {
               <tbody className="divide-y divide-border">
                 {filtered.map(job => {
                   const overdue = jobOverdues.get(job.id);
+                  const r = readiness.get(job.id);
                   return (
                   <tr key={job.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => canManage && setEditJob(job)}>
                     <td className="p-4 font-mono text-sm text-primary">
@@ -133,6 +161,13 @@ export default function JobsPage() {
                     <td className="p-4 text-sm font-medium text-foreground">{job.job_name}</td>
                     <td className="p-4 text-sm text-muted-foreground hidden sm:table-cell">{job.created_date}</td>
                     <td className="p-4"><JobStatusBadge status={job.status as JobStatus} /></td>
+                    <td className="p-4">
+                      {r ? (
+                        <ReadinessBadge score={r.readiness_score} status={r.readiness_status as any} compact />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground font-mono">—</span>
+                      )}
+                    </td>
                     <td className="p-4 text-right font-mono text-sm text-foreground">{job.parts_count}</td>
                     <td className="p-4 text-right font-mono text-sm text-muted-foreground hidden md:table-cell">{job.sheets_estimated}</td>
                     {canManage && (
