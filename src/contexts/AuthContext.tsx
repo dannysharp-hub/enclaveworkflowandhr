@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   userRole: string | null;
   profile: any | null;
+  tenantId: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   userRole: null,
   profile: null,
+  tenantId: null,
   signOut: async () => {},
 });
 
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
   const fetchUserData = async (userId: string) => {
     const [{ data: roleData }, { data: profileData }] = await Promise.all([
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ]);
     setUserRole(roleData?.role ?? null);
     setProfile(profileData ?? null);
+    setTenantId(profileData?.tenant_id ?? null);
   };
 
   useEffect(() => {
@@ -47,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUserRole(null);
         setProfile(null);
+        setTenantId(null);
       }
       setLoading(false);
     });
@@ -68,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, profile, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, profile, tenantId, signOut }}>
       {children}
     </AuthContext.Provider>
   );
