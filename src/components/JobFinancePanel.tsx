@@ -1,0 +1,262 @@
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { DollarSign, Receipt, Wallet, Save, TrendingUp, TrendingDown } from "lucide-react";
+
+const inputClass = "w-full h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-0.5 uppercase tracking-wider";
+
+interface Props {
+  jobId: string;
+  jobCode: string;
+}
+
+export default function JobFinancePanel({ jobId, jobCode }: Props) {
+  const { userRole } = useAuth();
+  const canEdit = ["admin", "office"].includes(userRole || "");
+
+  const [financials, setFinancials] = useState<any>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [bills, setBills] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState({
+    quote_value_ex_vat: 0,
+    material_cost_override: "",
+    labour_cost_override: "",
+    overhead_allocation_override: "",
+    customer_id: "",
+    revenue_status: "quoted",
+    notes: "",
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [jfRes, invRes, billRes, custRes] = await Promise.all([
+      supabase.from("job_financials").select("*").eq("job_id", jobId).maybeSingle(),
+      supabase.from("invoices").select("id, invoice_number, amount_ex_vat, vat_amount, amount_paid, status").eq("job_id", jobId),
+      supabase.from("bills").select("id, bill_reference, amount_ex_vat, vat_amount, amount_paid, status, category").eq("job_id", jobId),
+      supabase.from("customers").select("id, name").eq("active", true),
+    ]);
+
+    setFinancials(jfRes.data);
+    setInvoices(invRes.data ?? []);
+    setBills(billRes.data ?? []);
+    setCustomers(custRes.data ?? []);
+
+    if (jfRes.data) {
+      const jf = jfRes.data;
+      setForm({
+        quote_value_ex_vat: Number(jf.quote_value_ex_vat || 0),
+        material_cost_override: jf.material_cost_override != null ? String(jf.material_cost_override) : "",
+        labour_cost_override: jf.labour_cost_override != null ? String(jf.labour_cost_override) : "",
+        overhead_allocation_override: jf.overhead_allocation_override != null ? String(jf.overhead_allocation_override) : "",
+        customer_id: jf.customer_id || "",
+        revenue_status: jf.revenue_status || "quoted",
+        notes: jf.notes || "",
+      });
+    }
+    setLoading(false);
+  }, [jobId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        job_id: jobId,
+        quote_value_ex_vat: form.quote_value_ex_vat,
+        material_cost_override: form.material_cost_override ? parseFloat(form.material_cost_override) : null,
+        labour_cost_override: form.labour_cost_override ? parseFloat(form.labour_cost_override) : null,
+        overhead_allocation_override: form.overhead_allocation_override ? parseFloat(form.overhead_allocation_override) : null,
+        customer_id: form.customer_id || null,
+        revenue_status: form.revenue_status,
+        notes: form.notes || null,
+      };
+      if (financials) {
+        const { error } = await supabase.from("job_financials").update(payload).eq("id", financials.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("job_financials").insert(payload);
+        if (error) throw error;
+      }
+      toast({ title: "Financials saved" });
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  // Calculations
+  const quoteValue = form.quote_value_ex_vat;
+  const materialCost = form.material_cost_override ? parseFloat(form.material_cost_override) : 0;
+  const labourCost = form.labour_cost_override ? parseFloat(form.labour_cost_override) : 0;
+  const overheadCost = form.overhead_allocation_override ? parseFloat(form.overhead_allocation_override) : 0;
+  const billsTotal = bills.reduce((s, b) => s + Number(b.amount_ex_vat || 0), 0);
+  const totalCost = materialCost + labourCost + overheadCost + billsTotal;
+  const profit = quoteValue - totalCost;
+  const margin = quoteValue > 0 ? (profit / quoteValue) * 100 : 0;
+  const invoicedTotal = invoices.reduce((s, i) => s + Number(i.amount_ex_vat || 0), 0);
+  const paidTotal = invoices.reduce((s, i) => s + Number(i.amount_paid || 0), 0);
+  const billsPaidTotal = bills.reduce((s, b) => s + Number(b.amount_paid || 0), 0);
+
+  const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  if (loading) {
+    return (
+      <div className="glass-panel rounded-lg p-5 animate-pulse">
+        <div className="h-4 w-40 bg-muted rounded mb-4" />
+        <div className="grid grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-muted rounded" />)}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-panel rounded-lg p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <DollarSign size={16} className="text-primary" />
+          <h3 className="font-mono text-sm font-bold text-foreground">Financial Summary</h3>
+        </div>
+        {canEdit && (
+          <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-[10px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            <Save size={12} /> {saving ? "Saving…" : "Save"}
+          </button>
+        )}
+      </div>
+
+      {/* KPI row */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-[10px] font-mono text-muted-foreground uppercase">Quote Value</p>
+          <p className="text-lg font-mono font-bold text-foreground">{fmt(quoteValue)}</p>
+        </div>
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-[10px] font-mono text-muted-foreground uppercase">Total Cost</p>
+          <p className="text-lg font-mono font-bold text-foreground">{fmt(totalCost)}</p>
+        </div>
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-[10px] font-mono text-muted-foreground uppercase">Profit</p>
+          <p className={cn("text-lg font-mono font-bold", profit >= 0 ? "text-success" : "text-destructive")}>{fmt(profit)}</p>
+        </div>
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-[10px] font-mono text-muted-foreground uppercase">Margin</p>
+          <div className="flex items-center gap-1">
+            {margin >= 0 ? <TrendingUp size={14} className="text-success" /> : <TrendingDown size={14} className="text-destructive" />}
+            <p className={cn("text-lg font-mono font-bold", margin >= 15 ? "text-success" : margin >= 0 ? "text-warning" : "text-destructive")}>{margin.toFixed(1)}%</p>
+          </div>
+        </div>
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-[10px] font-mono text-muted-foreground uppercase">Cash In</p>
+          <p className="text-lg font-mono font-bold text-success">{fmt(paidTotal)}</p>
+        </div>
+      </div>
+
+      {/* Edit fields */}
+      {canEdit && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className={labelClass}>Quote (ex VAT)</label>
+            <input type="number" step="0.01" className={inputClass} value={form.quote_value_ex_vat} onChange={e => setForm(f => ({ ...f, quote_value_ex_vat: parseFloat(e.target.value) || 0 }))} />
+          </div>
+          <div>
+            <label className={labelClass}>Material Cost</label>
+            <input type="number" step="0.01" className={inputClass} value={form.material_cost_override} onChange={e => setForm(f => ({ ...f, material_cost_override: e.target.value }))} placeholder="Override" />
+          </div>
+          <div>
+            <label className={labelClass}>Labour Cost</label>
+            <input type="number" step="0.01" className={inputClass} value={form.labour_cost_override} onChange={e => setForm(f => ({ ...f, labour_cost_override: e.target.value }))} placeholder="Override" />
+          </div>
+          <div>
+            <label className={labelClass}>Overhead Allocation</label>
+            <input type="number" step="0.01" className={inputClass} value={form.overhead_allocation_override} onChange={e => setForm(f => ({ ...f, overhead_allocation_override: e.target.value }))} placeholder="Override" />
+          </div>
+          <div>
+            <label className={labelClass}>Customer</label>
+            <select className={inputClass} value={form.customer_id} onChange={e => setForm(f => ({ ...f, customer_id: e.target.value }))}>
+              <option value="">None</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Revenue Status</label>
+            <select className={inputClass} value={form.revenue_status} onChange={e => setForm(f => ({ ...f, revenue_status: e.target.value }))}>
+              {["quoted", "confirmed", "in_progress", "invoiced", "paid", "cancelled"].map(s => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+            </select>
+          </div>
+          <div className="lg:col-span-2">
+            <label className={labelClass}>Notes</label>
+            <input className={inputClass} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Financial notes…" />
+          </div>
+        </div>
+      )}
+
+      {/* Linked invoices & bills */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Invoices */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Receipt size={13} className="text-primary" />
+            <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Linked Invoices ({invoices.length})</span>
+          </div>
+          {invoices.length === 0 ? (
+            <p className="text-xs text-muted-foreground pl-5">No invoices linked to this job</p>
+          ) : (
+            <div className="space-y-1">
+              {invoices.map(inv => (
+                <div key={inv.id} className="flex items-center justify-between bg-muted/20 rounded px-3 py-1.5 text-xs">
+                  <span className="font-mono text-foreground">{inv.invoice_number}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground">{fmt(Number(inv.amount_ex_vat))}</span>
+                    <span className={cn("font-mono text-[10px] px-1.5 py-0.5 rounded-full", inv.status === "paid" ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>{inv.status}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between px-3 pt-1 text-[10px] font-mono text-muted-foreground">
+                <span>Total invoiced: {fmt(invoicedTotal)}</span>
+                <span>Paid: {fmt(paidTotal)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bills */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Wallet size={13} className="text-accent" />
+            <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Linked Bills ({bills.length})</span>
+          </div>
+          {bills.length === 0 ? (
+            <p className="text-xs text-muted-foreground pl-5">No bills linked to this job</p>
+          ) : (
+            <div className="space-y-1">
+              {bills.map(b => (
+                <div key={b.id} className="flex items-center justify-between bg-muted/20 rounded px-3 py-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-foreground">{b.bill_reference}</span>
+                    <span className="text-muted-foreground">{b.category}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground">{fmt(Number(b.amount_ex_vat))}</span>
+                    <span className={cn("font-mono text-[10px] px-1.5 py-0.5 rounded-full", b.status === "paid" ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>{b.status}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between px-3 pt-1 text-[10px] font-mono text-muted-foreground">
+                <span>Total billed: {fmt(billsTotal)}</span>
+                <span>Paid: {fmt(billsPaidTotal)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
