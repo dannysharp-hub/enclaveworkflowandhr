@@ -526,6 +526,9 @@ export type Database = {
           created_at: string
           department: Database["public"]["Enums"]["app_department"]
           email: string
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           employment_type: string
           full_name: string
           holiday_allowance_days: number
@@ -547,6 +550,9 @@ export type Database = {
           created_at?: string
           department?: Database["public"]["Enums"]["app_department"]
           email: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           employment_type?: string
           full_name: string
           holiday_allowance_days?: number
@@ -568,6 +574,9 @@ export type Database = {
           created_at?: string
           department?: Database["public"]["Enums"]["app_department"]
           email?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           employment_type?: string
           full_name?: string
           holiday_allowance_days?: number

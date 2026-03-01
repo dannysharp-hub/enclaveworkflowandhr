@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound, FileText, Upload, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Pencil, Shield, CreditCard, GraduationCap, Star, Calendar, Save, X, Palmtree, Plus, Check, XCircle, KeyRound, FileText, Upload, Download, Trash2, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -24,6 +24,9 @@ interface ProfileData {
   bank_name: string | null;
   ni_number: string | null;
   passport_number: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
   role: string;
 }
 
@@ -142,6 +145,11 @@ export default function StaffProfilePage() {
   });
   const [saving, setSaving] = useState(false);
 
+  // Emergency contact edit state
+  const [editingEmergency, setEditingEmergency] = useState(false);
+  const [emergencyForm, setEmergencyForm] = useState({ emergency_contact_name: "", emergency_contact_phone: "", emergency_contact_relationship: "" });
+  const [savingEmergency, setSavingEmergency] = useState(false);
+
   useEffect(() => {
     if (!userId) return;
     fetchAll();
@@ -172,6 +180,11 @@ export default function StaffProfilePage() {
         bank_name: p.bank_name ?? "",
         ni_number: p.ni_number ?? "",
         passport_number: p.passport_number ?? "",
+      });
+      setEmergencyForm({
+        emergency_contact_name: p.emergency_contact_name ?? "",
+        emergency_contact_phone: p.emergency_contact_phone ?? "",
+        emergency_contact_relationship: p.emergency_contact_relationship ?? "",
       });
     }
     setReviews((reviewsRes.data as any) ?? []);
@@ -283,6 +296,24 @@ export default function StaffProfilePage() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveEmergency = async () => {
+    if (!profile) return;
+    setSavingEmergency(true);
+    try {
+      const res = await supabase.functions.invoke("manage-staff?action=update-profile", {
+        body: { user_id: profile.user_id, ...emergencyForm },
+      });
+      if (res.data?.error) throw new Error(res.data.error);
+      toast({ title: "Saved", description: "Emergency contact updated" });
+      setEditingEmergency(false);
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingEmergency(false);
     }
   };
 
@@ -523,6 +554,65 @@ export default function StaffProfilePage() {
                     <input type="text" maxLength={100} value={piiForm.bank_name} onChange={e => setPiiForm(f => ({ ...f, bank_name: e.target.value }))} className={inputClass} placeholder="Barclays" />
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Emergency Contact */}
+      {canView && (
+        <div className="glass-panel rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Phone size={16} className="text-primary" />
+              <h3 className="text-sm font-mono font-bold text-foreground">Emergency Contact</h3>
+            </div>
+            {isAdmin && !editingEmergency && (
+              <button onClick={() => setEditingEmergency(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <Pencil size={12} /> Edit
+              </button>
+            )}
+            {isAdmin && editingEmergency && (
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditingEmergency(false)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <X size={12} /> Cancel
+                </button>
+                <button onClick={handleSaveEmergency} disabled={savingEmergency} className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50">
+                  <Save size={12} /> {savingEmergency ? "Saving..." : "Save"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!editingEmergency ? (
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <span className={labelClass}>Name</span>
+                <span className="text-sm text-foreground">{profile.emergency_contact_name || "—"}</span>
+              </div>
+              <div>
+                <span className={labelClass}>Phone</span>
+                <span className="text-sm text-foreground font-mono">{profile.emergency_contact_phone || "—"}</span>
+              </div>
+              <div>
+                <span className={labelClass}>Relationship</span>
+                <span className="text-sm text-foreground">{profile.emergency_contact_relationship || "—"}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Name</label>
+                <input type="text" maxLength={100} value={emergencyForm.emergency_contact_name} onChange={e => setEmergencyForm(f => ({ ...f, emergency_contact_name: e.target.value }))} className={inputClass} placeholder="Jane Doe" />
+              </div>
+              <div>
+                <label className={labelClass}>Phone</label>
+                <input type="tel" maxLength={20} value={emergencyForm.emergency_contact_phone} onChange={e => setEmergencyForm(f => ({ ...f, emergency_contact_phone: e.target.value }))} className={inputClass} placeholder="07700 900000" />
+              </div>
+              <div>
+                <label className={labelClass}>Relationship</label>
+                <input type="text" maxLength={50} value={emergencyForm.emergency_contact_relationship} onChange={e => setEmergencyForm(f => ({ ...f, emergency_contact_relationship: e.target.value }))} className={inputClass} placeholder="Spouse" />
               </div>
             </div>
           )}
