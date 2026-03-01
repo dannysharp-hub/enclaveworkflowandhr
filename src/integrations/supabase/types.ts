@@ -518,6 +518,10 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_name: string | null
+          bank_sort_code: string | null
           contracted_hours_per_week: number
           created_at: string
           department: Database["public"]["Enums"]["app_department"]
@@ -527,12 +531,18 @@ export type Database = {
           holiday_allowance_days: number
           holiday_balance_days: number
           id: string
+          ni_number: string | null
+          passport_number: string | null
           start_date: string
           updated_at: string
           user_id: string
         }
         Insert: {
           active?: boolean
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_sort_code?: string | null
           contracted_hours_per_week?: number
           created_at?: string
           department?: Database["public"]["Enums"]["app_department"]
@@ -542,12 +552,18 @@ export type Database = {
           holiday_allowance_days?: number
           holiday_balance_days?: number
           id?: string
+          ni_number?: string | null
+          passport_number?: string | null
           start_date?: string
           updated_at?: string
           user_id: string
         }
         Update: {
           active?: boolean
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_sort_code?: string | null
           contracted_hours_per_week?: number
           created_at?: string
           department?: Database["public"]["Enums"]["app_department"]
@@ -557,6 +573,8 @@ export type Database = {
           holiday_allowance_days?: number
           holiday_balance_days?: number
           id?: string
+          ni_number?: string | null
+          passport_number?: string | null
           start_date?: string
           updated_at?: string
           user_id?: string

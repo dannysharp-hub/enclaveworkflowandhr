@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Search, Pencil } from "lucide-react";
@@ -33,6 +34,7 @@ const roleBadge = (role: string) => {
 };
 
 export default function StaffPage() {
+  const navigate = useNavigate();
   const { userRole } = useAuth();
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,12 +143,7 @@ export default function StaffPage() {
             <div
               key={s.user_id}
               className="glass-panel rounded-lg p-4 hover:border-primary/20 transition-all cursor-pointer group"
-              onClick={() => {
-                if (isAdmin) {
-                  setSelectedStaff(s);
-                  setEditOpen(true);
-                }
-              }}
+              onClick={() => navigate(`/staff/${s.user_id}`)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">

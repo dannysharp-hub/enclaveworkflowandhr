@@ -8,6 +8,7 @@ import AppLayout from "@/components/AppLayout";
 import Index from "./pages/Index";
 import JobsPage from "./pages/JobsPage";
 import StaffPage from "./pages/StaffPage";
+import StaffProfilePage from "./pages/StaffProfilePage";
 import CalendarPage from "./pages/CalendarPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import CompliancePage from "./pages/CompliancePage";
@@ -56,6 +57,7 @@ const AppRoutes = () => (
               <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:jobId/builder" element={<JobBuilderPage />} />
               <Route path="/staff" element={<StaffPage />} />
+              <Route path="/staff/:userId" element={<StaffProfilePage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />

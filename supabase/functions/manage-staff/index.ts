@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === "POST" && action === "update-profile") {
-      const { user_id, full_name, department, employment_type, contracted_hours_per_week, holiday_allowance_days, active } = await req.json();
+      const { user_id, full_name, department, employment_type, contracted_hours_per_week, holiday_allowance_days, active, bank_sort_code, bank_account_number, bank_account_name, bank_name, ni_number, passport_number } = await req.json();
 
       if (!user_id) {
         return new Response(
@@ -146,6 +146,12 @@ Deno.serve(async (req) => {
       if (contracted_hours_per_week !== undefined) updates.contracted_hours_per_week = contracted_hours_per_week;
       if (holiday_allowance_days !== undefined) updates.holiday_allowance_days = holiday_allowance_days;
       if (active !== undefined) updates.active = active;
+      if (bank_sort_code !== undefined) updates.bank_sort_code = bank_sort_code;
+      if (bank_account_number !== undefined) updates.bank_account_number = bank_account_number;
+      if (bank_account_name !== undefined) updates.bank_account_name = bank_account_name;
+      if (bank_name !== undefined) updates.bank_name = bank_name;
+      if (ni_number !== undefined) updates.ni_number = ni_number;
+      if (passport_number !== undefined) updates.passport_number = passport_number;
 
       const { error } = await adminClient
         .from("profiles")
