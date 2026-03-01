@@ -593,6 +593,51 @@ export type Database = {
           },
         ]
       }
+      reviews: {
+        Row: {
+          completed_date: string | null
+          created_at: string
+          due_date: string
+          id: string
+          notes: string | null
+          outcome: string | null
+          review_type: string
+          reviewer_id: string | null
+          staff_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed_date?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          notes?: string | null
+          outcome?: string | null
+          review_type?: string
+          reviewer_id?: string | null
+          staff_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed_date?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          notes?: string | null
+          outcome?: string | null
+          review_type?: string
+          reviewer_id?: string | null
+          staff_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       skills: {
         Row: {
           active: boolean
