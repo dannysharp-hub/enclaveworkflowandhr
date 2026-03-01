@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ForecastDashboard from "@/components/ForecastDashboard";
+import ScenarioComparison from "@/components/ScenarioComparison";
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-xs font-mono font-medium text-muted-foreground mb-1 uppercase tracking-wider";
@@ -529,12 +530,16 @@ export default function CashflowForecastPage() {
       <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList className="bg-muted/30 border border-border">
           <TabsTrigger value="dashboard" className="text-xs font-mono">Dashboard</TabsTrigger>
+          <TabsTrigger value="compare" className="text-xs font-mono">Compare</TabsTrigger>
           <TabsTrigger value="scenarios" className="text-xs font-mono">Scenarios</TabsTrigger>
           <TabsTrigger value="adjustments" className="text-xs font-mono">Adjustments</TabsTrigger>
           <TabsTrigger value="settings" className="text-xs font-mono">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard" className="glass-panel rounded-lg p-5">
           <ForecastDashboard />
+        </TabsContent>
+        <TabsContent value="compare" className="glass-panel rounded-lg p-5">
+          <ScenarioComparison />
         </TabsContent>
         <TabsContent value="scenarios" className="glass-panel rounded-lg p-5">
           <ScenariosTab />
