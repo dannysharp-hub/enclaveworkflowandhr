@@ -12,6 +12,7 @@ import CalendarPage from "./pages/CalendarPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import RemnantsPage from "./pages/RemnantsPage";
 import MaterialsPage from "./pages/MaterialsPage";
+import JobBuilderPage from "./pages/JobBuilderPage";
 import WorkflowPage from "./pages/WorkflowPage";
 import MyWorkPage from "./pages/MyWorkPage";
 import LoginPage from "./pages/LoginPage";
@@ -47,6 +48,7 @@ const AppRoutes = () => (
               <Route path="/my-work" element={<MyWorkPage />} />
               <Route path="/workflow" element={<WorkflowPage />} />
               <Route path="/jobs" element={<JobsPage />} />
+              <Route path="/jobs/:jobId/builder" element={<JobBuilderPage />} />
               <Route path="/staff" element={<StaffPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
