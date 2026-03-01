@@ -24,6 +24,7 @@ import ReviewsPage from "./pages/ReviewsPage";
 import MyWorkPage from "./pages/MyWorkPage";
 import LoginPage from "./pages/LoginPage";
 import HolidayCalendarPage from "./pages/HolidayCalendarPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +71,7 @@ const AppRoutes = () => (
               <Route path="/whos-in" element={<WhosInPage />} />
               <Route path="/remnants" element={<RemnantsPage />} />
               <Route path="/materials" element={<MaterialsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>

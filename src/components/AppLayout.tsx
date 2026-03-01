@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   ClipboardCheck,
   Palmtree,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -109,7 +110,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-4 space-y-1 px-2">
+        <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
             return (
@@ -129,6 +130,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </NavLink>
             );
           })}
+          {userRole === "admin" && (
+            <>
+              <div className="my-2 border-t border-border" />
+              {(() => {
+                const isActive = location.pathname === "/settings";
+                return (
+                  <NavLink
+                    to="/settings"
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all",
+                      isActive
+                        ? "bg-primary/10 text-primary glow-primary"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <Settings size={18} className={isActive ? "text-primary" : ""} />
+                    {!collapsed && <span>Settings</span>}
+                  </NavLink>
+                );
+              })()}
+            </>
+          )}
         </nav>
 
         {/* Footer */}
