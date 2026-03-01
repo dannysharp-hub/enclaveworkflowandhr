@@ -11,6 +11,7 @@ import StaffPage from "./pages/StaffPage";
 import CalendarPage from "./pages/CalendarPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import RemnantsPage from "./pages/RemnantsPage";
+import MaterialsPage from "./pages/MaterialsPage";
 import WorkflowPage from "./pages/WorkflowPage";
 import MyWorkPage from "./pages/MyWorkPage";
 import LoginPage from "./pages/LoginPage";
@@ -50,6 +51,7 @@ const AppRoutes = () => (
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/remnants" element={<RemnantsPage />} />
+              <Route path="/materials" element={<MaterialsPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>

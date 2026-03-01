@@ -14,6 +14,7 @@ import {
   LogOut,
   Kanban,
   ClipboardList,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +28,7 @@ const navItems = [
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/documents", label: "Documents", icon: FileText },
   { to: "/remnants", label: "Remnants", icon: Recycle },
+  { to: "/materials", label: "Materials", icon: Package },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
