@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import {
   LayoutDashboard,
   Wrench,
@@ -27,8 +28,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import type { LucideIcon } from "lucide-react";
 
-const navItems = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  featureFlag?: string;
+}
+
+const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/whos-in", label: "Who's In", icon: Sun },
   { to: "/my-work", label: "My Work", icon: ClipboardList },
@@ -43,7 +52,7 @@ const navItems = [
   { to: "/skills", label: "Skills Matrix", icon: Zap },
   { to: "/machine-auth", label: "Machine Auth", icon: ShieldAlert },
   { to: "/reviews", label: "Reviews", icon: ClipboardCheck },
-  { to: "/remnants", label: "Remnants", icon: Recycle },
+  { to: "/remnants", label: "Remnants", icon: Recycle, featureFlag: "enable_remnants" },
   { to: "/materials", label: "Materials", icon: Package },
 ];
 
@@ -52,12 +61,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { profile, userRole, signOut } = useAuth();
+  const { flags } = useFeatureFlags();
 
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map((n: string) => n[0]).join("")
     : "??";
   const displayName = profile?.full_name || "Loading...";
   const displayRole = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "";
+
+  // Filter nav items based on feature flags
+  const visibleNavItems = navItems.filter((item) => {
+    if (!item.featureFlag) return true;
+    return flags[item.featureFlag] === true;
+  });
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -111,7 +127,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
             return (
               <NavLink
@@ -194,7 +210,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <NotificationBell />
+            {flags.enable_notifications !== false && <NotificationBell />}
             <div className="flex items-center gap-2">
               <div className="status-dot status-active animate-pulse-glow" />
               <span className="text-xs text-muted-foreground font-mono">ONLINE</span>
