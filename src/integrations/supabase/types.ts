@@ -764,6 +764,30 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_notes: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          staff_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          staff_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          staff_id?: string
+        }
+        Relationships: []
+      }
       staff_skills: {
         Row: {
           assigned_by: string | null
