@@ -123,6 +123,13 @@ export default function JobBuilderPage() {
     setParts(prev => prev.filter(p => p.part_id !== partId));
   }, []);
 
+  const handleBulkPartUpdate = useCallback((updates: { part_id: string; changes: Record<string, any> }[]) => {
+    setParts(prev => prev.map(p => {
+      const upd = updates.find(u => u.part_id === p.part_id);
+      return upd ? { ...p, ...upd.changes } : p;
+    }));
+  }, []);
+
   const addBlankPart = useCallback(() => {
     const nextNum = parts.length + 1;
     setParts(prev => [...prev, {
@@ -418,7 +425,7 @@ export default function JobBuilderPage() {
 
       {/* Nesting Groups Panel */}
       {parts.length > 0 && (
-        <NestingGroupsPanel jobId={job.id} parts={parts} materials={fullMaterials} />
+        <NestingGroupsPanel jobId={job.id} parts={parts} materials={fullMaterials} onUpdateParts={handleBulkPartUpdate} />
       )}
 
       {/* Job Cards Panel */}

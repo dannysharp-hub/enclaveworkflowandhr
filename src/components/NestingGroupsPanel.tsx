@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Layers, RefreshCw, Cpu, Download } from "lucide-react";
+import { Layers, RefreshCw, Cpu, Download, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { nestParts, NestPart, NestSettings, NestResult } from "@/lib/nestingEngine";
 import NestingPreview from "@/components/NestingPreview";
+import NestingPreflightModal from "@/components/NestingPreflightModal";
 import { generateInternalNestPack } from "@/lib/internalNestExport";
+import { validatePartsForNesting, ValidationResult } from "@/lib/dimensionValidation";
 
 interface PartData {
   part_id: string;
@@ -18,6 +20,7 @@ interface PartData {
   grain_axis: string | null;
   rotation_allowed: string | null;
   dxf_file_reference: string | null;
+  library_part_id?: string | null;
 }
 
 interface NestingGroup {
@@ -44,14 +47,18 @@ interface Props {
   jobId: string;
   parts: PartData[];
   materials: { material_code: string; display_name: string; sheet_length_mm?: number; sheet_width_mm?: number; grain_direction?: string; thickness_mm?: number; colour_name?: string }[];
+  onUpdateParts?: (updates: { part_id: string; changes: Record<string, any> }[]) => void;
 }
 
-export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
+export default function NestingGroupsPanel({ jobId, parts, materials, onUpdateParts }: Props) {
   const [groups, setGroups] = useState<NestingGroup[]>([]);
   const [previewGroup, setPreviewGroup] = useState<string | null>(null);
   const [nestResult, setNestResult] = useState<NestResult | null>(null);
   const [committing, setCommitting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const [preflightValidation, setPreflightValidation] = useState<ValidationResult | null>(null);
+  const [preflightGroupLabel, setPreflightGroupLabel] = useState<string | null>(null);
 
   const buildGroups = useCallback(() => {
     const byMat = new Map<string, PartData[]>();
@@ -102,6 +109,31 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
   };
 
   const runInternalNest = (group: NestingGroup) => {
+    // Pre-flight validation gate
+    const validation = validatePartsForNesting(group.parts, {
+      usable_width: group.sheet_width_mm - 2 * group.margin_mm,
+      usable_height: group.sheet_length_mm - 2 * group.margin_mm,
+    });
+
+    if (!validation.valid) {
+      setPreflightValidation(validation);
+      setPreflightGroupLabel(group.group_label);
+      setPreflightOpen(true);
+      return;
+    }
+
+    // Show warnings but don't block
+    if (validation.totalWarnings > 0) {
+      toast({
+        title: `${validation.totalWarnings} dimension warning(s)`,
+        description: "Check part dimensions for potential issues",
+      });
+    }
+
+    executeNest(group);
+  };
+
+  const executeNest = (group: NestingGroup) => {
     const nestPart: NestPart[] = group.parts.map(p => ({
       part_id: p.part_id,
       width_mm: p.length_mm,
@@ -127,6 +159,31 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
     setPreviewGroup(group.group_label);
   };
 
+  const handlePreflightUpdate = (updates: { part_id: string; changes: Record<string, any> }[]) => {
+    if (onUpdateParts) {
+      onUpdateParts(updates);
+    }
+    // Re-validate after applying updates
+    if (preflightGroupLabel) {
+      const group = groups.find(g => g.group_label === preflightGroupLabel);
+      if (group) {
+        // Apply updates locally to re-validate
+        const updatedParts = group.parts.map(p => {
+          const upd = updates.find(u => u.part_id === p.part_id);
+          return upd ? { ...p, ...upd.changes } : p;
+        });
+        const validation = validatePartsForNesting(updatedParts, {
+          usable_width: group.sheet_width_mm - 2 * group.margin_mm,
+          usable_height: group.sheet_length_mm - 2 * group.margin_mm,
+        });
+        setPreflightValidation(validation);
+        if (validation.valid) {
+          toast({ title: "All issues resolved!", description: "You can now run the nesting engine." });
+        }
+      }
+    }
+  };
+
   const commitLayout = async (group: NestingGroup) => {
     if (!nestResult || !nestResult.success) return;
     setCommitting(true);
@@ -137,7 +194,7 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
           .from("job_sheet_layouts")
           .insert({
             job_id: jobId,
-            group_id: group.id || jobId, // fallback
+            group_id: group.id || jobId,
             sheet_number: sheet.sheet_number,
             sheet_width_mm: group.sheet_width_mm,
             sheet_length_mm: group.sheet_length_mm,
@@ -173,7 +230,6 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
         if (partsErr) throw partsErr;
       }
 
-      // Log the nesting run
       await supabase.from("nesting_runs").insert({
         job_id: jobId,
         group_id: group.id || jobId,
@@ -188,7 +244,6 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
         },
       } as any);
 
-      // Mark group as locked
       setGroups(prev => prev.map(g =>
         g.group_label === group.group_label ? { ...g, locked: true } : g
       ));
@@ -230,6 +285,7 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
   if (parts.length === 0) return null;
 
   const activePreviewGroup = groups.find(g => g.group_label === previewGroup);
+  const preflightGroup = groups.find(g => g.group_label === preflightGroupLabel);
 
   return (
     <div className="space-y-4">
@@ -244,76 +300,104 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {groups.map((g, i) => (
-            <div key={i} className={`rounded-md border bg-card/50 p-3 space-y-2 ${g.locked ? 'border-primary/40' : 'border-border'}`}>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold text-foreground">{g.group_label}</span>
-                <div className="flex items-center gap-1">
-                  {g.locked && (
-                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">LOCKED</span>
-                  )}
-                  <span className="text-[10px] font-mono text-muted-foreground">{g.parts.length} parts</span>
+          {groups.map((g, i) => {
+            // Inline validation status for each group
+            const groupValidation = g.nesting_engine === "internal"
+              ? validatePartsForNesting(g.parts, {
+                  usable_width: g.sheet_width_mm - 2 * g.margin_mm,
+                  usable_height: g.sheet_length_mm - 2 * g.margin_mm,
+                })
+              : null;
+
+            return (
+              <div key={i} className={`rounded-md border bg-card/50 p-3 space-y-2 ${g.locked ? 'border-primary/40' : 'border-border'}`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold text-foreground">{g.group_label}</span>
+                  <div className="flex items-center gap-1">
+                    {g.locked && (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">LOCKED</span>
+                    )}
+                    <span className="text-[10px] font-mono text-muted-foreground">{g.parts.length} parts</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-muted-foreground">
-                <span>Sheet: {g.sheet_length_mm}×{g.sheet_width_mm}</span>
-                <span>Thickness: {g.thickness_mm || "—"}mm</span>
-                <span>Margin: {g.margin_mm}mm</span>
-                <span>Spacing: {g.spacing_mm}mm</span>
-                <span>Grain: {g.grain_direction}</span>
-                <span>Rotation: {g.allow_rotation_90 ? "Yes" : "No"}</span>
-              </div>
+                <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-muted-foreground">
+                  <span>Sheet: {g.sheet_length_mm}×{g.sheet_width_mm}</span>
+                  <span>Thickness: {g.thickness_mm || "—"}mm</span>
+                  <span>Margin: {g.margin_mm}mm</span>
+                  <span>Spacing: {g.spacing_mm}mm</span>
+                  <span>Grain: {g.grain_direction}</span>
+                  <span>Rotation: {g.allow_rotation_90 ? "Yes" : "No"}</span>
+                </div>
 
-              {/* Engine Toggle */}
-              <div className="flex items-center gap-2 pt-1 border-t border-border/30">
-                <span className="text-[10px] font-mono text-muted-foreground">Engine:</span>
-                <button
-                  onClick={() => toggleEngine(g.group_label)}
-                  disabled={g.locked}
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
-                    g.nesting_engine === "internal"
-                      ? "bg-primary/20 text-primary border border-primary/30"
-                      : "bg-muted/30 text-muted-foreground border border-border/50"
-                  }`}
-                >
-                  {g.nesting_engine === "internal" ? "Internal" : "VCarve"}
-                </button>
-              </div>
+                {/* Validation status indicator */}
+                {groupValidation && !g.locked && (
+                  <div className={`flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded ${
+                    groupValidation.valid
+                      ? "bg-primary/5 text-primary"
+                      : "bg-destructive/5 text-destructive"
+                  }`}>
+                    {groupValidation.valid ? (
+                      <>✅ Ready to nest</>
+                    ) : (
+                      <>
+                        <AlertTriangle size={10} />
+                        {groupValidation.totalMissing} missing · {groupValidation.totalBlockers} blocker{groupValidation.totalBlockers !== 1 ? "s" : ""}
+                      </>
+                    )}
+                  </div>
+                )}
 
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-muted-foreground">
-                  Qty: {g.parts.reduce((s, p) => s + p.quantity, 0)}
-                </span>
-                <div className="flex items-center gap-1">
-                  {g.nesting_engine === "internal" && !g.locked && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 text-[10px] px-2"
-                      onClick={() => runInternalNest(g)}
-                    >
-                      <Cpu size={10} className="mr-1" /> Nest
-                    </Button>
-                  )}
-                  {g.locked && nestResult && previewGroup === g.group_label && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 text-[10px] px-2"
-                      onClick={() => handleExport(g)}
-                      disabled={exporting}
-                    >
-                      <Download size={10} className="mr-1" /> Export
-                    </Button>
-                  )}
-                  <span className="font-mono text-xs font-bold text-primary">
-                    ~{g.sheet_count} sheet{g.sheet_count !== 1 ? "s" : ""}
+                {/* Engine Toggle */}
+                <div className="flex items-center gap-2 pt-1 border-t border-border/30">
+                  <span className="text-[10px] font-mono text-muted-foreground">Engine:</span>
+                  <button
+                    onClick={() => toggleEngine(g.group_label)}
+                    disabled={g.locked}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
+                      g.nesting_engine === "internal"
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "bg-muted/30 text-muted-foreground border border-border/50"
+                    }`}
+                  >
+                    {g.nesting_engine === "internal" ? "Internal" : "VCarve"}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-muted-foreground">
+                    Qty: {g.parts.reduce((s, p) => s + p.quantity, 0)}
                   </span>
+                  <div className="flex items-center gap-1">
+                    {g.nesting_engine === "internal" && !g.locked && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => runInternalNest(g)}
+                      >
+                        <Cpu size={10} className="mr-1" /> Nest
+                      </Button>
+                    )}
+                    {g.locked && nestResult && previewGroup === g.group_label && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => handleExport(g)}
+                        disabled={exporting}
+                      >
+                        <Download size={10} className="mr-1" /> Export
+                      </Button>
+                    )}
+                    <span className="font-mono text-xs font-bold text-primary">
+                      ~{g.sheet_count} sheet{g.sheet_count !== 1 ? "s" : ""}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -328,6 +412,17 @@ export default function NestingGroupsPanel({ jobId, parts, materials }: Props) {
           onRerun={() => runInternalNest(activePreviewGroup)}
           onClose={() => { setPreviewGroup(null); setNestResult(null); }}
           committing={committing}
+        />
+      )}
+
+      {/* Pre-flight Modal */}
+      {preflightValidation && preflightGroup && (
+        <NestingPreflightModal
+          open={preflightOpen}
+          onOpenChange={setPreflightOpen}
+          validation={preflightValidation}
+          parts={preflightGroup.parts}
+          onUpdateParts={handlePreflightUpdate}
         />
       )}
     </div>
