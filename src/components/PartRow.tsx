@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileCheck, AlertTriangle, Trash2 } from "lucide-react";
+import { Upload, FileCheck, AlertTriangle, Trash2, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { extractFromDxfFile } from "@/lib/dxfExtractor";
 
 interface PartData {
   id?: string;
@@ -16,6 +17,10 @@ interface PartData {
   rotation_allowed: string | null;
   dxf_file_reference: string | null;
   validation_status: string | null;
+  bbox_width_mm?: number | null;
+  bbox_height_mm?: number | null;
+  bbox_source?: string | null;
+  bbox_confidence?: string | null;
 }
 
 interface Props {
@@ -33,10 +38,23 @@ export default function PartRow({ part, materials, jobUuid, onUpdate, onDelete, 
 
   const validationIssues: string[] = [];
   if (!part.material_code) validationIssues.push("No material assigned");
-  if (part.length_mm <= 0 || part.width_mm <= 0) validationIssues.push("Invalid dimensions");
+  
+  // Resolve effective dims: manual > bbox
+  const effectiveW = (part.length_mm > 0) ? part.length_mm : (part.bbox_width_mm || 0);
+  const effectiveH = (part.width_mm > 0) ? part.width_mm : (part.bbox_height_mm || 0);
+  
+  if (effectiveW <= 0 || effectiveH <= 0) validationIssues.push("Invalid dimensions");
   if (part.grain_required && !part.grain_axis) validationIssues.push("Grain axis not set");
 
+  // Check for bbox mismatch
+  const hasBboxMismatch = part.length_mm > 0 && part.width_mm > 0 && part.bbox_width_mm && part.bbox_height_mm &&
+    (Math.abs(part.bbox_width_mm - part.length_mm) / part.length_mm > 0.02 ||
+     Math.abs(part.bbox_height_mm - part.width_mm) / part.width_mm > 0.02);
+
+  if (hasBboxMismatch) validationIssues.push("DXF dims differ from manual");
+
   const isValid = validationIssues.length === 0;
+  const usingBbox = part.length_mm <= 0 && part.bbox_width_mm && part.bbox_width_mm > 0;
 
   const handleDxfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,8 +65,29 @@ export default function PartRow({ part, materials, jobUuid, onUpdate, onDelete, 
     if (error) {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
     } else {
-      onUpdate(part.part_id, { dxf_file_reference: path });
-      toast({ title: "DXF uploaded", description: part.part_id });
+      // Auto-extract bounding box
+      const result = await extractFromDxfFile(file, { defaultUnits: "mm" });
+      const updates: Partial<PartData> = { dxf_file_reference: path };
+      
+      if (result.bbox) {
+        updates.bbox_width_mm = result.bbox.width_mm;
+        updates.bbox_height_mm = result.bbox.height_mm;
+        updates.bbox_source = "dxf_extract";
+        updates.bbox_confidence = result.bbox_confidence;
+        
+        // Auto-fill manual dims if empty
+        if (part.length_mm <= 0 && part.width_mm <= 0) {
+          updates.length_mm = result.bbox.width_mm;
+          updates.width_mm = result.bbox.height_mm;
+          toast({ title: "DXF uploaded + dims extracted", description: `${result.bbox.width_mm}×${result.bbox.height_mm}mm (${result.bbox_confidence})` });
+        } else {
+          toast({ title: "DXF uploaded", description: `Extracted: ${result.bbox.width_mm}×${result.bbox.height_mm}mm` });
+        }
+      } else {
+        toast({ title: "DXF uploaded", description: part.part_id });
+      }
+      
+      onUpdate(part.part_id, updates);
     }
     setUploading(false);
   };
@@ -57,11 +96,17 @@ export default function PartRow({ part, materials, jobUuid, onUpdate, onDelete, 
   const cellClass = "px-3 py-2";
 
   return (
-    <tr className={`border-b border-border/30 transition-colors ${!isValid ? "bg-destructive/5" : "hover:bg-muted/10"}`}>
+    <tr className={`border-b border-border/30 transition-colors ${!isValid ? "bg-destructive/5" : usingBbox ? "bg-primary/5" : "hover:bg-muted/10"}`}>
       <td className={`${cellClass} font-mono text-xs font-bold text-foreground`}>{part.part_id}</td>
       <td className={`${cellClass} text-xs text-muted-foreground`}>{part.product_code}</td>
-      <td className={`${cellClass} text-right font-mono text-xs text-muted-foreground`}>{part.length_mm}</td>
-      <td className={`${cellClass} text-right font-mono text-xs text-muted-foreground`}>{part.width_mm}</td>
+      <td className={`${cellClass} text-right font-mono text-xs text-muted-foreground`}>
+        {part.length_mm}
+        {usingBbox && <span className="text-primary ml-1" title="Using DXF bbox">⟨{part.bbox_width_mm}⟩</span>}
+      </td>
+      <td className={`${cellClass} text-right font-mono text-xs text-muted-foreground`}>
+        {part.width_mm}
+        {usingBbox && <span className="text-primary ml-1" title="Using DXF bbox">⟨{part.bbox_height_mm}⟩</span>}
+      </td>
       <td className={`${cellClass} text-right font-mono text-xs text-foreground`}>{part.quantity}</td>
       <td className={cellClass}>
         {readOnly ? (
@@ -123,7 +168,18 @@ export default function PartRow({ part, materials, jobUuid, onUpdate, onDelete, 
       </td>
       <td className={`${cellClass} text-center`}>
         {part.dxf_file_reference ? (
-          <FileCheck size={14} className="inline text-primary" />
+          <div className="flex items-center justify-center gap-1">
+            <FileCheck size={14} className="text-primary" />
+            {part.bbox_confidence && (
+              <span className={`text-[8px] font-mono ${
+                part.bbox_confidence === "high" ? "text-primary" :
+                part.bbox_confidence === "medium" ? "text-amber-500" :
+                "text-destructive"
+              }`} title={`Extraction: ${part.bbox_confidence}`}>
+                {part.bbox_confidence[0].toUpperCase()}
+              </span>
+            )}
+          </div>
         ) : readOnly ? (
           <span className="text-xs text-muted-foreground">—</span>
         ) : (
@@ -132,7 +188,7 @@ export default function PartRow({ part, materials, jobUuid, onUpdate, onDelete, 
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
               className="text-muted-foreground hover:text-primary transition-colors"
-              title="Upload DXF"
+              title="Upload DXF (auto-extracts dimensions)"
             >
               <Upload size={14} />
             </button>
@@ -143,7 +199,7 @@ export default function PartRow({ part, materials, jobUuid, onUpdate, onDelete, 
       <td className={`${cellClass} text-center`}>
         {!isValid ? (
           <span title={validationIssues.join(", ")}>
-            <AlertTriangle size={14} className="inline text-destructive" />
+            <AlertTriangle size={14} className={`inline ${hasBboxMismatch && validationIssues.length === 1 ? "text-amber-500" : "text-destructive"}`} />
           </span>
         ) : (
           <span className="text-[10px] font-mono text-primary">OK</span>

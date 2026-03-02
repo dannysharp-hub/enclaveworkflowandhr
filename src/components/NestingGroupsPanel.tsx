@@ -167,15 +167,20 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
   };
 
   const executeNest = (group: NestingGroup) => {
-    const nestPart: NestPart[] = group.parts.map(p => ({
-      part_id: p.part_id,
-      width_mm: p.length_mm,
-      height_mm: p.width_mm,
-      quantity: p.quantity,
-      grain_required: p.grain_required,
-      rotation_allowed: p.rotation_allowed !== "none",
-      dxf_ref: p.dxf_file_reference,
-    }));
+    const nestPart: NestPart[] = group.parts.map(p => {
+      // Resolve dims: manual > bbox > 0
+      const resolvedW = (p.length_mm && p.length_mm > 0) ? p.length_mm : ((p as any).bbox_width_mm || 0);
+      const resolvedH = (p.width_mm && p.width_mm > 0) ? p.width_mm : ((p as any).bbox_height_mm || 0);
+      return {
+        part_id: p.part_id,
+        width_mm: resolvedW,
+        height_mm: resolvedH,
+        quantity: p.quantity,
+        grain_required: p.grain_required,
+        rotation_allowed: p.rotation_allowed !== "none",
+        dxf_ref: p.dxf_file_reference,
+      };
+    });
 
     const settings: NestSettings = {
       sheet_width_mm: group.sheet_width_mm,

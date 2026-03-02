@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Search, Upload, FileCheck, Trash2, Edit2, Save, X, Library } from "lucide-react";
+import { Plus, Search, Upload, FileCheck, Trash2, Edit2, Save, X, Library, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { useDxfExtraction } from "@/hooks/useDxfExtraction";
+import DxfExtractionBadge from "@/components/DxfExtractionBadge";
+import { extractFromDxfFile, DxfExtractionResult } from "@/lib/dxfExtractor";
 
 interface LibraryPart {
   id: string;
@@ -21,6 +25,12 @@ interface LibraryPart {
   tags: string[];
   version: number;
   active: boolean;
+  bbox_width_mm: number | null;
+  bbox_height_mm: number | null;
+  bbox_source: string | null;
+  bbox_confidence: string | null;
+  bbox_extracted_at: string | null;
+  extraction_notes: string | null;
 }
 
 const EMPTY_PART: Omit<LibraryPart, "id"> = {
@@ -38,6 +48,12 @@ const EMPTY_PART: Omit<LibraryPart, "id"> = {
   tags: [],
   version: 1,
   active: true,
+  bbox_width_mm: null,
+  bbox_height_mm: null,
+  bbox_source: null,
+  bbox_confidence: null,
+  bbox_extracted_at: null,
+  extraction_notes: null,
 };
 
 export default function PartLibraryPage() {
@@ -51,6 +67,10 @@ export default function PartLibraryPage() {
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const { flags } = useFeatureFlags();
+  const [extractionResult, setExtractionResult] = useState<DxfExtractionResult | null>(null);
+  const [useExtractedDims, setUseExtractedDims] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -68,12 +88,39 @@ export default function PartLibraryPage() {
   const openNew = () => {
     setEditId(null);
     setEditPart({ ...EMPTY_PART });
+    setExtractionResult(null);
+    setUseExtractedDims(false);
     setDialogOpen(true);
   };
 
   const openEdit = (p: LibraryPart) => {
     setEditId(p.id);
     setEditPart({ ...p });
+    // If part has extraction data, reconstruct a result for display
+    if (p.bbox_width_mm && p.bbox_height_mm) {
+      setExtractionResult({
+        bbox: {
+          width_mm: p.bbox_width_mm,
+          height_mm: p.bbox_height_mm,
+          min_x: 0, min_y: 0,
+          max_x: p.bbox_width_mm,
+          max_y: p.bbox_height_mm,
+        },
+        bbox_confidence: (p.bbox_confidence as any) || "medium",
+        polygon: null,
+        polygon_confidence: null,
+        outline_layer_used: null,
+        notes: p.extraction_notes ? p.extraction_notes.split("; ") : [],
+        entity_count: 0,
+        has_closed_polylines: false,
+        detected_units: "mm",
+      });
+      // If manual dims are 0, default to using extracted
+      setUseExtractedDims(p.length_mm === 0 && p.width_mm === 0);
+    } else {
+      setExtractionResult(null);
+      setUseExtractedDims(false);
+    }
     setDialogOpen(true);
   };
 
@@ -81,15 +128,86 @@ export default function PartLibraryPage() {
     const file = e.target.files?.[0];
     if (!file || !editPart.part_code) return;
     setUploading(true);
+
+    // Upload DXF file
     const path = `library/${editPart.part_code}.dxf`;
     const { error } = await supabase.storage.from("dxf-files").upload(path, file, { upsert: true });
     if (error) {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
-    } else {
-      setEditPart(prev => ({ ...prev, dxf_file_reference: path }));
-      toast({ title: "DXF uploaded" });
+      setUploading(false);
+      return;
     }
+
+    setEditPart(prev => ({ ...prev, dxf_file_reference: path }));
+
+    // Auto-extract bounding box
+    const result = await extractFromDxfFile(file, {
+      enablePolygon: flags.enable_polygon_outline_extraction,
+      defaultUnits: "mm",
+    });
+    setExtractionResult(result);
+
+    if (result.bbox) {
+      setEditPart(prev => ({
+        ...prev,
+        bbox_width_mm: result.bbox!.width_mm,
+        bbox_height_mm: result.bbox!.height_mm,
+        bbox_source: "dxf_extract",
+        bbox_confidence: result.bbox_confidence,
+        bbox_extracted_at: new Date().toISOString(),
+        extraction_notes: result.notes.join("; ") || null,
+      }));
+
+      // Auto-fill manual dims if they're empty
+      if (editPart.length_mm === 0 && editPart.width_mm === 0) {
+        setEditPart(prev => ({
+          ...prev,
+          length_mm: result.bbox!.width_mm,
+          width_mm: result.bbox!.height_mm,
+        }));
+        setUseExtractedDims(true);
+      }
+    }
+
+    toast({ title: "DXF uploaded" });
     setUploading(false);
+  };
+
+  const handleReprocess = async () => {
+    if (!editPart.dxf_file_reference) return;
+    setReprocessing(true);
+
+    try {
+      const { data, error } = await supabase.storage.from("dxf-files").download(editPart.dxf_file_reference);
+      if (error || !data) {
+        toast({ title: "Cannot download DXF", variant: "destructive" });
+        setReprocessing(false);
+        return;
+      }
+
+      const file = new File([data], "reprocess.dxf");
+      const result = await extractFromDxfFile(file, {
+        enablePolygon: flags.enable_polygon_outline_extraction,
+        defaultUnits: "mm",
+      });
+      setExtractionResult(result);
+
+      if (result.bbox) {
+        setEditPart(prev => ({
+          ...prev,
+          bbox_width_mm: result.bbox!.width_mm,
+          bbox_height_mm: result.bbox!.height_mm,
+          bbox_source: "dxf_extract",
+          bbox_confidence: result.bbox_confidence,
+          bbox_extracted_at: new Date().toISOString(),
+          extraction_notes: result.notes.join("; ") || null,
+        }));
+      }
+    } catch {
+      toast({ title: "Reprocess failed", variant: "destructive" });
+    } finally {
+      setReprocessing(false);
+    }
   };
 
   const handleSave = async () => {
@@ -99,25 +217,48 @@ export default function PartLibraryPage() {
     }
     setSaving(true);
     try {
-      const row = {
+      // If using extracted dims, apply them to length/width
+      const finalLength = useExtractedDims && editPart.bbox_width_mm ? editPart.bbox_width_mm : editPart.length_mm;
+      const finalWidth = useExtractedDims && editPart.bbox_height_mm ? editPart.bbox_height_mm : editPart.width_mm;
+
+      const row: Record<string, any> = {
         part_code: editPart.part_code,
         description: editPart.description || null,
         product_code: editPart.product_code || null,
         material_code: editPart.material_code || null,
-        length_mm: editPart.length_mm,
-        width_mm: editPart.width_mm,
+        length_mm: finalLength,
+        width_mm: finalWidth,
         thickness_mm: editPart.thickness_mm,
         grain_required: editPart.grain_required,
         grain_axis: editPart.grain_axis,
         rotation_allowed: editPart.rotation_allowed,
         dxf_file_reference: editPart.dxf_file_reference,
         tags: editPart.tags,
+        bbox_width_mm: editPart.bbox_width_mm,
+        bbox_height_mm: editPart.bbox_height_mm,
+        bbox_source: editPart.bbox_source,
+        bbox_confidence: editPart.bbox_confidence,
+        bbox_extracted_at: editPart.bbox_extracted_at,
+        extraction_notes: editPart.extraction_notes,
       };
+
       if (editId) {
         const { error } = await supabase.from("part_library").update(row).eq("id", editId);
         if (error) throw error;
+
+        // Audit log
+        await supabase.from("dxf_extraction_log").insert({
+          entity_type: "part_library",
+          entity_id: editId,
+          dxf_file_reference: editPart.dxf_file_reference,
+          bbox_width_mm: editPart.bbox_width_mm,
+          bbox_height_mm: editPart.bbox_height_mm,
+          bbox_confidence: editPart.bbox_confidence,
+          manual_override_exists: !useExtractedDims && finalLength > 0,
+          notes: useExtractedDims ? "Using extracted dimensions" : "Manual dimensions preferred",
+        } as any);
       } else {
-        const { error } = await supabase.from("part_library").insert([{ ...row, tenant_id: "00000000-0000-0000-0000-000000000001" }]);
+        const { error } = await supabase.from("part_library").insert([{ ...row, part_code: editPart.part_code, tenant_id: "00000000-0000-0000-0000-000000000001" }] as any);
         if (error) throw error;
       }
       toast({ title: editId ? "Part updated" : "Part saved" });
@@ -155,7 +296,7 @@ export default function PartLibraryPage() {
           <h2 className="font-mono text-xl font-bold text-foreground flex items-center gap-2">
             <Library size={20} className="text-primary" /> Part Library
           </h2>
-          <p className="text-sm text-muted-foreground">Reusable part definitions with DXF files</p>
+          <p className="text-sm text-muted-foreground">Reusable part definitions with DXF files & auto-extraction</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -187,34 +328,54 @@ export default function PartLibraryPage() {
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left px-3 py-2.5 font-mono text-[10px] text-muted-foreground">CODE</th>
                   <th className="text-left px-3 py-2.5 font-mono text-[10px] text-muted-foreground">DESCRIPTION</th>
-                  <th className="text-left px-3 py-2.5 font-mono text-[10px] text-muted-foreground">PRODUCT</th>
                   <th className="text-left px-3 py-2.5 font-mono text-[10px] text-muted-foreground">MATERIAL</th>
-                  <th className="text-right px-3 py-2.5 font-mono text-[10px] text-muted-foreground">L×W</th>
-                  <th className="text-center px-3 py-2.5 font-mono text-[10px] text-muted-foreground">GRAIN</th>
+                  <th className="text-right px-3 py-2.5 font-mono text-[10px] text-muted-foreground">L×W (MANUAL)</th>
+                  <th className="text-right px-3 py-2.5 font-mono text-[10px] text-muted-foreground">BBOX (DXF)</th>
+                  <th className="text-center px-3 py-2.5 font-mono text-[10px] text-muted-foreground">CONF</th>
                   <th className="text-center px-3 py-2.5 font-mono text-[10px] text-muted-foreground">DXF</th>
                   <th className="px-3 py-2.5"></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => (
-                  <tr key={p.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
-                    <td className="px-3 py-2 font-mono text-xs font-bold text-foreground">{p.part_code}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{p.description || "—"}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{p.product_code || "—"}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{p.material_code || "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">{p.length_mm}×{p.width_mm}</td>
-                    <td className="px-3 py-2 text-center text-xs text-muted-foreground">{p.grain_required ? `Yes (${p.grain_axis})` : "No"}</td>
-                    <td className="px-3 py-2 text-center">
-                      {p.dxf_file_reference ? <FileCheck size={14} className="inline text-primary" /> : <span className="text-xs text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(p)} className="text-muted-foreground hover:text-primary transition-colors"><Edit2 size={14} /></button>
-                        <button onClick={() => handleDelete(p.id)} className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(p => {
+                  const hasMismatch = p.bbox_width_mm && p.bbox_height_mm && p.length_mm > 0 && p.width_mm > 0 &&
+                    (Math.abs(p.bbox_width_mm - p.length_mm) / p.length_mm > 0.02 ||
+                     Math.abs(p.bbox_height_mm - p.width_mm) / p.width_mm > 0.02);
+
+                  return (
+                    <tr key={p.id} className={`border-b border-border/30 hover:bg-muted/10 transition-colors ${hasMismatch ? "bg-amber-500/5" : ""}`}>
+                      <td className="px-3 py-2 font-mono text-xs font-bold text-foreground">{p.part_code}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{p.description || "—"}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{p.material_code || "—"}</td>
+                      <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">{p.length_mm}×{p.width_mm}</td>
+                      <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                        {p.bbox_width_mm && p.bbox_height_mm
+                          ? `${p.bbox_width_mm}×${p.bbox_height_mm}`
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {p.bbox_confidence ? (
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            p.bbox_confidence === "high" ? "bg-primary/10 text-primary" :
+                            p.bbox_confidence === "medium" ? "bg-amber-500/10 text-amber-600" :
+                            "bg-destructive/10 text-destructive"
+                          }`}>
+                            {p.bbox_confidence}
+                          </span>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {p.dxf_file_reference ? <FileCheck size={14} className="inline text-primary" /> : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEdit(p)} className="text-muted-foreground hover:text-primary transition-colors"><Edit2 size={14} /></button>
+                          <button onClick={() => handleDelete(p.id)} className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -222,10 +383,10 @@ export default function PartLibraryPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? "Edit Part" : "Add Part to Library"}</DialogTitle>
-            <DialogDescription>Define a reusable part with dimensions and CNC properties.</DialogDescription>
+            <DialogDescription>Define a reusable part with dimensions and CNC properties. Upload a DXF for automatic dimension extraction.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
@@ -247,13 +408,66 @@ export default function PartLibraryPage() {
                 {materials.map(m => <option key={m.material_code} value={m.material_code}>{m.material_code} — {m.display_name}</option>)}
               </select>
             </div>
+
+            {/* DXF Upload Section */}
+            <div className="col-span-2 border border-border/50 rounded-md p-3 space-y-2 bg-muted/5">
+              <label className="text-xs font-medium text-foreground block">DXF File & Auto-Extraction</label>
+              <div className="flex items-center gap-2">
+                {editPart.dxf_file_reference ? (
+                  <span className="flex items-center gap-1 text-xs text-primary"><FileCheck size={14} /> Uploaded</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">No DXF</span>
+                )}
+                <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading || !editPart.part_code}>
+                  <Upload size={14} /> {uploading ? "Uploading..." : "Upload DXF"}
+                </Button>
+                <input ref={fileRef} type="file" accept=".dxf" onChange={handleDxfUpload} className="hidden" />
+              </div>
+              {extractionResult && (
+                <DxfExtractionBadge
+                  extraction={extractionResult}
+                  manualWidth={editPart.length_mm}
+                  manualHeight={editPart.width_mm}
+                  useExtracted={useExtractedDims}
+                  onToggleUseExtracted={(use) => {
+                    setUseExtractedDims(use);
+                    if (use && extractionResult.bbox) {
+                      setEditPart(prev => ({
+                        ...prev,
+                        length_mm: extractionResult.bbox!.width_mm,
+                        width_mm: extractionResult.bbox!.height_mm,
+                      }));
+                    }
+                  }}
+                  onReprocess={editPart.dxf_file_reference ? handleReprocess : undefined}
+                  reprocessing={reprocessing}
+                />
+              )}
+            </div>
+
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Length (mm)</label>
-              <input type="number" value={editPart.length_mm} onChange={e => setEditPart(p => ({ ...p, length_mm: +e.target.value }))} className={inputClass} />
+              <label className="text-xs text-muted-foreground mb-1 block">Length (mm) {useExtractedDims && <span className="text-primary">(from DXF)</span>}</label>
+              <input
+                type="number"
+                value={editPart.length_mm}
+                onChange={e => {
+                  setEditPart(p => ({ ...p, length_mm: +e.target.value }));
+                  if (useExtractedDims) setUseExtractedDims(false);
+                }}
+                className={inputClass}
+              />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Width (mm)</label>
-              <input type="number" value={editPart.width_mm} onChange={e => setEditPart(p => ({ ...p, width_mm: +e.target.value }))} className={inputClass} />
+              <label className="text-xs text-muted-foreground mb-1 block">Width (mm) {useExtractedDims && <span className="text-primary">(from DXF)</span>}</label>
+              <input
+                type="number"
+                value={editPart.width_mm}
+                onChange={e => {
+                  setEditPart(p => ({ ...p, width_mm: +e.target.value }));
+                  if (useExtractedDims) setUseExtractedDims(false);
+                }}
+                className={inputClass}
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Thickness (mm)</label>
@@ -280,20 +494,6 @@ export default function PartLibraryPage() {
                 </select>
               </div>
             )}
-            <div className="col-span-2">
-              <label className="text-xs text-muted-foreground mb-1 block">DXF File</label>
-              <div className="flex items-center gap-2">
-                {editPart.dxf_file_reference ? (
-                  <span className="flex items-center gap-1 text-xs text-primary"><FileCheck size={14} /> Uploaded</span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">No DXF</span>
-                )}
-                <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading || !editPart.part_code}>
-                  <Upload size={14} /> {uploading ? "Uploading..." : "Upload DXF"}
-                </Button>
-                <input ref={fileRef} type="file" accept=".dxf" onChange={handleDxfUpload} className="hidden" />
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

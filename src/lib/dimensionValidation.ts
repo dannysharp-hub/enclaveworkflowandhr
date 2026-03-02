@@ -36,6 +36,10 @@ interface PartForValidation {
   rotation_allowed: string | null;
   dxf_file_reference: string | null;
   library_part_id?: string | null;
+  bbox_width_mm?: number | null;
+  bbox_height_mm?: number | null;
+  bbox_source?: string | null;
+  bbox_confidence?: string | null;
 }
 
 interface SheetInfo {
@@ -54,18 +58,31 @@ export function validatePartsForNesting(
     const warnings: string[] = [];
     const blockers: string[] = [];
 
-    // Missing field checks
-    if (!p.length_mm || p.length_mm <= 0) missing.push("length_mm");
-    if (!p.width_mm || p.width_mm <= 0) missing.push("width_mm");
+    // Resolve effective dimensions: manual > bbox > missing
+    const effectiveW = (p.length_mm && p.length_mm > 0) ? p.length_mm : (p.bbox_width_mm && p.bbox_width_mm > 0 ? p.bbox_width_mm : 0);
+    const effectiveH = (p.width_mm && p.width_mm > 0) ? p.width_mm : (p.bbox_height_mm && p.bbox_height_mm > 0 ? p.bbox_height_mm : 0);
+    const usingBbox = effectiveW !== p.length_mm || effectiveH !== p.width_mm;
+
+    // Missing field checks — only if neither manual nor bbox available
+    if (effectiveW <= 0) missing.push("length_mm");
+    if (effectiveH <= 0) missing.push("width_mm");
     if (!p.quantity || p.quantity < 1) missing.push("quantity");
+
+    // Warn if using bbox as fallback
+    if (usingBbox && effectiveW > 0 && effectiveH > 0) {
+      warnings.push(`Using DXF-extracted dims (${effectiveW}×${effectiveH}mm) — no manual dims set`);
+      if (p.bbox_confidence === "low") {
+        warnings.push("DXF extraction confidence is LOW — verify dimensions");
+      }
+    }
 
     // Blocker checks
     if (p.length_mm < 0 || p.width_mm < 0) {
       blockers.push("Negative dimension values");
     }
 
-    const w = p.length_mm || 0;
-    const h = p.width_mm || 0;
+    const w = effectiveW;
+    const h = effectiveH;
     const canRotate = p.rotation_allowed !== "none" && !p.grain_required;
 
     if (w > 0 && h > 0) {
@@ -83,9 +100,18 @@ export function validatePartsForNesting(
     if (h > 0 && h < 20) warnings.push(`Height ${h}mm is very small (<20mm)`);
     if (w > 3000) warnings.push(`Width ${w}mm is unusually large (>3000mm)`);
     if (h > 3000) warnings.push(`Height ${h}mm is unusually large (>3000mm)`);
-    if (w > 0 && h > 0 && w > 0 && h > 0) {
+    if (w > 0 && h > 0) {
       const ratio = Math.max(w, h) / Math.min(w, h);
       if (ratio > 20) warnings.push(`Extreme aspect ratio (${ratio.toFixed(1)}:1)`);
+    }
+
+    // Mismatch between manual and extracted
+    if (p.length_mm > 0 && p.width_mm > 0 && p.bbox_width_mm && p.bbox_height_mm && p.bbox_width_mm > 0 && p.bbox_height_mm > 0) {
+      const wDiff = Math.abs(p.bbox_width_mm - p.length_mm) / p.length_mm * 100;
+      const hDiff = Math.abs(p.bbox_height_mm - p.width_mm) / p.width_mm * 100;
+      if (wDiff > 2 || hDiff > 2) {
+        warnings.push(`DXF dims (${p.bbox_width_mm}×${p.bbox_height_mm}) differ from manual (${p.length_mm}×${p.width_mm}) by >${Math.max(wDiff, hDiff).toFixed(1)}%`);
+      }
     }
 
     if (missing.length > 0 || warnings.length > 0 || blockers.length > 0) {
