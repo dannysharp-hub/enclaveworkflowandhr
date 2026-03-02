@@ -1,11 +1,16 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import ReadinessBadge from "@/components/ReadinessBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search, Hammer, AlertTriangle, RefreshCw } from "lucide-react";
+import { Plus, Search, Hammer, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { cn } from "@/lib/utils";
 import { updateAllJobReadiness, type ReadinessResult } from "@/lib/readinessEngine";
@@ -34,6 +39,8 @@ export default function JobsPage() {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editJob, setEditJob] = useState<DbJob | null>(null);
+  const [deleteJob, setDeleteJob] = useState<DbJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const canManage = userRole === "admin" || userRole === "engineer" || userRole === "supervisor";
 
@@ -79,6 +86,20 @@ export default function JobsPage() {
       setReadiness(rMap);
     } finally { setRefreshingReadiness(false); }
   }, []);
+
+  const handleDeleteJob = useCallback(async () => {
+    if (!deleteJob) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("jobs").delete().eq("id", deleteJob.id);
+      if (error) throw error;
+      toast({ title: "Job deleted", description: `${deleteJob.job_id} removed` });
+      setDeleteJob(null);
+      fetchJobs();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setDeleting(false); }
+  }, [deleteJob, fetchJobs]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
@@ -137,6 +158,7 @@ export default function JobsPage() {
                   <th className="text-right p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Parts</th>
                   <th className="text-right p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Sheets</th>
                   {canManage && <th className="p-4 text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Build</th>}
+                  {canManage && <th className="p-4"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -180,6 +202,16 @@ export default function JobsPage() {
                         </button>
                       </td>
                     )}
+                    {canManage && (
+                      <td className="p-4">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteJob(job); }}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                   );
                 })}
@@ -191,6 +223,23 @@ export default function JobsPage() {
 
       <JobDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={fetchJobs} />
       {editJob && <JobDialog open={!!editJob} onOpenChange={o => { if (!o) setEditJob(null); }} onSuccess={fetchJobs} job={editJob} />}
+
+      <AlertDialog open={!!deleteJob} onOpenChange={o => { if (!o) setDeleteJob(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold">{deleteJob?.job_id}</span> — {deleteJob?.job_name}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteJob} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
