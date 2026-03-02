@@ -178,6 +178,83 @@ export type Database = {
           },
         ]
       }
+      capacity_simulations: {
+        Row: {
+          capacity_impact_json: Json
+          cashflow_impact: number
+          created_at: string
+          created_by: string | null
+          delivery_date_prediction: string | null
+          estimated_margin_percent: number
+          id: string
+          job_description: string | null
+          job_type: string | null
+          planned_assembly_hours: number
+          planned_cnc_hours: number
+          planned_install_hours: number
+          planned_spray_hours: number
+          quote_value: number
+          risk_assessment: string
+          sheet_count: number
+          simulation_name: string
+          target_end_date: string | null
+          target_start_date: string | null
+          tenant_id: string
+        }
+        Insert: {
+          capacity_impact_json?: Json
+          cashflow_impact?: number
+          created_at?: string
+          created_by?: string | null
+          delivery_date_prediction?: string | null
+          estimated_margin_percent?: number
+          id?: string
+          job_description?: string | null
+          job_type?: string | null
+          planned_assembly_hours?: number
+          planned_cnc_hours?: number
+          planned_install_hours?: number
+          planned_spray_hours?: number
+          quote_value?: number
+          risk_assessment?: string
+          sheet_count?: number
+          simulation_name?: string
+          target_end_date?: string | null
+          target_start_date?: string | null
+          tenant_id?: string
+        }
+        Update: {
+          capacity_impact_json?: Json
+          cashflow_impact?: number
+          created_at?: string
+          created_by?: string | null
+          delivery_date_prediction?: string | null
+          estimated_margin_percent?: number
+          id?: string
+          job_description?: string | null
+          job_type?: string | null
+          planned_assembly_hours?: number
+          planned_cnc_hours?: number
+          planned_install_hours?: number
+          planned_spray_hours?: number
+          quote_value?: number
+          risk_assessment?: string
+          sheet_count?: number
+          simulation_name?: string
+          target_end_date?: string | null
+          target_start_date?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capacity_simulations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cashflow_adjustments: {
         Row: {
           active: boolean
@@ -2755,6 +2832,69 @@ export type Database = {
           },
         ]
       }
+      production_schedule: {
+        Row: {
+          actual_hours: number
+          assigned_staff_ids: string[] | null
+          created_at: string
+          id: string
+          job_id: string
+          notes: string | null
+          planned_hours: number
+          scheduled_date: string
+          sort_order: number
+          stage_name: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_hours?: number
+          assigned_staff_ids?: string[] | null
+          created_at?: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          planned_hours?: number
+          scheduled_date: string
+          sort_order?: number
+          stage_name: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_hours?: number
+          assigned_staff_ids?: string[] | null
+          created_at?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          planned_hours?: number
+          scheduled_date?: string
+          sort_order?: number
+          stage_name?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_schedule_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_schedule_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           active: boolean
@@ -3526,6 +3666,50 @@ export type Database = {
           },
           {
             foreignKeyName: "staff_skills_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stage_capacity_config: {
+        Row: {
+          active: boolean
+          created_at: string
+          daily_available_hours: number
+          id: string
+          max_concurrent_jobs: number
+          notes: string | null
+          stage_name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          daily_available_hours?: number
+          id?: string
+          max_concurrent_jobs?: number
+          notes?: string | null
+          stage_name: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          daily_available_hours?: number
+          id?: string
+          max_concurrent_jobs?: number
+          notes?: string | null
+          stage_name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_capacity_config_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
