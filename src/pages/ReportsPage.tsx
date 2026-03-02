@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import {
   BarChart3, TrendingUp, AlertTriangle, CheckCircle2, Clock,
   Wrench, Package, DollarSign, PoundSterling, Percent, ArrowUpRight, ArrowDownRight,
+  Users, Download, Calendar, Sparkles,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -12,10 +13,11 @@ import {
 } from "recharts";
 import {
   format, differenceInDays, startOfMonth, endOfMonth, eachMonthOfInterval,
-  subMonths, startOfWeek, eachWeekOfInterval, subWeeks,
+  subMonths, startOfWeek, eachWeekOfInterval, subWeeks, subDays, isWithinInterval,
 } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { exportToCsv } from "@/lib/csvExport";
 
 const COLOURS = [
   "hsl(var(--primary))",
@@ -35,6 +37,20 @@ const chartTooltipStyle = {
 
 const axisTick = { fontSize: 10, fill: "hsl(var(--muted-foreground))" };
 
+type DatePreset = "7d" | "30d" | "90d" | "6m" | "12m";
+
+function getDateRange(preset: DatePreset) {
+  const now = new Date();
+  const map: Record<DatePreset, Date> = {
+    "7d": subDays(now, 7),
+    "30d": subDays(now, 30),
+    "90d": subDays(now, 90),
+    "6m": subMonths(now, 6),
+    "12m": subMonths(now, 12),
+  };
+  return { from: map[preset], to: now };
+}
+
 export default function ReportsPage() {
   const { flags } = useFeatureFlags();
   const [jobs, setJobs] = useState<any[]>([]);
@@ -43,21 +59,36 @@ export default function ReportsPage() {
   const [financials, setFinancials] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [bills, setBills] = useState<any[]>([]);
+  const [timeEntries, setTimeEntries] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [datePreset, setDatePreset] = useState<DatePreset>("30d");
+
+  const { from: rangeFrom, to: rangeTo } = useMemo(() => getDateRange(datePreset), [datePreset]);
+
+  const inRange = useCallback((dateStr: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return d >= rangeFrom && d <= rangeTo;
+  }, [rangeFrom, rangeTo]);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
 
-      const [jobsRes, stagesRes, issuesRes] = await Promise.all([
+      const [jobsRes, stagesRes, issuesRes, timeRes, staffRes] = await Promise.all([
         supabase.from("jobs").select("id, job_id, job_name, status, created_date, parts_count, materials_count"),
         supabase.from("job_stages").select("id, job_id, stage_name, status, created_at, updated_at, due_date"),
         supabase.from("job_issues").select("id, job_id, severity, status, category, reported_at, resolved_at"),
+        supabase.from("time_entries").select("id, staff_id, date, hours, stage_name, job_id"),
+        supabase.from("profiles").select("user_id, full_name, department, role"),
       ]);
 
       setJobs(jobsRes.data ?? []);
       setStages(stagesRes.data ?? []);
       setIssues(issuesRes.data ?? []);
+      setTimeEntries(timeRes.data ?? []);
+      setStaff(staffRes.data ?? []);
 
       if (flags.enable_finance) {
         const [finRes, invRes, billRes] = await Promise.all([
@@ -75,10 +106,16 @@ export default function ReportsPage() {
     load();
   }, [flags.enable_finance]);
 
+  // ── Filtered data ──
+  const filteredJobs = useMemo(() => jobs.filter(j => inRange(j.created_date)), [jobs, inRange]);
+  const filteredStages = useMemo(() => stages.filter(s => inRange(s.updated_at)), [stages, inRange]);
+  const filteredIssues = useMemo(() => issues.filter(i => inRange(i.reported_at)), [issues, inRange]);
+  const filteredTimeEntries = useMemo(() => timeEntries.filter(t => inRange(t.date)), [timeEntries, inRange]);
+
   // ── Computed metrics ──
-  const completedStages = useMemo(() => stages.filter(s => s.status === "Done"), [stages]);
-  const openIssues = useMemo(() => issues.filter(i => i.status === "open"), [issues]);
-  const resolvedIssues = useMemo(() => issues.filter(i => i.status === "resolved"), [issues]);
+  const completedStages = useMemo(() => filteredStages.filter(s => s.status === "Done"), [filteredStages]);
+  const openIssues = useMemo(() => filteredIssues.filter(i => i.status === "open"), [filteredIssues]);
+  const resolvedIssues = useMemo(() => filteredIssues.filter(i => i.status === "resolved"), [filteredIssues]);
 
   const avgCycleTime = useMemo(() => {
     if (completedStages.length === 0) return 0;
@@ -93,8 +130,24 @@ export default function ReportsPage() {
       sum + differenceInDays(new Date(i.resolved_at), new Date(i.reported_at)), 0) / resolved.length * 10) / 10;
   }, [resolvedIssues]);
 
-  const completedJobs = useMemo(() => jobs.filter(j => j.status === "complete" || j.status === "installed"), [jobs]);
-  const totalParts = useMemo(() => jobs.reduce((s, j) => s + j.parts_count, 0), [jobs]);
+  const completedJobs = useMemo(() => filteredJobs.filter(j => j.status === "complete" || j.status === "installed"), [filteredJobs]);
+  const totalParts = useMemo(() => filteredJobs.reduce((s, j) => s + j.parts_count, 0), [filteredJobs]);
+
+  // ── Previous period comparison ──
+  const prevRange = useMemo(() => {
+    const duration = rangeTo.getTime() - rangeFrom.getTime();
+    return { from: new Date(rangeFrom.getTime() - duration), to: new Date(rangeFrom.getTime()) };
+  }, [rangeFrom, rangeTo]);
+
+  const inPrevRange = useCallback((dateStr: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return d >= prevRange.from && d <= prevRange.to;
+  }, [prevRange]);
+
+  const prevCompletedJobs = useMemo(() => jobs.filter(j => inPrevRange(j.created_date) && (j.status === "complete" || j.status === "installed")).length, [jobs, inPrevRange]);
+  const prevParts = useMemo(() => jobs.filter(j => inPrevRange(j.created_date)).reduce((s, j) => s + j.parts_count, 0), [jobs, inPrevRange]);
+  const prevIssues = useMemo(() => issues.filter(i => inPrevRange(i.reported_at) && i.status === "open").length, [issues, inPrevRange]);
 
   // ── Stage cycle times ──
   const stageCycleTimes = useMemo(() => {
@@ -114,11 +167,11 @@ export default function ReportsPage() {
   const jobsByStatus = useMemo(() =>
     ["draft", "in_progress", "review", "complete", "installed"].map(status => ({
       status: status.replace("_", " "),
-      count: jobs.filter(j => j.status === status).length,
+      count: filteredJobs.filter(j => j.status === status).length,
     })).filter(d => d.count > 0)
-  , [jobs]);
+  , [filteredJobs]);
 
-  // ── Throughput: jobs completed per week (last 12 weeks) ──
+  // ── Throughput: stages completed per week (last 12 weeks) ──
   const throughputData = useMemo(() => {
     const weeks = eachWeekOfInterval({ start: subWeeks(new Date(), 11), end: new Date() });
     return weeks.map(w => {
@@ -143,9 +196,9 @@ export default function ReportsPage() {
 
   const issuesByCategory = useMemo(() =>
     Object.entries(
-      issues.reduce((acc, i) => { acc[i.category] = (acc[i.category] || 0) + 1; return acc; }, {} as Record<string, number>)
+      filteredIssues.reduce((acc, i) => { acc[i.category] = (acc[i.category] || 0) + 1; return acc; }, {} as Record<string, number>)
     ).map(([category, count]) => ({ category, count: count as number })).sort((a, b) => b.count - a.count)
-  , [issues]);
+  , [filteredIssues]);
 
   // ── Financial: job profitability ──
   const profitabilityData = useMemo(() => {
@@ -199,6 +252,81 @@ export default function ReportsPage() {
 
   const overdueStages = useMemo(() => stages.filter(s => s.due_date && new Date(s.due_date) < new Date() && s.status !== "Done"), [stages]);
 
+  // ── Staff / Productivity ──
+  const totalHoursLogged = useMemo(() => filteredTimeEntries.reduce((s, t) => s + Number(t.hours || 0), 0), [filteredTimeEntries]);
+
+  const hoursByStaff = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredTimeEntries.forEach(t => {
+      map.set(t.staff_id, (map.get(t.staff_id) || 0) + Number(t.hours || 0));
+    });
+    return Array.from(map.entries()).map(([staffId, hours]) => {
+      const s = staff.find(p => p.user_id === staffId);
+      return { name: s?.full_name || "Unknown", hours: Math.round(hours * 10) / 10, department: s?.department || "—" };
+    }).sort((a, b) => b.hours - a.hours);
+  }, [filteredTimeEntries, staff]);
+
+  const hoursByDepartment = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredTimeEntries.forEach(t => {
+      const s = staff.find(p => p.user_id === t.staff_id);
+      const dept = s?.department || "Other";
+      map.set(dept, (map.get(dept) || 0) + Number(t.hours || 0));
+    });
+    return Array.from(map.entries()).map(([dept, hours]) => ({
+      department: dept, hours: Math.round(hours * 10) / 10,
+    })).sort((a, b) => b.hours - a.hours);
+  }, [filteredTimeEntries, staff]);
+
+  const hoursByStage = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredTimeEntries.forEach(t => {
+      const stage = t.stage_name || "Unassigned";
+      map.set(stage, (map.get(stage) || 0) + Number(t.hours || 0));
+    });
+    return Array.from(map.entries()).map(([stage, hours]) => ({
+      stage, hours: Math.round(hours * 10) / 10,
+    })).sort((a, b) => b.hours - a.hours);
+  }, [filteredTimeEntries]);
+
+  // ── Export functions ──
+  const exportOperations = useCallback(() => {
+    exportToCsv("operations_report", [
+      "Metric", "Value",
+    ], [
+      ["Total Jobs", filteredJobs.length],
+      ["Total Parts", totalParts],
+      ["Completed Jobs", completedJobs.length],
+      ["Avg Cycle Time (days)", avgCycleTime],
+      ["Overdue Stages", overdueStages.length],
+      ...stageCycleTimes.map(s => [`Stage: ${s.stage} Avg Days`, s.avgDays]),
+    ]);
+  }, [filteredJobs, totalParts, completedJobs, avgCycleTime, overdueStages, stageCycleTimes]);
+
+  const exportQuality = useCallback(() => {
+    exportToCsv("quality_report", [
+      "Metric", "Value",
+    ], [
+      ["Open Issues", openIssues.length],
+      ["Resolved Issues", resolvedIssues.length],
+      ["Avg Resolution Days", avgResolutionDays],
+      ...issuesByCategory.map(c => [`Category: ${c.category}`, c.count]),
+    ]);
+  }, [openIssues, resolvedIssues, avgResolutionDays, issuesByCategory]);
+
+  const exportStaff = useCallback(() => {
+    exportToCsv("staff_productivity", [
+      "Staff", "Department", "Hours",
+    ], hoursByStaff.map(s => [s.name, s.department, s.hours]));
+  }, [hoursByStaff]);
+
+  const exportFinance = useCallback(() => {
+    if (!profitabilityData.length) return;
+    exportToCsv("finance_report", [
+      "Job", "Name", "Revenue", "Costs", "Profit", "Margin %",
+    ], profitabilityData.map(d => [d.jobCode, d.jobName, d.revenue, d.costs, d.profit, d.margin]));
+  }, [profitabilityData]);
+
   if (loading) {
     return (
       <div className="space-y-6 animate-slide-in">
@@ -211,33 +339,55 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <div>
-        <h1 className="text-2xl font-mono font-bold text-foreground flex items-center gap-2">
-          <BarChart3 size={20} className="text-primary" /> Reports & Analytics
-        </h1>
-        <p className="text-sm text-muted-foreground">Operational insights across jobs, stages, issues, and finance</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-mono font-bold text-foreground flex items-center gap-2">
+            <BarChart3 size={20} className="text-primary" /> Reports & Analytics
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {format(rangeFrom, "dd MMM yyyy")} – {format(rangeTo, "dd MMM yyyy")}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 bg-muted rounded-lg p-1">
+            {(["7d", "30d", "90d", "6m", "12m"] as DatePreset[]).map(p => (
+              <button
+                key={p}
+                onClick={() => setDatePreset(p)}
+                className={cn(
+                  "px-2.5 py-1 text-[10px] font-mono font-medium rounded-md transition-colors",
+                  datePreset === p ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="operations" className="space-y-6">
         <TabsList className="bg-muted/50">
           <TabsTrigger value="operations" className="text-xs font-mono">Operations</TabsTrigger>
+          <TabsTrigger value="staff" className="text-xs font-mono">Staff</TabsTrigger>
           {flags.enable_finance && <TabsTrigger value="finance" className="text-xs font-mono">Finance</TabsTrigger>}
           <TabsTrigger value="quality" className="text-xs font-mono">Quality</TabsTrigger>
         </TabsList>
 
         {/* ═══ Operations Tab ═══ */}
         <TabsContent value="operations" className="space-y-6">
-          {/* KPIs */}
+          <div className="flex justify-end">
+            <ExportBtn onClick={exportOperations} />
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <KPI icon={Wrench} label="TOTAL JOBS" value={jobs.length} />
-            <KPI icon={Package} label="TOTAL PARTS" value={totalParts} />
-            <KPI icon={CheckCircle2} label="COMPLETED" value={completedJobs.length} variant="primary" />
+            <KPI icon={Wrench} label="TOTAL JOBS" value={filteredJobs.length} delta={filteredJobs.length - jobs.filter(j => inPrevRange(j.created_date)).length} />
+            <KPI icon={Package} label="TOTAL PARTS" value={totalParts} delta={totalParts - prevParts} />
+            <KPI icon={CheckCircle2} label="COMPLETED" value={completedJobs.length} variant="primary" delta={completedJobs.length - prevCompletedJobs} />
             <KPI icon={Clock} label="AVG CYCLE" value={`${avgCycleTime}d`} />
             <KPI icon={AlertTriangle} label="OVERDUE STAGES" value={overdueStages.length} variant={overdueStages.length > 0 ? "danger" : "default"} />
             <KPI icon={TrendingUp} label="THROUGHPUT/WK" value={throughputData.length > 0 ? throughputData[throughputData.length - 1].stages : 0} variant="primary" />
           </div>
 
-          {/* Charts row 1 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ChartCard title="Jobs by Status">
               <ResponsiveContainer width="100%" height={220}>
@@ -264,7 +414,6 @@ export default function ReportsPage() {
             </ChartCard>
           </div>
 
-          {/* Cycle times */}
           <ChartCard title="Avg Stage Cycle Time (days)">
             {stageCycleTimes.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
@@ -281,7 +430,6 @@ export default function ReportsPage() {
             )}
           </ChartCard>
 
-          {/* Overdue stages table */}
           {overdueStages.length > 0 && (
             <div className="glass-panel rounded-lg overflow-hidden">
               <div className="px-4 py-3 border-b border-border flex items-center gap-2">
@@ -314,10 +462,94 @@ export default function ReportsPage() {
           )}
         </TabsContent>
 
+        {/* ═══ Staff / Productivity Tab ═══ */}
+        <TabsContent value="staff" className="space-y-6">
+          <div className="flex justify-end">
+            <ExportBtn onClick={exportStaff} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KPI icon={Clock} label="HOURS LOGGED" value={Math.round(totalHoursLogged * 10) / 10} variant="primary" />
+            <KPI icon={Users} label="ACTIVE STAFF" value={new Set(filteredTimeEntries.map(t => t.staff_id)).size} />
+            <KPI icon={BarChart3} label="AVG HRS/PERSON" value={hoursByStaff.length > 0 ? Math.round(totalHoursLogged / hoursByStaff.length * 10) / 10 : 0} />
+            <KPI icon={Wrench} label="STAGES COVERED" value={hoursByStage.length} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ChartCard title="Hours by Department">
+              {hoursByDepartment.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={hoursByDepartment} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="department" tick={axisTick} />
+                    <YAxis allowDecimals={false} tick={axisTick} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: any) => [`${v}h`, "Hours"]} />
+                    <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyChart text="No time entries recorded" />
+              )}
+            </ChartCard>
+
+            <ChartCard title="Hours by Stage">
+              {hoursByStage.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={hoursByStage} dataKey="hours" nameKey="stage" cx="50%" cy="50%" outerRadius={70}
+                      label={({ stage, hours }) => `${stage} (${hours}h)`} labelLine={false} fontSize={10}>
+                      {hoursByStage.map((_, i) => <Cell key={i} fill={COLOURS[i % COLOURS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyChart text="No time entries recorded" />
+              )}
+            </ChartCard>
+          </div>
+
+          {/* Top staff table */}
+          {hoursByStaff.length > 0 && (
+            <div className="glass-panel rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-border">
+                <h3 className="font-mono text-xs font-bold text-muted-foreground uppercase tracking-wider">Staff Hours Leaderboard</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground">#</th>
+                      <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground">NAME</th>
+                      <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground">DEPARTMENT</th>
+                      <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground">HOURS</th>
+                      <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground">% OF TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hoursByStaff.slice(0, 20).map((s, idx) => (
+                      <tr key={s.name} className="border-b border-border last:border-0 hover:bg-secondary/20">
+                        <td className="px-4 py-2 font-mono text-muted-foreground">{idx + 1}</td>
+                        <td className="px-4 py-2 font-medium text-foreground">{s.name}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{s.department}</td>
+                        <td className="px-4 py-2 text-right font-mono text-primary">{s.hours}h</td>
+                        <td className="px-4 py-2 text-right font-mono text-muted-foreground">
+                          {totalHoursLogged > 0 ? Math.round((s.hours / totalHoursLogged) * 100) : 0}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
         {/* ═══ Finance Tab ═══ */}
         {flags.enable_finance && (
           <TabsContent value="finance" className="space-y-6">
-            {/* Finance KPIs */}
+            <div className="flex justify-end">
+              <ExportBtn onClick={exportFinance} />
+            </div>
             {financeKPIs && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <KPI icon={PoundSterling} label="TOTAL REVENUE" value={`£${financeKPIs.totalRevenue.toLocaleString()}`} variant="primary" />
@@ -327,7 +559,6 @@ export default function ReportsPage() {
               </div>
             )}
 
-            {/* Revenue vs Costs trend */}
             <ChartCard title="Revenue vs Costs (6 Months)">
               {revenueTrend.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
@@ -347,7 +578,6 @@ export default function ReportsPage() {
               )}
             </ChartCard>
 
-            {/* Job Profitability Table */}
             {profitabilityData.length > 0 && (
               <div className="glass-panel rounded-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-border">
@@ -397,11 +627,14 @@ export default function ReportsPage() {
 
         {/* ═══ Quality Tab ═══ */}
         <TabsContent value="quality" className="space-y-6">
+          <div className="flex justify-end">
+            <ExportBtn onClick={exportQuality} />
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KPI icon={AlertTriangle} label="OPEN ISSUES" value={openIssues.length} variant={openIssues.length > 0 ? "danger" : "default"} />
+            <KPI icon={AlertTriangle} label="OPEN ISSUES" value={openIssues.length} variant={openIssues.length > 0 ? "danger" : "default"} delta={openIssues.length - prevIssues} />
             <KPI icon={CheckCircle2} label="RESOLVED" value={resolvedIssues.length} variant="primary" />
             <KPI icon={Clock} label="AVG RESOLUTION" value={`${avgResolutionDays}d`} />
-            <KPI icon={Percent} label="RESOLVE RATE" value={`${issues.length > 0 ? Math.round((resolvedIssues.length / issues.length) * 100) : 100}%`} variant="primary" />
+            <KPI icon={Percent} label="RESOLVE RATE" value={`${filteredIssues.length > 0 ? Math.round((resolvedIssues.length / filteredIssues.length) * 100) : 100}%`} variant="primary" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -447,9 +680,10 @@ export default function ReportsPage() {
 
 // ── Sub-components ──
 
-function KPI({ icon: Icon, label, value, variant = "default" }: {
+function KPI({ icon: Icon, label, value, variant = "default", delta }: {
   icon: any; label: string; value: string | number;
   variant?: "default" | "primary" | "danger" | "warning";
+  delta?: number;
 }) {
   const colors = {
     default: "text-foreground",
@@ -468,6 +702,12 @@ function KPI({ icon: Icon, label, value, variant = "default" }: {
       <Icon size={16} className={cn(iconColors[variant], "mx-auto mb-1")} />
       <p className={cn("text-2xl font-mono font-bold", colors[variant])}>{value}</p>
       <p className="text-[10px] font-mono text-muted-foreground tracking-wide">{label}</p>
+      {delta !== undefined && delta !== 0 && (
+        <div className={cn("flex items-center justify-center gap-0.5 mt-1 text-[10px] font-mono", delta > 0 ? "text-primary" : "text-destructive")}>
+          {delta > 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+          <span>{delta > 0 ? "+" : ""}{delta} vs prev</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -483,4 +723,15 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 
 function EmptyChart({ text }: { text: string }) {
   return <p className="text-sm text-muted-foreground text-center py-12">{text}</p>;
+}
+
+function ExportBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+    >
+      <Download size={14} /> Export CSV
+    </button>
+  );
 }
