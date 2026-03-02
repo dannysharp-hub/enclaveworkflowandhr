@@ -5,8 +5,12 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Calendar, Link2, Unlink, RefreshCw, CheckCircle2, AlertTriangle,
-  XCircle, Loader2, ChevronDown, ChevronUp, Settings2,
+  XCircle, Loader2, ChevronDown, ChevronUp, Settings2, Download,
 } from "lucide-react";
+import {
+  exportCalendarEvents, exportCalendarSyncLinks,
+  exportCalendarSyncQueue, exportCalendarSyncAudit,
+} from "@/lib/calendarExport";
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase tracking-wider";
@@ -220,8 +224,8 @@ export default function GoogleIntegrationSettings() {
   };
 
   const statusIcon = {
-    healthy: <CheckCircle2 size={16} className="text-green-500" />,
-    needs_auth: <AlertTriangle size={16} className="text-yellow-500" />,
+    healthy: <CheckCircle2 size={16} className="text-success" />,
+    needs_auth: <AlertTriangle size={16} className="text-warning" />,
     error: <XCircle size={16} className="text-destructive" />,
     disconnected: <XCircle size={16} className="text-muted-foreground" />,
   };
@@ -440,6 +444,30 @@ export default function GoogleIntegrationSettings() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Exports ─── */}
+      {settings?.is_connected && (
+        <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
+          <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">Exports</h4>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: "Calendar Events", fn: exportCalendarEvents },
+              { label: "Sync Links", fn: exportCalendarSyncLinks },
+              { label: "Sync Queue", fn: exportCalendarSyncQueue },
+              { label: "Audit Log", fn: exportCalendarSyncAudit },
+            ].map(({ label, fn }) => (
+              <button
+                key={label}
+                onClick={fn}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Download size={12} />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
