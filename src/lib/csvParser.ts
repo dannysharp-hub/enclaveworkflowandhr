@@ -107,8 +107,10 @@ function parseDimensionString(dim: string): { width: number; height: number; thi
 
 /**
  * Resolve grain/rotation rules from grain value.
- * "H" or "V" → grain_required=true, rotation_allowed=false
- * "None" or blank → grain_required=false, rotation_allowed=true
+ * BOM uses H/V, DB expects L/W for grain_axis.
+ * H (horizontal) → W (width), V (vertical) → L (length)
+ * Grain present → rotation restricted to 0_or_180
+ * No grain → rotation = any
  */
 function resolveGrainRules(grainRaw: string | undefined): {
   grain_required: boolean;
@@ -116,18 +118,17 @@ function resolveGrainRules(grainRaw: string | undefined): {
   rotation_allowed: string;
 } {
   const g = (grainRaw || "").toString().trim().toUpperCase();
-  if (g === "H" || g === "V") {
-    return {
-      grain_required: true,
-      grain_axis: g,
-      rotation_allowed: "none", // only 0/180 allowed
-    };
+  if (g === "H") {
+    return { grain_required: true, grain_axis: "W", rotation_allowed: "0_or_180" };
   }
-  return {
-    grain_required: false,
-    grain_axis: undefined,
-    rotation_allowed: "any",
-  };
+  if (g === "V") {
+    return { grain_required: true, grain_axis: "L", rotation_allowed: "0_or_180" };
+  }
+  // Also accept L/W directly
+  if (g === "L" || g === "W") {
+    return { grain_required: true, grain_axis: g, rotation_allowed: "0_or_180" };
+  }
+  return { grain_required: false, grain_axis: undefined, rotation_allowed: "any" };
 }
 
 export function parseCsv(text: string): CsvParseResult {
