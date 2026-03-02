@@ -3,11 +3,13 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package, ClipboardCheck, Library } from "lucide-react";
 import CsvImportDialog from "@/components/CsvImportDialog";
 import PartRow from "@/components/PartRow";
+import PartLibraryPicker from "@/components/PartLibraryPicker";
+import NestingGroupsPanel from "@/components/NestingGroupsPanel";
 import { CsvPart } from "@/lib/csvParser";
-import { generateVCarveExportPack } from "@/lib/vcarveExport";
+import { generateVCarveJobPack } from "@/lib/vcarveExport";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import JobFinancePanel from "@/components/JobFinancePanel";
 import JobIssuesPanel from "@/components/JobIssuesPanel";
@@ -48,7 +50,9 @@ export default function JobBuilderPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [fullMaterials, setFullMaterials] = useState<any[]>([]);
 
   const fetchJob = useCallback(async () => {
     if (!jobId) return;
@@ -57,12 +61,14 @@ export default function JobBuilderPage() {
     const [jobRes, partsRes, matsRes] = await Promise.all([
       supabase.from("jobs").select("id, job_id, job_name, status").eq("id", jobId).single(),
       supabase.from("parts").select("*").eq("job_id", jobId).order("part_id"),
-      supabase.from("materials").select("material_code, display_name").eq("active", true).order("material_code"),
+      supabase.from("materials").select("*").eq("active", true).order("material_code"),
     ]);
 
     if (jobRes.data) setJob(jobRes.data as JobInfo);
     if (partsRes.data) setParts(partsRes.data as PartData[]);
-    setMaterials((matsRes.data as any[]) ?? []);
+    const allMats = (matsRes.data as any[]) ?? [];
+    setMaterials(allMats.map(m => ({ material_code: m.material_code, display_name: m.display_name })));
+    setFullMaterials(allMats);
     setLoading(false);
   }, [jobId]);
 
@@ -174,6 +180,28 @@ export default function JobBuilderPage() {
     }
   }, [job, parts]);
 
+  const handleLibrarySelect = useCallback((libParts: any[]) => {
+    const newParts: PartData[] = libParts.map((lp, i) => ({
+      part_id: lp.part_code || `LP${String(parts.length + i + 1).padStart(3, "0")}`,
+      product_code: lp.product_code || "",
+      length_mm: lp.length_mm,
+      width_mm: lp.width_mm,
+      quantity: 1,
+      material_code: lp.material_code,
+      grain_required: lp.grain_required,
+      grain_axis: lp.grain_axis,
+      rotation_allowed: lp.rotation_allowed,
+      dxf_file_reference: lp.dxf_file_reference,
+      validation_status: "pending",
+    }));
+    setParts(prev => {
+      const existingIds = new Set(prev.map(p => p.part_id));
+      const unique = newParts.filter(p => !existingIds.has(p.part_id));
+      return [...prev, ...unique];
+    });
+    toast({ title: "Parts added from library", description: `${newParts.length} parts` });
+  }, [parts.length]);
+
   const handleExport = useCallback(async () => {
     if (!job) return;
     const invalid = parts.filter(p => !p.material_code || p.length_mm <= 0 || p.width_mm <= 0);
@@ -183,14 +211,59 @@ export default function JobBuilderPage() {
     }
     setExporting(true);
     try {
-      await generateVCarveExportPack(job.id, job.job_id, parts);
-      toast({ title: "Export complete", description: `${job.job_id}_VCarve_Pack.zip downloaded` });
+      // Build nesting groups from parts + material data
+      const byMat = new Map<string, PartData[]>();
+      for (const p of parts) {
+        const key = p.material_code || "UNKNOWN";
+        if (!byMat.has(key)) byMat.set(key, []);
+        byMat.get(key)!.push(p);
+      }
+
+      const groups = Array.from(byMat.entries()).map(([mat, matParts]) => {
+        const matDef = fullMaterials.find((m: any) => m.material_code === mat);
+        const totalArea = matParts.reduce((s, p) => s + (p.length_mm * p.width_mm * p.quantity), 0);
+        const sheetArea = (matDef?.sheet_length_mm || 2440) * (matDef?.sheet_width_mm || 1220);
+        const estSheets = Math.max(1, Math.ceil((totalArea * 1.15) / sheetArea));
+
+        return {
+          group_id: crypto.randomUUID(),
+          group_label: mat,
+          material_code: mat,
+          thickness_mm: matDef?.thickness_mm || null,
+          colour_name: matDef?.colour_name || null,
+          sheet_length_mm: matDef?.sheet_length_mm || 2440,
+          sheet_width_mm: matDef?.sheet_width_mm || 1220,
+          margin_mm: 10,
+          spacing_mm: 8,
+          allow_rotation_90: !matParts.some(p => p.rotation_allowed === "none"),
+          allow_mirror: false,
+          grain_direction: matDef?.grain_direction || "length",
+          nest_method: "by_area",
+          keep_parts_together: false,
+          prioritise_grain_parts: true,
+          toolpath_template_name: null,
+          parts: matParts,
+          planned_sheets: Array.from({ length: estSheets }, (_, i) => ({
+            sheet_id: crypto.randomUUID(),
+            sheet_number: i + 1,
+            qr_payload: `${job.job_id}_${mat}_S${i + 1}`,
+          })),
+        };
+      });
+
+      await generateVCarveJobPack({
+        jobId: job.id,
+        jobCode: job.job_id,
+        jobName: job.job_name,
+        groups,
+      });
+      toast({ title: "VCarve Job Pack exported", description: `${job.job_id}_VCarve_Pack.zip downloaded` });
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     } finally {
       setExporting(false);
     }
-  }, [job, parts]);
+  }, [job, parts, fullMaterials]);
 
   const validCount = parts.filter(p => p.material_code && p.length_mm > 0 && p.width_mm > 0).length;
   const invalidCount = parts.length - validCount;
@@ -232,6 +305,9 @@ export default function JobBuilderPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {canEdit && (
             <>
+              <button onClick={() => setLibraryPickerOpen(true)} className="flex items-center gap-2 h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-muted/20 transition-colors">
+                <Library size={14} /> From Library
+              </button>
               <button onClick={() => setCsvDialogOpen(true)} className="flex items-center gap-2 h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-muted/20 transition-colors">
                 <FileSpreadsheet size={14} /> Import CSV
               </button>
@@ -244,7 +320,7 @@ export default function JobBuilderPage() {
             </>
           )}
           <button onClick={handleExport} disabled={exporting || parts.length === 0} className="flex items-center gap-2 h-9 px-3 rounded-md border border-primary text-sm font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-50">
-            <Download size={14} /> {exporting ? "Exporting..." : "VCarve Pack"}
+            <Download size={14} /> {exporting ? "Exporting..." : "VCarve Job Pack"}
           </button>
         </div>
       </div>
@@ -340,6 +416,11 @@ export default function JobBuilderPage() {
         </div>
       )}
 
+      {/* Nesting Groups Panel */}
+      {parts.length > 0 && (
+        <NestingGroupsPanel jobId={job.id} parts={parts} materials={fullMaterials} />
+      )}
+
       {/* Job Cards Panel */}
       {job && <JobCardPanel jobId={job.id} jobCode={job.job_id} readOnly={!canEdit} />}
 
@@ -360,6 +441,7 @@ export default function JobBuilderPage() {
       )}
 
       <CsvImportDialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen} onImport={handleCsvImport} />
+      <PartLibraryPicker open={libraryPickerOpen} onOpenChange={setLibraryPickerOpen} onSelect={handleLibrarySelect} />
     </div>
   );
 }

@@ -49,6 +49,7 @@ const navItems: NavItem[] = [
   { to: "/reviews", label: "Reviews", icon: ClipboardCheck },
   { to: "/remnants", label: "Remnants", icon: Recycle, featureFlag: "enable_remnants" },
   { to: "/materials", label: "Materials", icon: Package },
+  { to: "/part-library", label: "Part Library", icon: Package },
   { to: "/purchasing", label: "Purchase Orders", icon: Truck },
   { to: "/drift", label: "Drift Control", icon: TrendingDown, adminOnly: true },
   { to: "/capacity", label: "Capacity", icon: Factory, adminOnly: true },

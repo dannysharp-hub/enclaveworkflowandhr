@@ -20,6 +20,7 @@ import WhosInPage from "./pages/WhosInPage";
 import RemnantsPage from "./pages/RemnantsPage";
 import MaterialsPage from "./pages/MaterialsPage";
 import JobBuilderPage from "./pages/JobBuilderPage";
+import PartLibraryPage from "./pages/PartLibraryPage";
 import WorkflowPage from "./pages/WorkflowPage";
 import MachineAuthPage from "./pages/MachineAuthPage";
 import ReviewsPage from "./pages/ReviewsPage";
@@ -94,6 +95,7 @@ const AppRoutes = () => (
               <Route path="/workflow" element={<WorkflowPage />} />
               <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:jobId/builder" element={<JobBuilderPage />} />
+              <Route path="/part-library" element={<PartLibraryPage />} />
               <Route path="/production" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionControlPage /></RoleGate>} />
               <Route path="/jobs/:jobId/install-signoff" element={<InstallSignOffPage />} />
               <Route path="/staff" element={<StaffPage />} />

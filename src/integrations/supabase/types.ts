@@ -1964,6 +1964,104 @@ export type Database = {
           },
         ]
       }
+      job_nesting_groups: {
+        Row: {
+          allow_mirror: boolean
+          allow_rotation_90: boolean
+          colour_name: string | null
+          created_at: string
+          grain_direction: string | null
+          group_label: string
+          id: string
+          job_id: string
+          keep_parts_together: boolean | null
+          margin_mm: number
+          material_code: string | null
+          nest_method: string | null
+          prioritise_grain_parts: boolean | null
+          sheet_length_mm: number
+          sheet_width_mm: number
+          spacing_mm: number
+          tenant_id: string
+          thickness_mm: number | null
+          toolpath_template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          allow_mirror?: boolean
+          allow_rotation_90?: boolean
+          colour_name?: string | null
+          created_at?: string
+          grain_direction?: string | null
+          group_label: string
+          id?: string
+          job_id: string
+          keep_parts_together?: boolean | null
+          margin_mm?: number
+          material_code?: string | null
+          nest_method?: string | null
+          prioritise_grain_parts?: boolean | null
+          sheet_length_mm?: number
+          sheet_width_mm?: number
+          spacing_mm?: number
+          tenant_id: string
+          thickness_mm?: number | null
+          toolpath_template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          allow_mirror?: boolean
+          allow_rotation_90?: boolean
+          colour_name?: string | null
+          created_at?: string
+          grain_direction?: string | null
+          group_label?: string
+          id?: string
+          job_id?: string
+          keep_parts_together?: boolean | null
+          margin_mm?: number
+          material_code?: string | null
+          nest_method?: string | null
+          prioritise_grain_parts?: boolean | null
+          sheet_length_mm?: number
+          sheet_width_mm?: number
+          spacing_mm?: number
+          tenant_id?: string
+          thickness_mm?: number | null
+          toolpath_template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_nesting_groups_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_nesting_groups_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "job_nesting_groups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_nesting_groups_toolpath_template_id_fkey"
+            columns: ["toolpath_template_id"]
+            isOneToOne: false
+            referencedRelation: "toolpath_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_payment_schedules: {
         Row: {
           amount: number
@@ -2092,6 +2190,89 @@ export type Database = {
           },
           {
             foreignKeyName: "job_performance_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_sheets: {
+        Row: {
+          created_at: string
+          cut_at: string | null
+          cut_by: string | null
+          id: string
+          job_id: string
+          material_code: string | null
+          nesting_group_id: string | null
+          notes: string | null
+          qr_payload: string | null
+          sheet_length_mm: number
+          sheet_number: number
+          sheet_width_mm: number
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cut_at?: string | null
+          cut_by?: string | null
+          id?: string
+          job_id: string
+          material_code?: string | null
+          nesting_group_id?: string | null
+          notes?: string | null
+          qr_payload?: string | null
+          sheet_length_mm?: number
+          sheet_number?: number
+          sheet_width_mm?: number
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cut_at?: string | null
+          cut_by?: string | null
+          id?: string
+          job_id?: string
+          material_code?: string | null
+          nesting_group_id?: string | null
+          notes?: string | null
+          qr_payload?: string | null
+          sheet_length_mm?: number
+          sheet_number?: number
+          sheet_width_mm?: number
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_sheets_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheets_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "job_sheets_nesting_group_id_fkey"
+            columns: ["nesting_group_id"]
+            isOneToOne: false
+            referencedRelation: "job_nesting_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheets_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2273,6 +2454,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           created_date: string
+          customer_id: string | null
+          due_date: string | null
           id: string
           job_id: string
           job_name: string
@@ -2292,6 +2475,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_date?: string
+          customer_id?: string | null
+          due_date?: string | null
           id?: string
           job_id: string
           job_name: string
@@ -2311,6 +2496,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_date?: string
+          customer_id?: string | null
+          due_date?: string | null
           id?: string
           job_id?: string
           job_name?: string
@@ -2326,6 +2513,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "jobs_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -2614,8 +2808,90 @@ export type Database = {
           },
         ]
       }
+      part_library: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          dxf_file_reference: string | null
+          grain_axis: string | null
+          grain_required: boolean
+          id: string
+          length_mm: number
+          material_code: string | null
+          part_code: string
+          product_code: string | null
+          rotation_allowed: string | null
+          tags: string[] | null
+          tenant_id: string
+          thickness_mm: number | null
+          updated_at: string
+          version: number
+          width_mm: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dxf_file_reference?: string | null
+          grain_axis?: string | null
+          grain_required?: boolean
+          id?: string
+          length_mm?: number
+          material_code?: string | null
+          part_code: string
+          product_code?: string | null
+          rotation_allowed?: string | null
+          tags?: string[] | null
+          tenant_id: string
+          thickness_mm?: number | null
+          updated_at?: string
+          version?: number
+          width_mm?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dxf_file_reference?: string | null
+          grain_axis?: string | null
+          grain_required?: boolean
+          id?: string
+          length_mm?: number
+          material_code?: string | null
+          part_code?: string
+          product_code?: string | null
+          rotation_allowed?: string | null
+          tags?: string[] | null
+          tenant_id?: string
+          thickness_mm?: number | null
+          updated_at?: string
+          version?: number
+          width_mm?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_library_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "part_library_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parts: {
         Row: {
+          colour_name: string | null
           created_at: string
           dxf_file_reference: string | null
           grain_axis: string | null
@@ -2623,17 +2899,20 @@ export type Database = {
           id: string
           job_id: string
           length_mm: number
+          library_part_id: string | null
           material_code: string | null
           part_id: string
           product_code: string
           quantity: number
           rotation_allowed: string | null
           tenant_id: string
+          thickness_mm: number | null
           updated_at: string
           validation_status: string | null
           width_mm: number
         }
         Insert: {
+          colour_name?: string | null
           created_at?: string
           dxf_file_reference?: string | null
           grain_axis?: string | null
@@ -2641,17 +2920,20 @@ export type Database = {
           id?: string
           job_id: string
           length_mm: number
+          library_part_id?: string | null
           material_code?: string | null
           part_id: string
           product_code: string
           quantity?: number
           rotation_allowed?: string | null
           tenant_id?: string
+          thickness_mm?: number | null
           updated_at?: string
           validation_status?: string | null
           width_mm: number
         }
         Update: {
+          colour_name?: string | null
           created_at?: string
           dxf_file_reference?: string | null
           grain_axis?: string | null
@@ -2659,12 +2941,14 @@ export type Database = {
           id?: string
           job_id?: string
           length_mm?: number
+          library_part_id?: string | null
           material_code?: string | null
           part_id?: string
           product_code?: string
           quantity?: number
           rotation_allowed?: string | null
           tenant_id?: string
+          thickness_mm?: number | null
           updated_at?: string
           validation_status?: string | null
           width_mm?: number
@@ -2675,6 +2959,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_library_part_id_fkey"
+            columns: ["library_part_id"]
+            isOneToOne: false
+            referencedRelation: "part_library"
             referencedColumns: ["id"]
           },
           {
