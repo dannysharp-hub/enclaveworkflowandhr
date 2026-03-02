@@ -4401,6 +4401,57 @@ export type Database = {
           },
         ]
       }
+      po_delivery_events: {
+        Row: {
+          created_at: string
+          created_by_name: string
+          created_by_type: string
+          event_date: string
+          event_type: string
+          id: string
+          notes: string | null
+          po_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_name: string
+          created_by_type?: string
+          event_date?: string
+          event_type?: string
+          id?: string
+          notes?: string | null
+          po_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_name?: string
+          created_by_type?: string
+          event_date?: string
+          event_type?: string
+          id?: string
+          notes?: string | null
+          po_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_delivery_events_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_delivery_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_mappings: {
         Row: {
           created_at: string
@@ -5784,6 +5835,108 @@ export type Database = {
           },
           {
             foreignKeyName: "supplier_performance_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_po_documents: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_reference: string | null
+          file_size_bytes: number | null
+          id: string
+          notes: string | null
+          po_id: string
+          tenant_id: string
+          uploaded_by_name: string
+          uploaded_by_type: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_reference?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          notes?: string | null
+          po_id: string
+          tenant_id: string
+          uploaded_by_name: string
+          uploaded_by_type?: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_reference?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          notes?: string | null
+          po_id?: string
+          tenant_id?: string
+          uploaded_by_name?: string
+          uploaded_by_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_po_documents_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_po_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_po_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          po_id: string
+          sender_id: string
+          sender_name: string
+          sender_type: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          po_id: string
+          sender_id: string
+          sender_name: string
+          sender_type?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          po_id?: string
+          sender_id?: string
+          sender_name?: string
+          sender_type?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_po_messages_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_po_messages_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

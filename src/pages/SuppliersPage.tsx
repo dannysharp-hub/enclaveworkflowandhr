@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Plus, X, Check, Pencil, Search } from "lucide-react";
+import { format } from "date-fns";
+import { Plus, X, Check, Pencil, Search, UserPlus, Users, Activity } from "lucide-react";
+import SupplierInviteDialog from "@/components/SupplierInviteDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase tracking-wider";
 
 export default function SuppliersPage() {
+  const { userRole } = useAuth();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -15,6 +20,13 @@ export default function SuppliersPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "" });
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [portalUsersOpen, setPortalUsersOpen] = useState(false);
+  const [portalUsers, setPortalUsers] = useState<any[]>([]);
+  const [activityLog, setActivityLog] = useState<any[]>([]);
+  const [activityOpen, setActivityOpen] = useState(false);
+
+  const canManage = userRole === "admin" || userRole === "office";
 
   const load = async () => {
     setLoading(true);
@@ -48,15 +60,45 @@ export default function SuppliersPage() {
     load();
   };
 
+  const viewPortalUsers = async () => {
+    const { data } = await (supabase.from("supplier_users") as any).select("*, suppliers(name)").order("created_at", { ascending: false });
+    setPortalUsers(data ?? []);
+    setPortalUsersOpen(true);
+  };
+
+  const viewActivity = async () => {
+    const { data } = await (supabase.from("supplier_activity_log") as any)
+      .select("*, supplier_users(name)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setActivityLog(data ?? []);
+    setActivityOpen(true);
+  };
+
   const filtered = suppliers.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()));
 
   if (loading) return <div className="space-y-6 animate-slide-in"><h2 className="text-2xl font-mono font-bold text-foreground">Suppliers</h2><div className="h-40 flex items-center justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div></div>;
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-mono font-bold text-foreground">Suppliers</h2>
-        {!adding && <button onClick={() => { setAdding(true); setEditId(null); setForm({ name: "", email: "", phone: "", address: "" }); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> Add Supplier</button>}
+        <div className="flex items-center gap-2">
+          {canManage && (
+            <>
+              <button onClick={viewActivity} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground">
+                <Activity size={14} /> Activity
+              </button>
+              <button onClick={viewPortalUsers} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground">
+                <Users size={14} /> Portal Users
+              </button>
+              <button onClick={() => setInviteOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-primary/30 text-xs text-primary hover:bg-primary/10">
+                <UserPlus size={14} /> Invite to Portal
+              </button>
+            </>
+          )}
+          {!adding && <button onClick={() => { setAdding(true); setEditId(null); setForm({ name: "", email: "", phone: "", address: "" }); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> Add Supplier</button>}
+        </div>
       </div>
 
       <div className="relative max-w-xs">
@@ -96,7 +138,7 @@ export default function SuppliersPage() {
                 <td className="px-4 py-2 text-muted-foreground">{s.email || "—"}</td>
                 <td className="px-4 py-2 text-muted-foreground">{s.phone || "—"}</td>
                 <td className="px-4 py-2">
-                  <button onClick={() => toggleActive(s)} className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono cursor-pointer", s.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground")}>{s.active ? "Active" : "Inactive"}</button>
+                  <button onClick={() => toggleActive(s)} className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono cursor-pointer", s.active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>{s.active ? "Active" : "Inactive"}</button>
                 </td>
                 <td className="px-4 py-2">
                   <button onClick={() => { setEditId(s.id); setAdding(true); setForm({ name: s.name, email: s.email || "", phone: s.phone || "", address: s.address || "" }); }} className="p-1 text-muted-foreground hover:text-foreground"><Pencil size={14} /></button>
@@ -107,6 +149,73 @@ export default function SuppliersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Invite Dialog */}
+      <SupplierInviteDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        suppliers={suppliers.filter(s => s.active)}
+        onSuccess={load}
+      />
+
+      {/* Portal Users Dialog */}
+      <Dialog open={portalUsersOpen} onOpenChange={setPortalUsersOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-foreground flex items-center gap-2">
+              <Users size={16} className="text-primary" /> Supplier Portal Users
+            </DialogTitle>
+          </DialogHeader>
+          {portalUsers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No portal users yet. Invite a supplier contact.</p>
+          ) : (
+            <div className="space-y-2">
+              {portalUsers.map(u => (
+                <div key={u.id} className="rounded-lg border border-border bg-card p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{u.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{u.email} · {u.suppliers?.name} · {u.supplier_role}</p>
+                  </div>
+                  <span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded-full",
+                    u.active && u.portal_access_enabled ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                  )}>
+                    {u.active && u.portal_access_enabled ? "Active" : "Disabled"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Activity Log Dialog */}
+      <Dialog open={activityOpen} onOpenChange={setActivityOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-foreground flex items-center gap-2">
+              <Activity size={16} className="text-primary" /> Supplier Activity Log
+            </DialogTitle>
+          </DialogHeader>
+          {activityLog.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No activity yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {activityLog.map(a => (
+                <div key={a.id} className="rounded-lg border border-border bg-card p-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-foreground">
+                      <span className="font-medium">{a.supplier_users?.name || "Unknown"}</span>
+                      {" — "}
+                      <span className="text-muted-foreground">{a.action.replace(/_/g, " ")}</span>
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">{format(new Date(a.created_at), "dd MMM HH:mm")}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

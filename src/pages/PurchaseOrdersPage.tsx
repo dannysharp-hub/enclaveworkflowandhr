@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
   Package, Plus, Truck, CheckCircle2, Clock, AlertTriangle,
-  Send, FileText, ArrowRight, Search, Filter,
+  Send, FileText, ArrowRight, Search, Filter, MessageSquare,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -405,18 +405,38 @@ function PODetailDialog({ po, onClose, onUpdate, canManage }: {
 }) {
   const [items, setItems] = useState<POItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<"items" | "messages" | "delivery">("items");
+  const [messages, setMessages] = useState<any[]>([]);
+  const [deliveryEvents, setDeliveryEvents] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
 
   useEffect(() => {
     if (!po) return;
     setLoading(true);
-    (supabase.from("purchase_order_items") as any)
-      .select("*")
-      .eq("po_id", po.id)
-      .then(({ data }: any) => {
-        setItems(data ?? []);
-        setLoading(false);
-      });
+    setTab("items");
+    Promise.all([
+      (supabase.from("purchase_order_items") as any).select("*").eq("po_id", po.id),
+      (supabase.from("supplier_po_messages") as any).select("*").eq("po_id", po.id).order("created_at", { ascending: true }),
+      (supabase.from("po_delivery_events") as any).select("*").eq("po_id", po.id).order("event_date", { ascending: false }),
+    ]).then(([itemsRes, msgsRes, eventsRes]) => {
+      setItems(itemsRes.data ?? []);
+      setMessages(msgsRes.data ?? []);
+      setDeliveryEvents(eventsRes.data ?? []);
+      setLoading(false);
+    });
   }, [po]);
+
+  // Realtime messages
+  useEffect(() => {
+    if (!po) return;
+    const channel = supabase
+      .channel(`admin-po-msgs-${po.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "supplier_po_messages", filter: `po_id=eq.${po.id}` },
+        (payload: any) => setMessages(prev => [...prev, payload.new])
+      ).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [po?.id]);
 
   if (!po) return null;
 
@@ -432,23 +452,14 @@ function PODetailDialog({ po, onClose, onUpdate, canManage }: {
     if (qty === null) return;
     const received = Number(qty);
     const newStatus = received >= item.quantity ? "received" : received > 0 ? "partial" : "pending";
-    await (supabase.from("purchase_order_items") as any).update({
-      received_quantity: received,
-      status: newStatus,
-    }).eq("id", item.id);
-
-    // Check if all items are received
+    await (supabase.from("purchase_order_items") as any).update({ received_quantity: received, status: newStatus }).eq("id", item.id);
     const updatedItems = items.map(i => i.id === item.id ? { ...i, received_quantity: received, status: newStatus } : i);
     const allReceived = updatedItems.every(i => i.status === "received" || (i.id === item.id && newStatus === "received"));
-    const anyPartial = updatedItems.some(i => i.status === "partial" || (i.id === item.id && newStatus === "partial"));
-
-    if (allReceived) {
-      await handleStatusChange("received");
-    } else if (anyPartial || received > 0) {
+    if (allReceived) { await handleStatusChange("received"); }
+    else if (updatedItems.some(i => i.status === "partial") || received > 0) {
       await (supabase.from("purchase_orders") as any).update({ status: "partially_received" }).eq("id", po.id);
       onUpdate();
     }
-
     setItems(updatedItems);
     toast({ title: "Item updated" });
   };
@@ -462,10 +473,30 @@ function PODetailDialog({ po, onClose, onUpdate, canManage }: {
       category: "material_issue",
       severity: "medium",
       reported_by: (await supabase.auth.getUser()).data.user!.id,
-      tenant_id: po.suppliers ? undefined : undefined,
     } as any);
     toast({ title: "Discrepancy issue created" });
   };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
+    setSendingMsg(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("user_id", user!.id).single();
+    await (supabase.from("supplier_po_messages") as any).insert({
+      po_id: po.id,
+      sender_type: "staff",
+      sender_id: user!.id,
+      sender_name: profile?.full_name || user!.email || "Staff",
+      message: newMessage.trim(),
+    });
+    setNewMessage("");
+    setSendingMsg(false);
+  };
+
+  const tabClass = (t: string) => cn(
+    "px-3 py-1.5 text-xs font-mono rounded-md transition-colors",
+    tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"
+  );
 
   return (
     <Dialog open={!!po} onOpenChange={() => onClose()}>
@@ -477,93 +508,169 @@ function PODetailDialog({ po, onClose, onUpdate, canManage }: {
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Summary */}
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-[10px] font-mono text-muted-foreground">SUPPLIER</span>
-              <p className="font-medium text-foreground">{po.suppliers?.name}</p>
-            </div>
-            <div>
-              <span className="text-[10px] font-mono text-muted-foreground">STATUS</span>
-              <p><span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded-full", STATUS_COLORS[po.status])}>{po.status.replace("_", " ")}</span></p>
-            </div>
-            <div>
-              <span className="text-[10px] font-mono text-muted-foreground">ORDER DATE</span>
-              <p className="text-foreground">{format(new Date(po.order_date), "dd MMM yyyy")}</p>
-            </div>
-            <div>
-              <span className="text-[10px] font-mono text-muted-foreground">EXPECTED DELIVERY</span>
-              <p className="text-foreground">{po.expected_delivery_date ? format(new Date(po.expected_delivery_date), "dd MMM yyyy") : "—"}</p>
-            </div>
-            <div>
-              <span className="text-[10px] font-mono text-muted-foreground">TOTAL EX VAT</span>
-              <p className="font-mono font-bold text-foreground">£{Number(po.total_ex_vat).toLocaleString()}</p>
-            </div>
-            {po.jobs && (
-              <div>
-                <span className="text-[10px] font-mono text-muted-foreground">JOB</span>
-                <p className="text-foreground">{po.jobs.job_id} — {po.jobs.job_name}</p>
-              </div>
-            )}
+          {/* Tabs */}
+          <div className="flex gap-1 bg-muted/30 rounded-lg p-1">
+            <button className={tabClass("items")} onClick={() => setTab("items")}>Order</button>
+            <button className={tabClass("delivery")} onClick={() => setTab("delivery")}>
+              Delivery {deliveryEvents.length > 0 && `(${deliveryEvents.length})`}
+            </button>
+            <button className={tabClass("messages")} onClick={() => setTab("messages")}>
+              <MessageSquare size={12} className="inline mr-1" />Messages {messages.length > 0 && `(${messages.length})`}
+            </button>
           </div>
 
-          {/* Items */}
-          <div>
-            <h4 className="text-[10px] font-mono font-bold text-muted-foreground mb-2">LINE ITEMS</h4>
-            {loading ? (
-              <p className="text-xs text-muted-foreground">Loading...</p>
-            ) : (
-              <div className="space-y-2">
-                {items.map(item => (
-                  <div key={item.id} className="rounded-lg border border-border bg-card p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{item.description}</p>
-                        <p className="text-[10px] font-mono text-muted-foreground">
-                          {item.quantity} × £{Number(item.unit_cost_ex_vat).toFixed(2)} = £{Number(item.total_ex_vat).toFixed(2)} · {item.job_cost_category}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className={cn(
-                          "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
-                          item.status === "received" ? "bg-primary/15 text-primary" :
-                          item.status === "partial" ? "bg-warning/15 text-warning" :
-                          "bg-muted text-muted-foreground"
-                        )}>
-                          {item.received_quantity}/{item.quantity} received
-                        </span>
-                      </div>
-                    </div>
-                    {canManage && item.status !== "received" && (
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => handleReceiveItem(item)} className="text-[10px] font-mono text-primary hover:text-primary/80">
-                          ✓ Receive
-                        </button>
-                        {item.received_quantity > 0 && item.received_quantity < item.quantity && (
-                          <button onClick={() => handleCreateDiscrepancyIssue(item)} className="text-[10px] font-mono text-destructive hover:text-destructive/80">
-                            ⚠ Flag Discrepancy
-                          </button>
+          {tab === "items" && (
+            <>
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground">SUPPLIER</span>
+                  <p className="font-medium text-foreground">{po.suppliers?.name}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground">STATUS</span>
+                  <p><span className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded-full", STATUS_COLORS[po.status])}>{po.status.replace("_", " ")}</span></p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground">ORDER DATE</span>
+                  <p className="text-foreground">{format(new Date(po.order_date), "dd MMM yyyy")}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground">EXPECTED DELIVERY</span>
+                  <p className="text-foreground">{po.expected_delivery_date ? format(new Date(po.expected_delivery_date), "dd MMM yyyy") : "—"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground">TOTAL EX VAT</span>
+                  <p className="font-mono font-bold text-foreground">£{Number(po.total_ex_vat).toLocaleString()}</p>
+                </div>
+                {po.jobs && (
+                  <div>
+                    <span className="text-[10px] font-mono text-muted-foreground">JOB</span>
+                    <p className="text-foreground">{po.jobs.job_id} — {po.jobs.job_name}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Items */}
+              <div>
+                <h4 className="text-[10px] font-mono font-bold text-muted-foreground mb-2">LINE ITEMS</h4>
+                {loading ? (
+                  <p className="text-xs text-muted-foreground">Loading...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {items.map(item => (
+                      <div key={item.id} className="rounded-lg border border-border bg-card p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{item.description}</p>
+                            <p className="text-[10px] font-mono text-muted-foreground">
+                              {item.quantity} × £{Number(item.unit_cost_ex_vat).toFixed(2)} = £{Number(item.total_ex_vat).toFixed(2)} · {item.job_cost_category}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className={cn(
+                              "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
+                              item.status === "received" ? "bg-primary/15 text-primary" :
+                              item.status === "partial" ? "bg-warning/15 text-warning" :
+                              "bg-muted text-muted-foreground"
+                            )}>
+                              {item.received_quantity}/{item.quantity} received
+                            </span>
+                          </div>
+                        </div>
+                        {canManage && item.status !== "received" && (
+                          <div className="flex gap-2 mt-2">
+                            <button onClick={() => handleReceiveItem(item)} className="text-[10px] font-mono text-primary hover:text-primary/80">✓ Receive</button>
+                            {item.received_quantity > 0 && item.received_quantity < item.quantity && (
+                              <button onClick={() => handleCreateDiscrepancyIssue(item)} className="text-[10px] font-mono text-destructive hover:text-destructive/80">⚠ Flag Discrepancy</button>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              {canManage && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                  {po.status === "draft" && (
+                    <button onClick={() => handleStatusChange("sent")} className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                      <Send size={12} /> Send to Supplier
+                    </button>
+                  )}
+                  {po.status !== "cancelled" && po.status !== "received" && (
+                    <button onClick={() => handleStatusChange("cancelled")} className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-destructive/30 text-xs text-destructive hover:bg-destructive/10">
+                      Cancel PO
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Delivery Tab */}
+          {tab === "delivery" && (
+            <div className="space-y-3">
+              {deliveryEvents.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-6">No delivery updates from supplier yet.</p>
+              ) : (
+                <div className="space-y-0">
+                  {deliveryEvents.map((evt, i) => (
+                    <div key={evt.id} className="flex gap-3 relative">
+                      <div className="flex flex-col items-center">
+                        <div className="w-6 h-6 rounded-full border border-border bg-card flex items-center justify-center z-10">
+                          {evt.event_type === "dispatched" ? <Send size={10} className="text-primary" /> :
+                           evt.event_type === "delivered" ? <CheckCircle2 size={10} className="text-primary" /> :
+                           evt.event_type === "delayed" ? <AlertTriangle size={10} className="text-destructive" /> :
+                           <Clock size={10} className="text-muted-foreground" />}
+                        </div>
+                        {i < deliveryEvents.length - 1 && <div className="w-px flex-1 bg-border" />}
+                      </div>
+                      <div className="pb-3">
+                        <p className="text-xs font-medium text-foreground">{evt.notes}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {format(new Date(evt.event_date), "dd MMM yyyy HH:mm")} · {evt.created_by_name} ({evt.created_by_type})
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Messages Tab */}
+          {tab === "messages" && (
+            <div className="space-y-3">
+              <div className="max-h-[300px] overflow-y-auto space-y-2">
+                {messages.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-6">No messages. Send one to the supplier.</p>
+                )}
+                {messages.map(msg => (
+                  <div key={msg.id} className={cn(
+                    "rounded-lg p-2.5 max-w-[85%]",
+                    msg.sender_type === "staff" ? "ml-auto bg-primary/10 border border-primary/20" : "bg-muted/40 border border-border"
+                  )}>
+                    <p className="text-xs text-foreground">{msg.message}</p>
+                    <p className="text-[9px] text-muted-foreground mt-1">
+                      {msg.sender_name} · {format(new Date(msg.created_at), "dd MMM HH:mm")}
+                    </p>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          {canManage && (
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-              {po.status === "draft" && (
-                <button onClick={() => handleStatusChange("sent")} className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90">
-                  <Send size={12} /> Send to Supplier
-                </button>
-              )}
-              {po.status !== "cancelled" && po.status !== "received" && (
-                <button onClick={() => handleStatusChange("cancelled")} className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-destructive/30 text-xs text-destructive hover:bg-destructive/10">
-                  Cancel PO
-                </button>
+              {canManage && (
+                <div className="flex gap-2">
+                  <input value={newMessage} onChange={e => setNewMessage(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleSendMessage()}
+                    className="flex-1 h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Message supplier..." />
+                  <button onClick={handleSendMessage} disabled={sendingMsg || !newMessage.trim()}
+                    className="h-9 w-9 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center">
+                    <Send size={14} />
+                  </button>
+                </div>
               )}
             </div>
           )}
