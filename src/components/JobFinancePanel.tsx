@@ -3,17 +3,52 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { DollarSign, Receipt, Wallet, Save, TrendingUp, TrendingDown } from "lucide-react";
+import { DollarSign, Receipt, Wallet, Save, TrendingUp, TrendingDown, Package } from "lucide-react";
 
 const inputClass = "w-full h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-0.5 uppercase tracking-wider";
 
+interface PartData {
+  material_code: string | null;
+  length_mm: number;
+  width_mm: number;
+  quantity: number;
+}
+
+interface MaterialProduct {
+  material_code: string;
+  cost_per_sheet: number;
+  sheet_length_mm: number;
+  sheet_width_mm: number;
+  waste_factor_percent: number;
+}
+
 interface Props {
   jobId: string;
   jobCode: string;
+  parts?: PartData[];
+  materialProducts?: MaterialProduct[];
 }
 
-export default function JobFinancePanel({ jobId, jobCode }: Props) {
+/**
+ * Estimate sheets needed for a group of parts on a given material.
+ * Simple area-based estimate: total part area (with waste) / sheet area.
+ */
+function estimateSheetsForMaterial(
+  parts: PartData[],
+  mat: MaterialProduct
+): number {
+  const sheetArea = mat.sheet_length_mm * mat.sheet_width_mm;
+  if (sheetArea <= 0) return 0;
+  const wasteMul = 1 + (mat.waste_factor_percent / 100);
+  const totalPartArea = parts.reduce(
+    (sum, p) => sum + p.length_mm * p.width_mm * p.quantity,
+    0
+  );
+  return Math.ceil((totalPartArea * wasteMul) / sheetArea);
+}
+
+export default function JobFinancePanel({ jobId, jobCode, parts = [], materialProducts = [] }: Props) {
   const { userRole } = useAuth();
   const canEdit = ["admin", "office"].includes(userRole || "");
 
@@ -98,9 +133,31 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
     } finally { setSaving(false); }
   };
 
+  // Auto-calculate material cost from parts + material catalog
+  const matLookup = new Map(materialProducts.map(m => [m.material_code, m]));
+  const materialGroups = new Map<string, PartData[]>();
+  parts.forEach(p => {
+    if (!p.material_code) return;
+    const group = materialGroups.get(p.material_code) || [];
+    group.push(p);
+    materialGroups.set(p.material_code, group);
+  });
+
+  let autoMaterialCost = 0;
+  const materialBreakdown: { code: string; sheets: number; costPerSheet: number; subtotal: number }[] = [];
+  materialGroups.forEach((groupParts, code) => {
+    const mat = matLookup.get(code);
+    if (!mat) return;
+    const sheets = estimateSheetsForMaterial(groupParts, mat);
+    const subtotal = sheets * mat.cost_per_sheet;
+    autoMaterialCost += subtotal;
+    materialBreakdown.push({ code, sheets, costPerSheet: mat.cost_per_sheet, subtotal });
+  });
+
   // Calculations
   const quoteValue = form.quote_value_ex_vat;
-  const materialCost = form.material_cost_override ? parseFloat(form.material_cost_override) : 0;
+  const hasOverride = !!form.material_cost_override;
+  const materialCost = hasOverride ? parseFloat(form.material_cost_override) : autoMaterialCost;
   const labourCost = form.labour_cost_override ? parseFloat(form.labour_cost_override) : 0;
   const overheadCost = form.overhead_allocation_override ? parseFloat(form.overhead_allocation_override) : 0;
   const billsTotal = bills.reduce((s, b) => s + Number(b.amount_ex_vat || 0), 0);
@@ -148,6 +205,13 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
           <p className="text-lg font-mono font-bold text-foreground">{fmt(quoteValue)}</p>
         </div>
         <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-[10px] font-mono text-muted-foreground uppercase">Material Cost {hasOverride ? "(Override)" : "(Auto)"}</p>
+          <p className="text-lg font-mono font-bold text-foreground">{fmt(materialCost)}</p>
+          {!hasOverride && autoMaterialCost > 0 && (
+            <p className="text-[9px] font-mono text-muted-foreground mt-0.5">{materialBreakdown.length} material{materialBreakdown.length !== 1 ? "s" : ""} · {materialBreakdown.reduce((s, b) => s + b.sheets, 0)} sheets</p>
+          )}
+        </div>
+        <div className="bg-muted/30 rounded-lg p-3">
           <p className="text-[10px] font-mono text-muted-foreground uppercase">Total Cost</p>
           <p className="text-lg font-mono font-bold text-foreground">{fmt(totalCost)}</p>
         </div>
@@ -168,7 +232,30 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
         </div>
       </div>
 
-      {/* Edit fields */}
+      {/* Material Cost Breakdown */}
+      {materialBreakdown.length > 0 && !hasOverride && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Package size={13} className="text-primary" />
+            <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Material Cost Breakdown (auto-calculated)</span>
+          </div>
+          <div className="space-y-1">
+            {materialBreakdown.map(b => (
+              <div key={b.code} className="flex items-center justify-between bg-muted/20 rounded px-3 py-1.5 text-xs">
+                <span className="font-mono text-foreground">{b.code}</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-muted-foreground">{b.sheets} sheet{b.sheets !== 1 ? "s" : ""} × £{Number(b.costPerSheet).toFixed(2)}</span>
+                  <span className="font-mono font-bold text-foreground">{fmt(b.subtotal)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-end px-3 pt-1 text-[10px] font-mono text-muted-foreground">
+              incl. waste factor per material
+            </div>
+          </div>
+        </div>
+      )}
+
       {canEdit && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
@@ -176,8 +263,14 @@ export default function JobFinancePanel({ jobId, jobCode }: Props) {
             <input type="number" step="0.01" className={inputClass} value={form.quote_value_ex_vat} onChange={e => setForm(f => ({ ...f, quote_value_ex_vat: parseFloat(e.target.value) || 0 }))} />
           </div>
           <div>
-            <label className={labelClass}>Material Cost</label>
-            <input type="number" step="0.01" className={inputClass} value={form.material_cost_override} onChange={e => setForm(f => ({ ...f, material_cost_override: e.target.value }))} placeholder="Override" />
+            <label className={labelClass}>Material Cost Override</label>
+            <input type="number" step="0.01" className={inputClass} value={form.material_cost_override} onChange={e => setForm(f => ({ ...f, material_cost_override: e.target.value }))} placeholder={autoMaterialCost > 0 ? `Auto: £${autoMaterialCost.toFixed(2)}` : "Override"} />
+            {autoMaterialCost > 0 && !hasOverride && (
+              <p className="text-[9px] font-mono text-muted-foreground mt-0.5">Using auto-calculated cost</p>
+            )}
+            {hasOverride && autoMaterialCost > 0 && (
+              <button type="button" onClick={() => setForm(f => ({ ...f, material_cost_override: "" }))} className="text-[9px] font-mono text-primary hover:underline mt-0.5">Clear override → use auto ({fmt(autoMaterialCost)})</button>
+            )}
           </div>
           <div>
             <label className={labelClass}>Labour Cost</label>

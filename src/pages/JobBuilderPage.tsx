@@ -468,7 +468,7 @@ export default function JobBuilderPage() {
 
       {/* Finance Panel */}
       {flags.enable_finance && job && (
-        <JobFinancePanel jobId={job.id} jobCode={job.job_id} />
+        <JobFinancePanel jobId={job.id} jobCode={job.job_id} parts={parts} materialProducts={fullMaterials} />
       )}
 
       {/* Install Sign-Off Link */}
