@@ -14,6 +14,10 @@ interface PartData {
   grain_axis: string | null;
   rotation_allowed: string | null;
   dxf_file_reference: string | null;
+  bbox_width_mm?: number | null;
+  bbox_height_mm?: number | null;
+  bbox_source?: string | null;
+  bbox_confidence?: string | null;
 }
 
 interface InternalNestPackOptions {
@@ -75,9 +79,9 @@ export async function generateInternalNestPack(options: InternalNestPackOptions)
   }
   zip.file("manifest/Placements.csv", [placementHeader, ...placementRows].join("\n"));
 
-  // Parts CSV
-  const partsHeader = "part_id,product_code,material_code,length_mm,width_mm,quantity,grain_required,rotation_allowed";
-  const partsRows = parts.map(p => `${p.part_id},${p.product_code},${p.material_code || ""},${p.length_mm},${p.width_mm},${p.quantity},${p.grain_required},${p.rotation_allowed || "any"}`);
+  // Parts CSV (with bbox fields)
+  const partsHeader = "part_id,product_code,material_code,length_mm,width_mm,quantity,grain_required,rotation_allowed,bbox_width_mm,bbox_height_mm,bbox_source,bbox_confidence";
+  const partsRows = parts.map(p => `${p.part_id},${p.product_code},${p.material_code || ""},${p.length_mm},${p.width_mm},${p.quantity},${p.grain_required},${p.rotation_allowed || "any"},${p.bbox_width_mm || ""},${p.bbox_height_mm || ""},${p.bbox_source || ""},${p.bbox_confidence || ""}`);
   zip.file("manifest/Parts.csv", [partsHeader, ...partsRows].join("\n"));
 
   // Sheets CSV

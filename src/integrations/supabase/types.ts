@@ -969,6 +969,74 @@ export type Database = {
           },
         ]
       }
+      dxf_extraction_log: {
+        Row: {
+          bbox_confidence: string | null
+          bbox_height_mm: number | null
+          bbox_width_mm: number | null
+          created_at: string | null
+          dxf_file_reference: string | null
+          entity_id: string
+          entity_type: string
+          extracted_at: string | null
+          extracted_by: string | null
+          id: string
+          manual_override_exists: boolean | null
+          notes: string | null
+          polygon_confidence: string | null
+          polygon_extracted: boolean | null
+          previous_bbox_height_mm: number | null
+          previous_bbox_width_mm: number | null
+          tenant_id: string
+        }
+        Insert: {
+          bbox_confidence?: string | null
+          bbox_height_mm?: number | null
+          bbox_width_mm?: number | null
+          created_at?: string | null
+          dxf_file_reference?: string | null
+          entity_id: string
+          entity_type: string
+          extracted_at?: string | null
+          extracted_by?: string | null
+          id?: string
+          manual_override_exists?: boolean | null
+          notes?: string | null
+          polygon_confidence?: string | null
+          polygon_extracted?: boolean | null
+          previous_bbox_height_mm?: number | null
+          previous_bbox_width_mm?: number | null
+          tenant_id: string
+        }
+        Update: {
+          bbox_confidence?: string | null
+          bbox_height_mm?: number | null
+          bbox_width_mm?: number | null
+          created_at?: string | null
+          dxf_file_reference?: string | null
+          entity_id?: string
+          entity_type?: string
+          extracted_at?: string | null
+          extracted_by?: string | null
+          id?: string
+          manual_override_exists?: boolean | null
+          notes?: string | null
+          polygon_confidence?: string | null
+          polygon_extracted?: boolean | null
+          previous_bbox_height_mm?: number | null
+          previous_bbox_width_mm?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dxf_extraction_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_batches: {
         Row: {
           created_at: string
@@ -3222,6 +3290,11 @@ export type Database = {
       part_library: {
         Row: {
           active: boolean
+          bbox_confidence: string | null
+          bbox_extracted_at: string | null
+          bbox_height_mm: number | null
+          bbox_source: string | null
+          bbox_width_mm: number | null
           clearance_mm: number
           created_at: string
           created_by: string | null
@@ -3229,6 +3302,7 @@ export type Database = {
           dxf_file_reference: string | null
           dxf_outline_layer_name: string | null
           edge_profile_json: Json | null
+          extraction_notes: string | null
           face_orientation: string | null
           front_edge_designation: string | null
           grain_axis: string | null
@@ -3239,7 +3313,11 @@ export type Database = {
           material_code: string | null
           outer_polygon_points_json: Json | null
           outer_shape_type: string
+          outline_layer_name_used: string | null
           part_code: string
+          polygon_confidence: string | null
+          polygon_extracted_at: string | null
+          polygon_source: string | null
           product_code: string | null
           rotation_allowed: string | null
           tags: string[] | null
@@ -3251,6 +3329,11 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          bbox_confidence?: string | null
+          bbox_extracted_at?: string | null
+          bbox_height_mm?: number | null
+          bbox_source?: string | null
+          bbox_width_mm?: number | null
           clearance_mm?: number
           created_at?: string
           created_by?: string | null
@@ -3258,6 +3341,7 @@ export type Database = {
           dxf_file_reference?: string | null
           dxf_outline_layer_name?: string | null
           edge_profile_json?: Json | null
+          extraction_notes?: string | null
           face_orientation?: string | null
           front_edge_designation?: string | null
           grain_axis?: string | null
@@ -3268,7 +3352,11 @@ export type Database = {
           material_code?: string | null
           outer_polygon_points_json?: Json | null
           outer_shape_type?: string
+          outline_layer_name_used?: string | null
           part_code: string
+          polygon_confidence?: string | null
+          polygon_extracted_at?: string | null
+          polygon_source?: string | null
           product_code?: string | null
           rotation_allowed?: string | null
           tags?: string[] | null
@@ -3280,6 +3368,11 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          bbox_confidence?: string | null
+          bbox_extracted_at?: string | null
+          bbox_height_mm?: number | null
+          bbox_source?: string | null
+          bbox_width_mm?: number | null
           clearance_mm?: number
           created_at?: string
           created_by?: string | null
@@ -3287,6 +3380,7 @@ export type Database = {
           dxf_file_reference?: string | null
           dxf_outline_layer_name?: string | null
           edge_profile_json?: Json | null
+          extraction_notes?: string | null
           face_orientation?: string | null
           front_edge_designation?: string | null
           grain_axis?: string | null
@@ -3297,7 +3391,11 @@ export type Database = {
           material_code?: string | null
           outer_polygon_points_json?: Json | null
           outer_shape_type?: string
+          outline_layer_name_used?: string | null
           part_code?: string
+          polygon_confidence?: string | null
+          polygon_extracted_at?: string | null
+          polygon_source?: string | null
           product_code?: string | null
           rotation_allowed?: string | null
           tags?: string[] | null
@@ -3326,9 +3424,15 @@ export type Database = {
       }
       parts: {
         Row: {
+          bbox_confidence: string | null
+          bbox_extracted_at: string | null
+          bbox_height_mm: number | null
+          bbox_source: string | null
+          bbox_width_mm: number | null
           colour_name: string | null
           created_at: string
           dxf_file_reference: string | null
+          extraction_notes: string | null
           grain_axis: string | null
           grain_required: boolean
           id: string
@@ -3336,7 +3440,12 @@ export type Database = {
           length_mm: number
           library_part_id: string | null
           material_code: string | null
+          outer_polygon_points_json: Json | null
+          outer_shape_type: string | null
+          outline_layer_name_used: string | null
           part_id: string
+          polygon_confidence: string | null
+          polygon_source: string | null
           product_code: string
           quantity: number
           rotation_allowed: string | null
@@ -3347,9 +3456,15 @@ export type Database = {
           width_mm: number
         }
         Insert: {
+          bbox_confidence?: string | null
+          bbox_extracted_at?: string | null
+          bbox_height_mm?: number | null
+          bbox_source?: string | null
+          bbox_width_mm?: number | null
           colour_name?: string | null
           created_at?: string
           dxf_file_reference?: string | null
+          extraction_notes?: string | null
           grain_axis?: string | null
           grain_required?: boolean
           id?: string
@@ -3357,7 +3472,12 @@ export type Database = {
           length_mm: number
           library_part_id?: string | null
           material_code?: string | null
+          outer_polygon_points_json?: Json | null
+          outer_shape_type?: string | null
+          outline_layer_name_used?: string | null
           part_id: string
+          polygon_confidence?: string | null
+          polygon_source?: string | null
           product_code: string
           quantity?: number
           rotation_allowed?: string | null
@@ -3368,9 +3488,15 @@ export type Database = {
           width_mm: number
         }
         Update: {
+          bbox_confidence?: string | null
+          bbox_extracted_at?: string | null
+          bbox_height_mm?: number | null
+          bbox_source?: string | null
+          bbox_width_mm?: number | null
           colour_name?: string | null
           created_at?: string
           dxf_file_reference?: string | null
+          extraction_notes?: string | null
           grain_axis?: string | null
           grain_required?: boolean
           id?: string
@@ -3378,7 +3504,12 @@ export type Database = {
           length_mm?: number
           library_part_id?: string | null
           material_code?: string | null
+          outer_polygon_points_json?: Json | null
+          outer_shape_type?: string | null
+          outline_layer_name_used?: string | null
           part_id?: string
+          polygon_confidence?: string | null
+          polygon_source?: string | null
           product_code?: string
           quantity?: number
           rotation_allowed?: string | null
@@ -4994,7 +5125,9 @@ export type Database = {
           branding: Json
           created_at: string
           default_units: string
+          dxf_units_default: string | null
           id: string
+          outline_layer_preference: string | null
           subscription_status: string
           tenant_name: string
           timezone: string
@@ -5004,7 +5137,9 @@ export type Database = {
           branding?: Json
           created_at?: string
           default_units?: string
+          dxf_units_default?: string | null
           id?: string
+          outline_layer_preference?: string | null
           subscription_status?: string
           tenant_name: string
           timezone?: string
@@ -5014,7 +5149,9 @@ export type Database = {
           branding?: Json
           created_at?: string
           default_units?: string
+          dxf_units_default?: string | null
           id?: string
+          outline_layer_preference?: string | null
           subscription_status?: string
           tenant_name?: string
           timezone?: string

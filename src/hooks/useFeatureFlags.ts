@@ -11,6 +11,7 @@ export interface FeatureFlags {
   enable_finance: boolean;
   enable_client_portal: boolean;
   enable_smart_quoting: boolean;
+  enable_polygon_outline_extraction: boolean;
   [key: string]: boolean;
 }
 
@@ -23,6 +24,7 @@ const DEFAULTS: FeatureFlags = {
   enable_finance: false,
   enable_client_portal: false,
   enable_smart_quoting: false,
+  enable_polygon_outline_extraction: false,
 };
 
 export function useFeatureFlags() {
