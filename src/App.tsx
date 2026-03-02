@@ -43,6 +43,7 @@ import SmartQuotingPage from "./pages/SmartQuotingPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import SupplierPerformancePage from "./pages/SupplierPerformancePage";
 import ProductionDriftPage from "./pages/ProductionDriftPage";
+import CapacityPlannerPage from "./pages/CapacityPlannerPage";
 import ClientPortalLoginPage from "./pages/portal/ClientPortalLoginPage";
 import ClientPortalDashboardPage from "./pages/portal/ClientPortalDashboardPage";
 import ClientPortalJobPage from "./pages/portal/ClientPortalJobPage";
@@ -119,6 +120,7 @@ const AppRoutes = () => (
               <Route path="/purchasing" element={<PurchaseOrdersPage />} />
               <Route path="/purchasing/performance" element={<SupplierPerformancePage />} />
               <Route path="/drift" element={<ProductionDriftPage />} />
+              <Route path="/capacity" element={<CapacityPlannerPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>
