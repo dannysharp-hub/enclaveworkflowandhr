@@ -1967,6 +1967,7 @@ export type Database = {
       job_nesting_groups: {
         Row: {
           allow_mirror: boolean
+          allow_rotate_90: boolean
           allow_rotation_90: boolean
           colour_name: string | null
           created_at: string
@@ -1975,12 +1976,17 @@ export type Database = {
           id: string
           job_id: string
           keep_parts_together: boolean | null
+          locked: boolean
           margin_mm: number
           material_code: string | null
           nest_method: string | null
+          nesting_engine: string
+          optimisation_runs: number
           prioritise_grain_parts: boolean | null
+          remnant_first: boolean
           sheet_length_mm: number
           sheet_width_mm: number
+          sort_strategy: string
           spacing_mm: number
           tenant_id: string
           thickness_mm: number | null
@@ -1989,6 +1995,7 @@ export type Database = {
         }
         Insert: {
           allow_mirror?: boolean
+          allow_rotate_90?: boolean
           allow_rotation_90?: boolean
           colour_name?: string | null
           created_at?: string
@@ -1997,12 +2004,17 @@ export type Database = {
           id?: string
           job_id: string
           keep_parts_together?: boolean | null
+          locked?: boolean
           margin_mm?: number
           material_code?: string | null
           nest_method?: string | null
+          nesting_engine?: string
+          optimisation_runs?: number
           prioritise_grain_parts?: boolean | null
+          remnant_first?: boolean
           sheet_length_mm?: number
           sheet_width_mm?: number
+          sort_strategy?: string
           spacing_mm?: number
           tenant_id: string
           thickness_mm?: number | null
@@ -2011,6 +2023,7 @@ export type Database = {
         }
         Update: {
           allow_mirror?: boolean
+          allow_rotate_90?: boolean
           allow_rotation_90?: boolean
           colour_name?: string | null
           created_at?: string
@@ -2019,12 +2032,17 @@ export type Database = {
           id?: string
           job_id?: string
           keep_parts_together?: boolean | null
+          locked?: boolean
           margin_mm?: number
           material_code?: string | null
           nest_method?: string | null
+          nesting_engine?: string
+          optimisation_runs?: number
           prioritise_grain_parts?: boolean | null
+          remnant_first?: boolean
           sheet_length_mm?: number
           sheet_width_mm?: number
+          sort_strategy?: string
           spacing_mm?: number
           tenant_id?: string
           thickness_mm?: number | null
@@ -2190,6 +2208,178 @@ export type Database = {
           },
           {
             foreignKeyName: "job_performance_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_sheet_layouts: {
+        Row: {
+          algorithm_used: string
+          created_at: string
+          created_by: string | null
+          grain_direction: string
+          group_id: string
+          id: string
+          job_id: string
+          margin_mm: number
+          sheet_id: string | null
+          sheet_length_mm: number
+          sheet_number: number
+          sheet_width_mm: number
+          spacing_mm: number
+          tenant_id: string
+          utilisation_percent: number
+          waste_area_mm2: number
+        }
+        Insert: {
+          algorithm_used?: string
+          created_at?: string
+          created_by?: string | null
+          grain_direction?: string
+          group_id: string
+          id?: string
+          job_id: string
+          margin_mm?: number
+          sheet_id?: string | null
+          sheet_length_mm: number
+          sheet_number: number
+          sheet_width_mm: number
+          spacing_mm?: number
+          tenant_id: string
+          utilisation_percent?: number
+          waste_area_mm2?: number
+        }
+        Update: {
+          algorithm_used?: string
+          created_at?: string
+          created_by?: string | null
+          grain_direction?: string
+          group_id?: string
+          id?: string
+          job_id?: string
+          margin_mm?: number
+          sheet_id?: string | null
+          sheet_length_mm?: number
+          sheet_number?: number
+          sheet_width_mm?: number
+          spacing_mm?: number
+          tenant_id?: string
+          utilisation_percent?: number
+          waste_area_mm2?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_sheet_layouts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "job_nesting_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_layouts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_layouts_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "job_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_layouts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_sheet_parts: {
+        Row: {
+          bounding_box_ok: boolean
+          created_at: string
+          grain_locked: boolean
+          height_mm: number
+          id: string
+          layout_id: string
+          library_part_id: string | null
+          part_id: string
+          qty_instance_index: number
+          rotation_deg: number
+          sheet_id: string | null
+          source_dxf_ref: string | null
+          tenant_id: string
+          width_mm: number
+          x_mm: number
+          y_mm: number
+        }
+        Insert: {
+          bounding_box_ok?: boolean
+          created_at?: string
+          grain_locked?: boolean
+          height_mm: number
+          id?: string
+          layout_id: string
+          library_part_id?: string | null
+          part_id: string
+          qty_instance_index?: number
+          rotation_deg?: number
+          sheet_id?: string | null
+          source_dxf_ref?: string | null
+          tenant_id: string
+          width_mm: number
+          x_mm?: number
+          y_mm?: number
+        }
+        Update: {
+          bounding_box_ok?: boolean
+          created_at?: string
+          grain_locked?: boolean
+          height_mm?: number
+          id?: string
+          layout_id?: string
+          library_part_id?: string | null
+          part_id?: string
+          qty_instance_index?: number
+          rotation_deg?: number
+          sheet_id?: string | null
+          source_dxf_ref?: string | null
+          tenant_id?: string
+          width_mm?: number
+          x_mm?: number
+          y_mm?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_sheet_parts_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "job_sheet_layouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_parts_library_part_id_fkey"
+            columns: ["library_part_id"]
+            isOneToOne: false
+            referencedRelation: "part_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_parts_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "job_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sheet_parts_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2619,6 +2809,76 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "materials_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nesting_runs: {
+        Row: {
+          algorithm_variant: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          group_id: string
+          id: string
+          job_id: string
+          output_summary_json: Json | null
+          sheet_count: number
+          started_at: string
+          status: string
+          tenant_id: string
+          utilisation_percent: number
+        }
+        Insert: {
+          algorithm_variant?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          group_id: string
+          id?: string
+          job_id: string
+          output_summary_json?: Json | null
+          sheet_count?: number
+          started_at?: string
+          status?: string
+          tenant_id: string
+          utilisation_percent?: number
+        }
+        Update: {
+          algorithm_variant?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          group_id?: string
+          id?: string
+          job_id?: string
+          output_summary_json?: Json | null
+          sheet_count?: number
+          started_at?: string
+          status?: string
+          tenant_id?: string
+          utilisation_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nesting_runs_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "job_nesting_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nesting_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nesting_runs_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
