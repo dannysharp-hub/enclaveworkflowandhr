@@ -75,6 +75,7 @@ export default function JobBuilderPage() {
   useEffect(() => { fetchJob(); }, [fetchJob]);
 
   // Apply product mappings to resolve material and grain defaults
+  // Also validates material_code against the materials table to avoid FK violations
   const applyProductMappings = useCallback(async (importedParts: CsvPart[]) => {
     const productCodes = [...new Set(importedParts.map(p => p.product_code))];
     const { data: mappings } = await supabase
@@ -84,15 +85,27 @@ export default function JobBuilderPage() {
 
     const mappingMap = new Map((mappings ?? []).map((m: any) => [m.product_code, m]));
 
-    return importedParts.map(p => {
+    // Build a set of valid material_codes from the materials table
+    const validMaterialCodes = new Set(fullMaterials.map((m: any) => m.material_code));
+
+    let unmatchedMaterials = new Set<string>();
+
+    const resolved = importedParts.map(p => {
       const mapping = mappingMap.get(p.product_code);
+      // Resolve material_code: CSV value > mapping > null
+      let resolvedMaterial = p.material_code || mapping?.material_code || null;
+      // Validate against materials table — set to null if not a valid FK
+      if (resolvedMaterial && !validMaterialCodes.has(resolvedMaterial)) {
+        unmatchedMaterials.add(resolvedMaterial);
+        resolvedMaterial = null;
+      }
       return {
         part_id: p.part_id,
         product_code: p.product_code,
         length_mm: p.length_mm,
         width_mm: p.width_mm,
         quantity: p.quantity,
-        material_code: p.material_code || mapping?.material_code || null,
+        material_code: resolvedMaterial,
         grain_required: p.grain_required ?? mapping?.default_grain_required ?? false,
         grain_axis: p.grain_axis || mapping?.default_grain_axis || "L",
         rotation_allowed: p.rotation_allowed || mapping?.default_rotation_allowed || "any",
@@ -100,7 +113,17 @@ export default function JobBuilderPage() {
         validation_status: "pending",
       } as PartData;
     });
-  }, []);
+
+    if (unmatchedMaterials.size > 0) {
+      toast({
+        title: "Unmatched materials",
+        description: `${unmatchedMaterials.size} material(s) not found in your materials table and were cleared: ${[...unmatchedMaterials].join(", ")}. Add them in Materials page then re-assign.`,
+        variant: "destructive",
+      });
+    }
+
+    return resolved;
+  }, [fullMaterials]);
 
   const handleCsvImport = useCallback(async (csvParts: CsvPart[]) => {
     const resolved = await applyProductMappings(csvParts);
