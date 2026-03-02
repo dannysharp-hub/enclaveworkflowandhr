@@ -1794,6 +1794,118 @@ export type Database = {
           },
         ]
       }
+      job_edgeband_batch_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          instance_index: number
+          notes: string | null
+          part_id: string
+          tenant_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          instance_index?: number
+          notes?: string | null
+          part_id: string
+          tenant_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          instance_index?: number
+          notes?: string | null
+          part_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_edgeband_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "job_edgeband_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_edgeband_batch_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_edgeband_batches: {
+        Row: {
+          batch_name: string
+          colour_name: string | null
+          count_parts: number
+          created_at: string
+          front_edge_direction: string | null
+          group_id: string | null
+          id: string
+          job_id: string
+          tape_code_primary: string
+          tenant_id: string
+          thickness_mm: number | null
+          updated_at: string
+        }
+        Insert: {
+          batch_name: string
+          colour_name?: string | null
+          count_parts?: number
+          created_at?: string
+          front_edge_direction?: string | null
+          group_id?: string | null
+          id?: string
+          job_id: string
+          tape_code_primary?: string
+          tenant_id: string
+          thickness_mm?: number | null
+          updated_at?: string
+        }
+        Update: {
+          batch_name?: string
+          colour_name?: string | null
+          count_parts?: number
+          created_at?: string
+          front_edge_direction?: string | null
+          group_id?: string | null
+          id?: string
+          job_id?: string
+          tape_code_primary?: string
+          tenant_id?: string
+          thickness_mm?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_edgeband_batches_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "job_nesting_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_edgeband_batches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_edgeband_batches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_financials: {
         Row: {
           created_at: string
@@ -1966,7 +2078,9 @@ export type Database = {
       }
       job_nesting_groups: {
         Row: {
+          algorithm_pool: Json
           allow_mirror: boolean
+          allow_mix_remnant_and_full_sheets: boolean
           allow_rotate_90: boolean
           allow_rotation_90: boolean
           colour_name: string | null
@@ -1982,8 +2096,12 @@ export type Database = {
           nest_method: string | null
           nesting_engine: string
           optimisation_runs: number
+          optimisation_seed: string | null
+          optimisation_time_limit_seconds: number
           prioritise_grain_parts: boolean | null
           remnant_first: boolean
+          remnant_max_count_to_try: number
+          remnant_min_utilisation_percent: number
           sheet_length_mm: number
           sheet_width_mm: number
           sort_strategy: string
@@ -1994,7 +2112,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          algorithm_pool?: Json
           allow_mirror?: boolean
+          allow_mix_remnant_and_full_sheets?: boolean
           allow_rotate_90?: boolean
           allow_rotation_90?: boolean
           colour_name?: string | null
@@ -2010,8 +2130,12 @@ export type Database = {
           nest_method?: string | null
           nesting_engine?: string
           optimisation_runs?: number
+          optimisation_seed?: string | null
+          optimisation_time_limit_seconds?: number
           prioritise_grain_parts?: boolean | null
           remnant_first?: boolean
+          remnant_max_count_to_try?: number
+          remnant_min_utilisation_percent?: number
           sheet_length_mm?: number
           sheet_width_mm?: number
           sort_strategy?: string
@@ -2022,7 +2146,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          algorithm_pool?: Json
           allow_mirror?: boolean
+          allow_mix_remnant_and_full_sheets?: boolean
           allow_rotate_90?: boolean
           allow_rotation_90?: boolean
           colour_name?: string | null
@@ -2038,8 +2164,12 @@ export type Database = {
           nest_method?: string | null
           nesting_engine?: string
           optimisation_runs?: number
+          optimisation_seed?: string | null
+          optimisation_time_limit_seconds?: number
           prioritise_grain_parts?: boolean | null
           remnant_first?: boolean
+          remnant_max_count_to_try?: number
+          remnant_min_utilisation_percent?: number
           sheet_length_mm?: number
           sheet_width_mm?: number
           sort_strategy?: string
@@ -2821,11 +2951,18 @@ export type Database = {
           algorithm_variant: string
           completed_at: string | null
           created_at: string
+          created_by: string | null
           error_message: string | null
           group_id: string
           id: string
           job_id: string
+          min_sheet_utilisation_percent: number
           output_summary_json: Json | null
+          parameters_json: Json | null
+          remnant_area_used_mm2: number
+          result_hash: string | null
+          run_index: number
+          selected: boolean
           sheet_count: number
           started_at: string
           status: string
@@ -2836,11 +2973,18 @@ export type Database = {
           algorithm_variant?: string
           completed_at?: string | null
           created_at?: string
+          created_by?: string | null
           error_message?: string | null
           group_id: string
           id?: string
           job_id: string
+          min_sheet_utilisation_percent?: number
           output_summary_json?: Json | null
+          parameters_json?: Json | null
+          remnant_area_used_mm2?: number
+          result_hash?: string | null
+          run_index?: number
+          selected?: boolean
           sheet_count?: number
           started_at?: string
           status?: string
@@ -2851,11 +2995,18 @@ export type Database = {
           algorithm_variant?: string
           completed_at?: string | null
           created_at?: string
+          created_by?: string | null
           error_message?: string | null
           group_id?: string
           id?: string
           job_id?: string
+          min_sheet_utilisation_percent?: number
           output_summary_json?: Json | null
+          parameters_json?: Json | null
+          remnant_area_used_mm2?: number
+          result_hash?: string | null
+          run_index?: number
+          selected?: boolean
           sheet_count?: number
           started_at?: string
           status?: string
@@ -3071,15 +3222,23 @@ export type Database = {
       part_library: {
         Row: {
           active: boolean
+          clearance_mm: number
           created_at: string
           created_by: string | null
           description: string | null
           dxf_file_reference: string | null
+          dxf_outline_layer_name: string | null
+          edge_profile_json: Json | null
+          face_orientation: string | null
+          front_edge_designation: string | null
           grain_axis: string | null
           grain_required: boolean
           id: string
+          kerf_mm: number
           length_mm: number
           material_code: string | null
+          outer_polygon_points_json: Json | null
+          outer_shape_type: string
           part_code: string
           product_code: string | null
           rotation_allowed: string | null
@@ -3092,15 +3251,23 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          clearance_mm?: number
           created_at?: string
           created_by?: string | null
           description?: string | null
           dxf_file_reference?: string | null
+          dxf_outline_layer_name?: string | null
+          edge_profile_json?: Json | null
+          face_orientation?: string | null
+          front_edge_designation?: string | null
           grain_axis?: string | null
           grain_required?: boolean
           id?: string
+          kerf_mm?: number
           length_mm?: number
           material_code?: string | null
+          outer_polygon_points_json?: Json | null
+          outer_shape_type?: string
           part_code: string
           product_code?: string | null
           rotation_allowed?: string | null
@@ -3113,15 +3280,23 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          clearance_mm?: number
           created_at?: string
           created_by?: string | null
           description?: string | null
           dxf_file_reference?: string | null
+          dxf_outline_layer_name?: string | null
+          edge_profile_json?: Json | null
+          face_orientation?: string | null
+          front_edge_designation?: string | null
           grain_axis?: string | null
           grain_required?: boolean
           id?: string
+          kerf_mm?: number
           length_mm?: number
           material_code?: string | null
+          outer_polygon_points_json?: Json | null
+          outer_shape_type?: string
           part_code?: string
           product_code?: string | null
           rotation_allowed?: string | null

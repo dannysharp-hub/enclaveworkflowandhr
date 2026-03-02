@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Layers, RefreshCw, Cpu, Download, AlertTriangle } from "lucide-react";
+import { Layers, RefreshCw, Cpu, Download, AlertTriangle, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { nestParts, NestPart, NestSettings, NestResult } from "@/lib/nestingEngine";
+import { nestPartsV2, NestPart, NestSettings, NestResult, NestCandidate, RemnantInput } from "@/lib/nesting";
 import NestingPreview from "@/components/NestingPreview";
 import NestingPreflightModal from "@/components/NestingPreflightModal";
 import { generateInternalNestPack } from "@/lib/internalNestExport";
@@ -41,6 +41,10 @@ interface NestingGroup {
   locked: boolean;
   parts: PartData[];
   sheet_count: number;
+  // V2 settings
+  remnant_first: boolean;
+  algorithm_pool: string[];
+  optimisation_time_limit_seconds: number;
 }
 
 interface Props {
@@ -54,11 +58,36 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
   const [groups, setGroups] = useState<NestingGroup[]>([]);
   const [previewGroup, setPreviewGroup] = useState<string | null>(null);
   const [nestResult, setNestResult] = useState<NestResult | null>(null);
+  const [candidates, setCandidates] = useState<NestCandidate[]>([]);
   const [committing, setCommitting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [preflightOpen, setPreflightOpen] = useState(false);
   const [preflightValidation, setPreflightValidation] = useState<ValidationResult | null>(null);
   const [preflightGroupLabel, setPreflightGroupLabel] = useState<string | null>(null);
+  const [remnants, setRemnants] = useState<RemnantInput[]>([]);
+
+  // Fetch available remnants
+  useEffect(() => {
+    const fetchRemnants = async () => {
+      const { data } = await supabase
+        .from("remnants")
+        .select("id, width_mm, length_mm, material_code, thickness_mm, colour_name, location, status")
+        .eq("status", "available");
+      if (data) {
+        setRemnants(data.map(r => ({
+          remnant_id: r.id,
+          width_mm: Number(r.width_mm),
+          height_mm: Number(r.length_mm),
+          material_code: r.material_code,
+          thickness_mm: Number(r.thickness_mm),
+          colour_name: r.colour_name,
+          location: r.location,
+          status: r.status,
+        })));
+      }
+    };
+    fetchRemnants();
+  }, []);
 
   const buildGroups = useCallback(() => {
     const byMat = new Map<string, PartData[]>();
@@ -93,6 +122,9 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
         locked: false,
         parts: matParts,
         sheet_count: estSheets,
+        remnant_first: false,
+        algorithm_pool: ["maxrects_best_area_fit", "maxrects_best_short_side_fit", "skyline", "guillotine"],
+        optimisation_time_limit_seconds: 10,
       });
     }
     setGroups(result);
@@ -108,8 +140,13 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
     ));
   };
 
+  const updateGroupSetting = (groupLabel: string, field: string, value: any) => {
+    setGroups(prev => prev.map(g =>
+      g.group_label === groupLabel ? { ...g, [field]: value } : g
+    ));
+  };
+
   const runInternalNest = (group: NestingGroup) => {
-    // Pre-flight validation gate
     const validation = validatePartsForNesting(group.parts, {
       usable_width: group.sheet_width_mm - 2 * group.margin_mm,
       usable_height: group.sheet_length_mm - 2 * group.margin_mm,
@@ -122,12 +159,8 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
       return;
     }
 
-    // Show warnings but don't block
     if (validation.totalWarnings > 0) {
-      toast({
-        title: `${validation.totalWarnings} dimension warning(s)`,
-        description: "Check part dimensions for potential issues",
-      });
+      toast({ title: `${validation.totalWarnings} dimension warning(s)`, description: "Check part dimensions for potential issues" });
     }
 
     executeNest(group);
@@ -152,22 +185,35 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
       grain_direction: group.grain_direction as "length" | "width",
       sort_strategy: "largest_first",
       optimisation_runs: group.optimisation_runs,
+      optimisation_time_limit_seconds: group.optimisation_time_limit_seconds,
+      algorithm_pool: group.algorithm_pool as any,
+      remnant_first: group.remnant_first,
     };
 
-    const result = nestParts(nestPart, settings);
-    setNestResult(result);
+    // Filter remnants matching this group's material
+    const groupRemnants = remnants.filter(r =>
+      r.material_code === group.material_code &&
+      (group.thickness_mm == null || r.thickness_mm === group.thickness_mm)
+    );
+
+    const { best, candidates: allCandidates } = nestPartsV2(nestPart, settings, {
+      remnants: group.remnant_first ? groupRemnants : undefined,
+    });
+
+    setNestResult(best);
+    setCandidates(allCandidates);
     setPreviewGroup(group.group_label);
   };
 
+  const selectCandidate = (candidate: NestCandidate) => {
+    setNestResult(candidate.result);
+  };
+
   const handlePreflightUpdate = (updates: { part_id: string; changes: Record<string, any> }[]) => {
-    if (onUpdateParts) {
-      onUpdateParts(updates);
-    }
-    // Re-validate after applying updates
+    if (onUpdateParts) onUpdateParts(updates);
     if (preflightGroupLabel) {
       const group = groups.find(g => g.group_label === preflightGroupLabel);
       if (group) {
-        // Apply updates locally to re-validate
         const updatedParts = group.parts.map(p => {
           const upd = updates.find(u => u.part_id === p.part_id);
           return upd ? { ...p, ...upd.changes } : p;
@@ -189,6 +235,15 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
     setCommitting(true);
 
     try {
+      // Reserve any remnants used
+      const remnantSheets = nestResult.sheets.filter(s => s.is_remnant && s.remnant_id);
+      for (const rs of remnantSheets) {
+        await supabase
+          .from("remnants")
+          .update({ status: "reserved" } as any)
+          .eq("id", rs.remnant_id!);
+      }
+
       for (const sheet of nestResult.sheets) {
         const { data: layout, error: layoutErr } = await supabase
           .from("job_sheet_layouts")
@@ -196,8 +251,8 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
             job_id: jobId,
             group_id: group.id || jobId,
             sheet_number: sheet.sheet_number,
-            sheet_width_mm: group.sheet_width_mm,
-            sheet_length_mm: group.sheet_length_mm,
+            sheet_width_mm: sheet.is_remnant ? sheet.remnant_width_mm : group.sheet_width_mm,
+            sheet_length_mm: sheet.is_remnant ? sheet.remnant_height_mm : group.sheet_length_mm,
             margin_mm: group.margin_mm,
             spacing_mm: group.spacing_mm,
             grain_direction: group.grain_direction,
@@ -230,6 +285,8 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
         if (partsErr) throw partsErr;
       }
 
+      // Save nesting run with V2 metadata
+      const selectedCandidate = candidates.find(c => c.result.result_hash === nestResult.result_hash);
       await supabase.from("nesting_runs").insert({
         job_id: jobId,
         group_id: group.id || jobId,
@@ -238,9 +295,17 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
         utilisation_percent: nestResult.total_utilisation_percent,
         sheet_count: nestResult.total_sheets,
         completed_at: new Date().toISOString(),
+        run_index: selectedCandidate?.run_index ?? 1,
+        parameters_json: nestResult.parameters_json ?? {},
+        min_sheet_utilisation_percent: nestResult.min_sheet_utilisation_percent ?? 0,
+        remnant_area_used_mm2: nestResult.remnant_area_used_mm2 ?? 0,
+        result_hash: nestResult.result_hash ?? "",
+        selected: true,
         output_summary_json: {
           total_placements: nestResult.sheets.reduce((s, sh) => s + sh.placements.length, 0),
           warnings: nestResult.warnings,
+          candidates_evaluated: candidates.length,
+          remnants_used: nestResult.sheets.filter(s => s.is_remnant).map(s => s.remnant_id),
         },
       } as any);
 
@@ -251,6 +316,7 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
       toast({ title: "Layout committed", description: `${nestResult.total_sheets} sheets locked for ${group.group_label}` });
       setPreviewGroup(null);
       setNestResult(null);
+      setCandidates([]);
     } catch (err: any) {
       toast({ title: "Commit failed", description: err.message, variant: "destructive" });
     } finally {
@@ -301,13 +367,17 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
 
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {groups.map((g, i) => {
-            // Inline validation status for each group
             const groupValidation = g.nesting_engine === "internal"
               ? validatePartsForNesting(g.parts, {
                   usable_width: g.sheet_width_mm - 2 * g.margin_mm,
                   usable_height: g.sheet_length_mm - 2 * g.margin_mm,
                 })
               : null;
+
+            const matchingRemnants = remnants.filter(r =>
+              r.material_code === g.material_code &&
+              (g.thickness_mm == null || r.thickness_mm === g.thickness_mm)
+            );
 
             return (
               <div key={i} className={`rounded-md border bg-card/50 p-3 space-y-2 ${g.locked ? 'border-primary/40' : 'border-border'}`}>
@@ -330,7 +400,41 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
                   <span>Rotation: {g.allow_rotation_90 ? "Yes" : "No"}</span>
                 </div>
 
-                {/* Validation status indicator */}
+                {/* V2 Settings */}
+                {g.nesting_engine === "internal" && !g.locked && (
+                  <div className="space-y-1.5 pt-1 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <Settings2 size={10} className="text-muted-foreground" />
+                      <span className="text-[10px] font-mono text-muted-foreground">V2 Settings</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <label className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                        <span>Runs:</span>
+                        <select
+                          value={g.optimisation_runs}
+                          onChange={(e) => updateGroupSetting(g.group_label, "optimisation_runs", Number(e.target.value))}
+                          className="bg-background border border-border rounded px-1 py-0.5 text-[10px] w-14"
+                        >
+                          {[1, 5, 10, 20, 30, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={g.remnant_first}
+                          onChange={(e) => updateGroupSetting(g.group_label, "remnant_first", e.target.checked)}
+                          className="rounded border-border"
+                        />
+                        <span>Remnant-first</span>
+                        {matchingRemnants.length > 0 && (
+                          <span className="text-primary">({matchingRemnants.length})</span>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Validation status */}
                 {groupValidation && !g.locked && (
                   <div className={`flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded ${
                     groupValidation.valid
@@ -376,7 +480,8 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
                         className="h-6 text-[10px] px-2"
                         onClick={() => runInternalNest(g)}
                       >
-                        <Cpu size={10} className="mr-1" /> Nest
+                        <Cpu size={10} className="mr-1" />
+                        {g.optimisation_runs > 1 ? `Best of ${g.optimisation_runs}` : "Nest"}
                       </Button>
                     )}
                     {g.locked && nestResult && previewGroup === g.group_label && (
@@ -410,8 +515,10 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
           groupLabel={activePreviewGroup.group_label}
           onCommit={() => commitLayout(activePreviewGroup)}
           onRerun={() => runInternalNest(activePreviewGroup)}
-          onClose={() => { setPreviewGroup(null); setNestResult(null); }}
+          onClose={() => { setPreviewGroup(null); setNestResult(null); setCandidates([]); }}
           committing={committing}
+          candidates={candidates}
+          onSelectCandidate={selectCandidate}
         />
       )}
 
