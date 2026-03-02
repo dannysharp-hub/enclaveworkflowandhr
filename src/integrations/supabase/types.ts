@@ -178,6 +178,168 @@ export type Database = {
           },
         ]
       }
+      calendar_sync_audit: {
+        Row: {
+          action: string
+          actor_staff_id: string | null
+          app_event_id: string | null
+          created_at: string
+          google_event_id: string | null
+          id: string
+          payload_after_json: Json | null
+          payload_before_json: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          actor_staff_id?: string | null
+          app_event_id?: string | null
+          created_at?: string
+          google_event_id?: string | null
+          id?: string
+          payload_after_json?: Json | null
+          payload_before_json?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          actor_staff_id?: string | null
+          app_event_id?: string | null
+          created_at?: string
+          google_event_id?: string | null
+          id?: string
+          payload_after_json?: Json | null
+          payload_before_json?: Json | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_audit_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_sync_links: {
+        Row: {
+          app_event_id: string
+          checksum: string | null
+          created_at: string
+          direction_last_sync: string | null
+          error_message: string | null
+          google_calendar_id: string
+          google_etag: string | null
+          google_event_id: string | null
+          id: string
+          last_sync_attempt_at: string | null
+          last_synced_at: string | null
+          sync_status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          app_event_id: string
+          checksum?: string | null
+          created_at?: string
+          direction_last_sync?: string | null
+          error_message?: string | null
+          google_calendar_id: string
+          google_etag?: string | null
+          google_event_id?: string | null
+          id?: string
+          last_sync_attempt_at?: string | null
+          last_synced_at?: string | null
+          sync_status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          app_event_id?: string
+          checksum?: string | null
+          created_at?: string
+          direction_last_sync?: string | null
+          error_message?: string | null
+          google_calendar_id?: string
+          google_etag?: string | null
+          google_event_id?: string | null
+          id?: string
+          last_sync_attempt_at?: string | null
+          last_synced_at?: string | null
+          sync_status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_sync_queue: {
+        Row: {
+          action: string
+          app_event_id: string | null
+          attempts: number
+          created_at: string
+          google_calendar_id: string | null
+          google_event_id: string | null
+          id: string
+          last_error: string | null
+          max_attempts: number
+          priority: string
+          run_after: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          app_event_id?: string | null
+          attempts?: number
+          created_at?: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          priority?: string
+          run_after?: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          app_event_id?: string | null
+          attempts?: number
+          created_at?: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          priority?: string
+          run_after?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       capacity_simulations: {
         Row: {
           capacity_impact_json: Json
@@ -1255,6 +1417,141 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "finance_audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_calendar_mappings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          event_type: string
+          google_calendar_id: string
+          google_calendar_name: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          event_type: string
+          google_calendar_id: string
+          google_calendar_name?: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          event_type?: string
+          google_calendar_id?: string
+          google_calendar_name?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_integration_settings: {
+        Row: {
+          conflict_policy: string
+          created_at: string
+          default_timezone: string
+          google_user_email: string | null
+          google_user_id: string | null
+          granted_scopes: Json | null
+          is_connected: boolean
+          last_error_message: string | null
+          last_health_check_at: string | null
+          status: string
+          sync_mode: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          conflict_policy?: string
+          created_at?: string
+          default_timezone?: string
+          google_user_email?: string | null
+          google_user_id?: string | null
+          granted_scopes?: Json | null
+          is_connected?: boolean
+          last_error_message?: string | null
+          last_health_check_at?: string | null
+          status?: string
+          sync_mode?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          conflict_policy?: string
+          created_at?: string
+          default_timezone?: string
+          google_user_email?: string | null
+          google_user_id?: string | null
+          granted_scopes?: Json | null
+          is_connected?: boolean
+          last_error_message?: string | null
+          last_health_check_at?: string | null
+          status?: string
+          sync_mode?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_integration_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_oauth_tokens: {
+        Row: {
+          access_token_encrypted: string
+          created_at: string
+          expires_at: string
+          id: string
+          refresh_token_encrypted: string
+          tenant_id: string
+          token_version: number
+          updated_at: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          refresh_token_encrypted: string
+          tenant_id: string
+          token_version?: number
+          updated_at?: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          refresh_token_encrypted?: string
+          tenant_id?: string
+          token_version?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_oauth_tokens_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
