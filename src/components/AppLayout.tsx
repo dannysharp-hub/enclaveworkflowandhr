@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Kanban, ClipboardList,
   Package, ShieldCheck, GraduationCap, Zap, Sun, ShieldAlert,
   ClipboardCheck, Palmtree, Settings, ChevronDown, Activity, BarChart3,
-  BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download, TrendingUp, TrendingDown, Factory,
+  BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download, TrendingUp, TrendingDown, Factory, Timer, Banknote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   featureFlag?: string;
+  adminOnly?: boolean; // Only show for admin/supervisor/office
 }
 
 interface NavGroup {
@@ -32,10 +33,12 @@ const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/whos-in", label: "Who's In", icon: Sun },
   { to: "/my-work", label: "My Work", icon: ClipboardList },
+  { to: "/my-hours", label: "My Hours", icon: Timer },
+  { to: "/my-pay", label: "My Pay", icon: Banknote },
   { to: "/workflow", label: "Workflow", icon: Kanban },
   { to: "/jobs", label: "Jobs", icon: Wrench },
-  { to: "/production", label: "Production", icon: Activity },
-  { to: "/staff", label: "Staff", icon: Users },
+  { to: "/production", label: "Production", icon: Activity, adminOnly: true },
+  { to: "/staff", label: "Staff", icon: Users, adminOnly: true },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/holiday-calendar", label: "Holiday Cal", icon: Palmtree },
   { to: "/documents", label: "Documents", icon: FileText },
@@ -47,9 +50,9 @@ const navItems: NavItem[] = [
   { to: "/remnants", label: "Remnants", icon: Recycle, featureFlag: "enable_remnants" },
   { to: "/materials", label: "Materials", icon: Package },
   { to: "/purchasing", label: "Purchase Orders", icon: Truck },
-  { to: "/drift", label: "Drift Control", icon: TrendingDown },
-  { to: "/capacity", label: "Capacity", icon: Factory },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/drift", label: "Drift Control", icon: TrendingDown, adminOnly: true },
+  { to: "/capacity", label: "Capacity", icon: Factory, adminOnly: true },
+  { to: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
 ];
 
 const financeGroup: NavGroup = {
@@ -85,8 +88,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const displayName = profile?.full_name || "Loading...";
   const displayRole = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "";
 
-  // Filter nav items based on feature flags
+  const ADMIN_ROLES = ["admin", "supervisor", "office"];
+  const isAdminRole = userRole ? ADMIN_ROLES.includes(userRole) : false;
+
+  // Filter nav items based on feature flags and role
   const visibleNavItems = navItems.filter((item) => {
+    if (item.adminOnly && !isAdminRole) return false;
     if (!item.featureFlag) return true;
     return flags[item.featureFlag] === true;
   });

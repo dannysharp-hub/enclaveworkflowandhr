@@ -4,8 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload, FileText } from "lucide-react";
+import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload, FileText, Banknote } from "lucide-react";
 import JobCardTemplateManager from "@/components/JobCardTemplateManager";
+import PayrollSettingsTab from "@/pages/PayrollSettingsTab";
 
 // ─── Types ────────────────────────────────────────────
 interface DepartmentConfig {
@@ -44,6 +45,7 @@ const TABS = [
   { key: "stages", label: "Stages", icon: Kanban },
   { key: "machines", label: "Machines", icon: Cpu },
   { key: "job-cards", label: "Job Cards", icon: FileText },
+  { key: "payroll", label: "Payroll", icon: Banknote },
   { key: "client-portal", label: "Client Portal", icon: Building2 },
   { key: "flags", label: "Feature Flags", icon: ToggleLeft },
 ] as const;
@@ -131,6 +133,7 @@ export default function SettingsPage() {
           {tab === "stages" && <StagesTab data={stages} onRefresh={fetchAll} />}
           {tab === "machines" && <MachinesTab data={machines} departments={departments} onRefresh={fetchAll} />}
           {tab === "job-cards" && <JobCardTemplateManager />}
+          {tab === "payroll" && <PayrollSettingsTab />}
           {tab === "client-portal" && <ClientPortalTab />}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
         </>

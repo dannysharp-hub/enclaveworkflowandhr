@@ -2693,6 +2693,56 @@ export type Database = {
           },
         ]
       }
+      payroll_settings: {
+        Row: {
+          created_at: string
+          enable_productivity_kpis: boolean
+          enable_staff_pay_estimate: boolean
+          id: string
+          include_overtime_in_estimate: boolean
+          overtime_multiplier: number
+          pay_currency: string
+          pay_frequency: string
+          rounding_rule: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enable_productivity_kpis?: boolean
+          enable_staff_pay_estimate?: boolean
+          id?: string
+          include_overtime_in_estimate?: boolean
+          overtime_multiplier?: number
+          pay_currency?: string
+          pay_frequency?: string
+          rounding_rule?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enable_productivity_kpis?: boolean
+          enable_staff_pay_estimate?: boolean
+          id?: string
+          include_overtime_in_estimate?: boolean
+          overtime_multiplier?: number
+          pay_currency?: string
+          pay_frequency?: string
+          rounding_rule?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_mappings: {
         Row: {
           created_at: string
@@ -3619,6 +3669,56 @@ export type Database = {
           },
         ]
       }
+      staff_pay_profiles: {
+        Row: {
+          created_at: string
+          hourly_rate: number | null
+          id: string
+          overtime_eligible: boolean
+          pay_type: string
+          salary_monthly: number | null
+          staff_id: string
+          tax_handling_note: string
+          tenant_id: string
+          updated_at: string
+          visible_to_staff: boolean
+        }
+        Insert: {
+          created_at?: string
+          hourly_rate?: number | null
+          id?: string
+          overtime_eligible?: boolean
+          pay_type?: string
+          salary_monthly?: number | null
+          staff_id: string
+          tax_handling_note?: string
+          tenant_id: string
+          updated_at?: string
+          visible_to_staff?: boolean
+        }
+        Update: {
+          created_at?: string
+          hourly_rate?: number | null
+          id?: string
+          overtime_eligible?: boolean
+          pay_type?: string
+          salary_monthly?: number | null
+          staff_id?: string
+          tax_handling_note?: string
+          tenant_id?: string
+          updated_at?: string
+          visible_to_staff?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_pay_profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_skills: {
         Row: {
           assigned_by: string | null
@@ -4195,6 +4295,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      time_entries: {
+        Row: {
+          approved: boolean
+          approved_by: string | null
+          break_minutes: number
+          clock_in: string
+          clock_out: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          staff_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved?: boolean
+          approved_by?: string | null
+          break_minutes?: number
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          staff_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved?: boolean
+          approved_by?: string | null
+          break_minutes?: number
+          clock_in?: string
+          clock_out?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          staff_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       toolpath_templates: {
         Row: {
