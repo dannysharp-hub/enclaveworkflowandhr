@@ -4966,6 +4966,105 @@ export type Database = {
           },
         ]
       }
+      quote_line_items: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          markup_percent: number
+          quantity: number
+          quote_id: string
+          sort_order: number
+          tenant_id: string
+          total: number | null
+          unit_cost: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          markup_percent?: number
+          quantity?: number
+          quote_id: string
+          sort_order?: number
+          tenant_id: string
+          total?: number | null
+          unit_cost?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          markup_percent?: number
+          quantity?: number
+          quote_id?: string
+          sort_order?: number
+          tenant_id?: string
+          total?: number | null
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_line_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "smart_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_line_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_notes: {
+        Row: {
+          author_name: string
+          created_at: string
+          id: string
+          note: string
+          quote_id: string
+          tenant_id: string
+        }
+        Insert: {
+          author_name: string
+          created_at?: string
+          id?: string
+          note: string
+          quote_id: string
+          tenant_id: string
+        }
+        Update: {
+          author_name?: string
+          created_at?: string
+          id?: string
+          note?: string
+          quote_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_notes_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "smart_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_notes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_templates: {
         Row: {
           active: boolean
@@ -5012,6 +5111,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "quote_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_versions: {
+        Row: {
+          change_summary: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          quote_id: string
+          snapshot_json: Json
+          tenant_id: string
+          version_number: number
+        }
+        Insert: {
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          quote_id: string
+          snapshot_json?: Json
+          tenant_id: string
+          version_number?: number
+        }
+        Update: {
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          quote_id?: string
+          snapshot_json?: Json
+          tenant_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_versions_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "smart_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_versions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -5197,11 +5344,15 @@ export type Database = {
       }
       smart_quotes: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           assembly_complexity: string
           converted_job_id: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
+          drift_adjusted_value: number | null
+          drift_adjustment_percent: number | null
           estimated_cnc_sheets: number
           estimated_install_days: number
           estimated_sheets: number
@@ -5212,6 +5363,7 @@ export type Database = {
           labour_estimate: number
           margin_sensitivity: Json
           material_estimate: number
+          notes_count: number | null
           overhead_estimate: number
           special_factors: Json
           status: string
@@ -5223,13 +5375,18 @@ export type Database = {
           title: string
           updated_at: string
           use_historical_data: boolean
+          version_count: number | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           assembly_complexity?: string
           converted_job_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          drift_adjusted_value?: number | null
+          drift_adjustment_percent?: number | null
           estimated_cnc_sheets?: number
           estimated_install_days?: number
           estimated_sheets?: number
@@ -5240,6 +5397,7 @@ export type Database = {
           labour_estimate?: number
           margin_sensitivity?: Json
           material_estimate?: number
+          notes_count?: number | null
           overhead_estimate?: number
           special_factors?: Json
           status?: string
@@ -5251,13 +5409,18 @@ export type Database = {
           title: string
           updated_at?: string
           use_historical_data?: boolean
+          version_count?: number | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           assembly_complexity?: string
           converted_job_id?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          drift_adjusted_value?: number | null
+          drift_adjustment_percent?: number | null
           estimated_cnc_sheets?: number
           estimated_install_days?: number
           estimated_sheets?: number
@@ -5268,6 +5431,7 @@ export type Database = {
           labour_estimate?: number
           margin_sensitivity?: Json
           material_estimate?: number
+          notes_count?: number | null
           overhead_estimate?: number
           special_factors?: Json
           status?: string
@@ -5279,6 +5443,7 @@ export type Database = {
           title?: string
           updated_at?: string
           use_historical_data?: boolean
+          version_count?: number | null
         }
         Relationships: [
           {
