@@ -15,6 +15,7 @@ import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import JobFinancePanel from "@/components/JobFinancePanel";
 import JobIssuesPanel from "@/components/JobIssuesPanel";
 import JobCardPanel from "@/components/JobCardPanel";
+import JobDrivePanel from "@/components/JobDrivePanel";
 
 interface PartData {
   id?: string;
@@ -53,6 +54,7 @@ export default function JobBuilderPage() {
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
   const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [uploadToDrive, setUploadToDrive] = useState(true);
   const [fullMaterials, setFullMaterials] = useState<any[]>([]);
   const [bulkDxfOpen, setBulkDxfOpen] = useState(false);
 
@@ -305,8 +307,9 @@ export default function JobBuilderPage() {
         jobCode: job.job_id,
         jobName: job.job_name,
         groups,
+        uploadToDrive,
       });
-      toast({ title: "VCarve Job Pack exported", description: `${job.job_id}_VCarve_Pack.zip downloaded` });
+      toast({ title: "VCarve Job Pack exported", description: `${job.job_id}_VCarve_Pack.zip downloaded${uploadToDrive ? " + uploaded to Drive" : ""}` });
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     } finally {
@@ -472,6 +475,9 @@ export default function JobBuilderPage() {
       {parts.length > 0 && (
         <NestingGroupsPanel jobId={job.id} parts={parts} materials={fullMaterials} onUpdateParts={handleBulkPartUpdate} />
       )}
+
+      {/* Drive Documents Panel */}
+      {job && <JobDrivePanel jobId={job.id} />}
 
       {/* Job Cards Panel */}
       {job && <JobCardPanel jobId={job.id} jobCode={job.job_id} readOnly={!canEdit} />}
