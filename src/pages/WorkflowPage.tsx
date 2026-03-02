@@ -5,7 +5,14 @@ import { useStageConfig } from "@/hooks/useStageConfig";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import { GripVertical, User, Calendar } from "lucide-react";
+import {
+  GripVertical, User, Calendar, Filter, Search, ChevronDown,
+  AlertTriangle, Clock, UserPlus, X,
+} from "lucide-react";
+import { format, differenceInDays } from "date-fns";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface Stage {
   id: string;
@@ -16,6 +23,7 @@ interface Stage {
   due_date: string | null;
   notes: string | null;
   job_display?: string;
+  priority?: number;
 }
 
 const STATUSES = ["Not Started", "In Progress", "Blocked", "Done"] as const;
@@ -32,7 +40,6 @@ const STATUS_HEADER_COLORS: Record<string, string> = {
   "Done": "text-success",
 };
 
-// Dynamic badge colours based on index
 const BADGE_PALETTE = [
   "bg-info/15 text-info",
   "bg-accent/15 text-accent",
@@ -48,11 +55,16 @@ export default function WorkflowPage() {
   const { stages: stageConfig, loading: stagesLoading } = useStageConfig();
   const [jobStages, setJobStages] = useState<Stage[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [allStaff, setAllStaff] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStage, setFilterStage] = useState<string>("all");
+  const [filterStaff, setFilterStaff] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [assigningStageId, setAssigningStageId] = useState<string | null>(null);
 
   const canManage = userRole === "admin" || userRole === "supervisor" || userRole === "engineer";
 
-  // Build a badge map from stage_config
   const stageBadge = useMemo(() => {
     const map: Record<string, string> = {};
     stageConfig.forEach((sc, i) => {
@@ -64,20 +76,28 @@ export default function WorkflowPage() {
   const fetchData = useCallback(async () => {
     const [stagesRes, jobsRes, profilesRes] = await Promise.all([
       supabase.from("job_stages").select("*").order("created_at"),
-      supabase.from("jobs").select("id, job_id, job_name"),
+      supabase.from("jobs").select("id, job_id, job_name").neq("status", "complete"),
       supabase.from("profiles").select("user_id, full_name"),
     ]);
 
     const jobMap = new Map((jobsRes.data ?? []).map(j => [j.id, `${j.job_id} — ${j.job_name}`]));
+    const activeJobIds = new Set((jobsRes.data ?? []).map(j => j.id));
     const profMap: Record<string, string> = {};
-    (profilesRes.data ?? []).forEach(p => { profMap[p.user_id] = p.full_name; });
+    const staffList: { id: string; name: string }[] = [];
+    (profilesRes.data ?? []).forEach(p => {
+      profMap[p.user_id] = p.full_name;
+      staffList.push({ id: p.user_id, name: p.full_name });
+    });
     setProfiles(profMap);
+    setAllStaff(staffList.sort((a, b) => a.name.localeCompare(b.name)));
 
     setJobStages(
-      (stagesRes.data ?? []).map(s => ({
-        ...s,
-        job_display: jobMap.get(s.job_id) || s.job_id,
-      }))
+      (stagesRes.data ?? [])
+        .filter(s => activeJobIds.has(s.job_id))
+        .map(s => ({
+          ...s,
+          job_display: jobMap.get(s.job_id) || s.job_id,
+        }))
     );
     setLoading(false);
   }, []);
@@ -91,7 +111,6 @@ export default function WorkflowPage() {
     const stage = jobStages.find(s => s.id === stageId);
     if (!stage) return;
 
-    // Check machine auth when moving to "In Progress"
     if (newStatus === "In Progress" && stage.assigned_staff_ids && stage.assigned_staff_ids.length > 0) {
       const warnings: string[] = [];
       for (const staffId of stage.assigned_staff_ids) {
@@ -108,37 +127,97 @@ export default function WorkflowPage() {
         }
       }
       if (warnings.length > 0) {
-        toast({
-          title: "⚠️ Machine Auth Warning",
-          description: warnings.join(" · "),
-          variant: "destructive",
-        });
+        toast({ title: "⚠️ Machine Auth Warning", description: warnings.join(" · "), variant: "destructive" });
       }
     }
 
-    // Optimistic update
-    setJobStages(prev =>
-      prev.map(s => (s.id === stageId ? { ...s, status: newStatus } : s))
-    );
+    setJobStages(prev => prev.map(s => (s.id === stageId ? { ...s, status: newStatus } : s)));
 
-    const { error } = await supabase
-      .from("job_stages")
-      .update({ status: newStatus })
-      .eq("id", stageId);
-
+    const { error } = await supabase.from("job_stages").update({ status: newStatus }).eq("id", stageId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       fetchData();
     }
   };
 
+  const quickAssign = async (stageId: string, staffId: string) => {
+    const stage = jobStages.find(s => s.id === stageId);
+    if (!stage) return;
+    const current = stage.assigned_staff_ids || [];
+    if (current.includes(staffId)) return;
+    const updated = [...current, staffId];
+
+    setJobStages(prev => prev.map(s => s.id === stageId ? { ...s, assigned_staff_ids: updated } : s));
+    setAssigningStageId(null);
+
+    const { error } = await supabase.from("job_stages").update({ assigned_staff_ids: updated }).eq("id", stageId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      fetchData();
+    } else {
+      toast({ title: "Staff assigned", description: `${profiles[staffId]} assigned` });
+    }
+  };
+
+  const removeAssignment = async (stageId: string, staffId: string) => {
+    const stage = jobStages.find(s => s.id === stageId);
+    if (!stage) return;
+    const updated = (stage.assigned_staff_ids || []).filter(id => id !== staffId);
+
+    setJobStages(prev => prev.map(s => s.id === stageId ? { ...s, assigned_staff_ids: updated } : s));
+
+    const { error } = await supabase.from("job_stages").update({ assigned_staff_ids: updated }).eq("id", stageId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      fetchData();
+    }
+  };
+
+  // ── Filtering ──
+  const filtered = useMemo(() => {
+    let list = [...jobStages];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(s =>
+        s.job_display?.toLowerCase().includes(q) ||
+        s.stage_name.toLowerCase().includes(q) ||
+        s.notes?.toLowerCase().includes(q)
+      );
+    }
+    if (filterStage !== "all") list = list.filter(s => s.stage_name === filterStage);
+    if (filterStaff !== "all") list = list.filter(s => s.assigned_staff_ids?.includes(filterStaff));
+
+    // Sort: overdue first, then by due date
+    const today = new Date().toISOString().split("T")[0];
+    list.sort((a, b) => {
+      const aOverdue = a.due_date && a.due_date < today && a.status !== "Done" ? -1 : 0;
+      const bOverdue = b.due_date && b.due_date < today && b.status !== "Done" ? -1 : 0;
+      if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      return 0;
+    });
+
+    return list;
+  }, [jobStages, searchQuery, filterStage, filterStaff]);
+
   const grouped = STATUSES.reduce(
     (acc, status) => {
-      acc[status] = jobStages.filter(s => s.status === status);
+      acc[status] = filtered.filter(s => s.status === status);
       return acc;
     },
     {} as Record<string, Stage[]>
   );
+
+  const stageNames = useMemo(() => [...new Set(jobStages.map(s => s.stage_name))].sort(), [jobStages]);
+  const assignedStaffIds = useMemo(() => {
+    const ids = new Set<string>();
+    jobStages.forEach(s => s.assigned_staff_ids?.forEach(id => ids.add(id)));
+    return [...ids];
+  }, [jobStages]);
+
+  const today = new Date().toISOString().split("T")[0];
+  const overdueCount = jobStages.filter(s => s.due_date && s.due_date < today && s.status !== "Done").length;
+  const unassignedCount = jobStages.filter(s => s.status !== "Done" && (!s.assigned_staff_ids || s.assigned_staff_ids.length === 0)).length;
 
   const isLoading = loading || stagesLoading;
 
@@ -157,13 +236,45 @@ export default function WorkflowPage() {
 
   return (
     <div className="space-y-6 animate-slide-in">
-      <div>
-        <h2 className="text-2xl font-mono font-bold text-foreground">Workflow Board</h2>
-        <p className="text-sm text-muted-foreground">
-          {jobStages.length} stage{jobStages.length !== 1 ? "s" : ""} across {new Set(jobStages.map(s => s.job_id)).size} job{new Set(jobStages.map(s => s.job_id)).size !== 1 ? "s" : ""}
-          {stageConfig.length > 0 && ` · ${stageConfig.length} configured stage type${stageConfig.length !== 1 ? "s" : ""}`}
-          {!canManage && " · View only"}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-mono font-bold text-foreground">Workflow Board</h2>
+          <p className="text-sm text-muted-foreground">
+            {filtered.length} stage{filtered.length !== 1 ? "s" : ""} across {new Set(filtered.map(s => s.job_id)).size} jobs
+            {overdueCount > 0 && <span className="text-destructive ml-2">· {overdueCount} overdue</span>}
+            {unassignedCount > 0 && <span className="text-warning ml-2">· {unassignedCount} unassigned</span>}
+            {!canManage && " · View only"}
+          </p>
+        </div>
+      </div>
+
+      {/* Search & Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 max-w-xs">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search jobs, stages…"
+            className="w-full h-8 pl-8 pr-3 rounded-md border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+        <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-mono text-foreground hover:bg-secondary/50 transition-colors">
+          <Filter size={12} /> Filters <ChevronDown size={12} className={cn("transition-transform", showFilters && "rotate-180")} />
+        </button>
+        {showFilters && (
+          <>
+            <select value={filterStage} onChange={e => setFilterStage(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+              <option value="all">All Stages</option>
+              {stageNames.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+              <option value="all">All Staff</option>
+              {assignedStaffIds.map(id => <option key={id} value={id}>{profiles[id] || id}</option>)}
+            </select>
+          </>
+        )}
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
@@ -189,68 +300,105 @@ export default function WorkflowPage() {
                       snapshot.isDraggingOver && "bg-primary/5"
                     )}
                   >
-                    {grouped[status].map((stage, index) => (
-                      <Draggable
-                        key={stage.id}
-                        draggableId={stage.id}
-                        index={index}
-                        isDragDisabled={!canManage}
-                      >
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            className={cn(
-                              "rounded-md border-l-2 bg-card p-3 transition-shadow",
-                              STATUS_COLORS[status],
-                              snapshot.isDragging && "shadow-lg shadow-primary/10 ring-1 ring-primary/20"
-                            )}
-                          >
-                            <div className="flex items-start gap-2">
-                              {canManage && (
-                                <div {...provided.dragHandleProps} className="mt-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab">
-                                  <GripVertical size={14} />
-                                </div>
+                    {grouped[status].map((stage, index) => {
+                      const isOverdue = stage.due_date && stage.due_date < today && stage.status !== "Done";
+                      const daysOverdue = isOverdue ? differenceInDays(new Date(), new Date(stage.due_date!)) : 0;
+                      const isUnassigned = !stage.assigned_staff_ids || stage.assigned_staff_ids.length === 0;
+
+                      return (
+                        <Draggable key={stage.id} draggableId={stage.id} index={index} isDragDisabled={!canManage}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={cn(
+                                "rounded-md border-l-2 bg-card p-3 transition-shadow",
+                                isOverdue ? "border-destructive" : STATUS_COLORS[status],
+                                snapshot.isDragging && "shadow-lg shadow-primary/10 ring-1 ring-primary/20"
                               )}
-                              <div className="flex-1 min-w-0">
-                                <span className={cn(
-                                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium mb-1.5",
-                                  stageBadge[stage.stage_name] || "bg-muted text-muted-foreground"
-                                )}>
-                                  {stage.stage_name}
-                                </span>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {stage.job_display}
-                                </p>
-                                {stage.notes && (
-                                  <p className="text-[10px] text-muted-foreground/70 mt-1 truncate">
-                                    {stage.notes}
-                                  </p>
+                            >
+                              <div className="flex items-start gap-2">
+                                {canManage && (
+                                  <div {...provided.dragHandleProps} className="mt-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab">
+                                    <GripVertical size={14} />
+                                  </div>
                                 )}
-                                <div className="flex items-center gap-3 mt-2">
-                                  {stage.assigned_staff_ids && stage.assigned_staff_ids.length > 0 && (
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                      <User size={10} />
-                                      <span>
-                                        {stage.assigned_staff_ids
-                                          .map(id => profiles[id]?.split(" ")[0] || "?")
-                                          .join(", ")}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-1.5">
+                                    <span className={cn(
+                                      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium",
+                                      stageBadge[stage.stage_name] || "bg-muted text-muted-foreground"
+                                    )}>
+                                      {stage.stage_name}
+                                    </span>
+                                    {isOverdue && (
+                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-destructive">
+                                        <AlertTriangle size={9} /> {daysOverdue}d late
                                       </span>
-                                    </div>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {stage.job_display}
+                                  </p>
+                                  {stage.notes && (
+                                    <p className="text-[10px] text-muted-foreground/70 mt-1 truncate">
+                                      {stage.notes}
+                                    </p>
                                   )}
-                                  {stage.due_date && (
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                      <Calendar size={10} />
-                                      <span>{stage.due_date}</span>
-                                    </div>
-                                  )}
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    {stage.assigned_staff_ids && stage.assigned_staff_ids.length > 0 ? (
+                                      stage.assigned_staff_ids.map(id => (
+                                        <span key={id} className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/50 rounded-full px-1.5 py-0.5 group/tag">
+                                          <User size={9} />
+                                          {profiles[id]?.split(" ")[0] || "?"}
+                                          {canManage && (
+                                            <button onClick={(e) => { e.stopPropagation(); removeAssignment(stage.id, id); }} className="opacity-0 group-hover/tag:opacity-100 ml-0.5 hover:text-destructive">
+                                              <X size={8} />
+                                            </button>
+                                          )}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      status !== "Done" && (
+                                        <span className="text-[9px] font-mono text-warning/70 italic">Unassigned</span>
+                                      )
+                                    )}
+                                    {canManage && status !== "Done" && (
+                                      <Popover open={assigningStageId === stage.id} onOpenChange={open => setAssigningStageId(open ? stage.id : null)}>
+                                        <PopoverTrigger asChild>
+                                          <button className="inline-flex items-center gap-0.5 text-[9px] font-mono text-primary/70 hover:text-primary transition-colors" onClick={e => e.stopPropagation()}>
+                                            <UserPlus size={10} /> Assign
+                                          </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-48 p-1" align="start" onClick={e => e.stopPropagation()}>
+                                          <div className="max-h-40 overflow-y-auto">
+                                            {allStaff.filter(s => !(stage.assigned_staff_ids || []).includes(s.id)).map(s => (
+                                              <button
+                                                key={s.id}
+                                                onClick={() => quickAssign(stage.id, s.id)}
+                                                className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-muted/50 rounded-sm transition-colors"
+                                              >
+                                                {s.name}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                    )}
+                                    {stage.due_date && (
+                                      <div className={cn("flex items-center gap-1 text-[10px] ml-auto", isOverdue ? "text-destructive" : "text-muted-foreground")}>
+                                        <Calendar size={10} />
+                                        <span>{format(new Date(stage.due_date), "dd MMM")}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
+                          )}
+                        </Draggable>
+                      );
+                    })}
                     {provided.placeholder}
                     {grouped[status].length === 0 && (
                       <p className="text-center text-[10px] text-muted-foreground/50 py-4 font-mono">
