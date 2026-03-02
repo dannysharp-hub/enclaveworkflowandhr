@@ -4256,6 +4256,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean
+          annual_salary: number | null
           avatar_url: string | null
           bank_account_name: string | null
           bank_account_number: string | null
@@ -4272,9 +4273,11 @@ export type Database = {
           full_name: string
           holiday_allowance_days: number
           holiday_balance_days: number
+          hourly_rate: number | null
           id: string
           ni_number: string | null
           passport_number: string | null
+          pay_type: string
           start_date: string
           tenant_id: string
           updated_at: string
@@ -4282,6 +4285,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          annual_salary?: number | null
           avatar_url?: string | null
           bank_account_name?: string | null
           bank_account_number?: string | null
@@ -4298,9 +4302,11 @@ export type Database = {
           full_name: string
           holiday_allowance_days?: number
           holiday_balance_days?: number
+          hourly_rate?: number | null
           id?: string
           ni_number?: string | null
           passport_number?: string | null
+          pay_type?: string
           start_date?: string
           tenant_id?: string
           updated_at?: string
@@ -4308,6 +4314,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          annual_salary?: number | null
           avatar_url?: string | null
           bank_account_name?: string | null
           bank_account_number?: string | null
@@ -4324,9 +4331,11 @@ export type Database = {
           full_name?: string
           holiday_allowance_days?: number
           holiday_balance_days?: number
+          hourly_rate?: number | null
           id?: string
           ni_number?: string | null
           passport_number?: string | null
+          pay_type?: string
           start_date?: string
           tenant_id?: string
           updated_at?: string
