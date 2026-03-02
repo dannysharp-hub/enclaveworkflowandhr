@@ -28,7 +28,7 @@ interface Props {
 export default function RemnantDialog({ open, onOpenChange, onSuccess, remnant }: Props) {
   const isEdit = !!remnant;
   const [loading, setLoading] = useState(false);
-  const [materials, setMaterials] = useState<{ material_code: string; display_name: string; thickness_mm: number; colour_name: string; grain_direction: string }[]>([]);
+  const [materials, setMaterials] = useState<{ material_code: string; colour_name: string | null; thickness_mm: number; grain_default: string | null }[]>([]);
   const [form, setForm] = useState({
     material_code: remnant?.material_code ?? "",
     thickness_mm: remnant?.thickness_mm ?? 18,
@@ -41,7 +41,7 @@ export default function RemnantDialog({ open, onOpenChange, onSuccess, remnant }
   });
 
   useEffect(() => {
-    supabase.from("materials").select("material_code, display_name, thickness_mm, colour_name, grain_direction").eq("active", true).then(({ data }) => {
+    supabase.from("material_products").select("material_code, colour_name, thickness_mm, grain_default").eq("active", true).then(({ data }) => {
       setMaterials(data ?? []);
     });
   }, []);
@@ -53,7 +53,7 @@ export default function RemnantDialog({ open, onOpenChange, onSuccess, remnant }
       material_code: code,
       thickness_mm: mat?.thickness_mm ?? f.thickness_mm,
       colour_name: mat?.colour_name ?? f.colour_name,
-      grain_direction: mat?.grain_direction ?? f.grain_direction,
+      grain_direction: mat?.grain_default ?? f.grain_direction,
     }));
   };
 
@@ -123,7 +123,7 @@ export default function RemnantDialog({ open, onOpenChange, onSuccess, remnant }
               <label className={labelClass}>MATERIAL</label>
               <select value={form.material_code} onChange={e => onMaterialChange(e.target.value)} className={selectClass} required>
                 <option value="">Select material...</option>
-                {materials.map(m => <option key={m.material_code} value={m.material_code}>{m.display_name}</option>)}
+                {materials.map(m => <option key={m.material_code} value={m.material_code}>{m.colour_name || m.material_code}</option>)}
               </select>
               {materials.length === 0 && <p className="text-[10px] text-warning mt-1">No materials in database. Add materials first.</p>}
             </div>

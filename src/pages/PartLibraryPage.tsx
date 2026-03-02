@@ -58,7 +58,7 @@ const EMPTY_PART: Omit<LibraryPart, "id"> = {
 
 export default function PartLibraryPage() {
   const [parts, setParts] = useState<LibraryPart[]>([]);
-  const [materials, setMaterials] = useState<{ material_code: string; display_name: string }[]>([]);
+  const [materials, setMaterials] = useState<{ material_code: string; colour_name: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -76,7 +76,7 @@ export default function PartLibraryPage() {
     setLoading(true);
     const [partsRes, matsRes] = await Promise.all([
       supabase.from("part_library").select("*").eq("active", true).order("part_code"),
-      supabase.from("materials").select("material_code, display_name").eq("active", true).order("material_code"),
+      supabase.from("material_products").select("material_code, colour_name").eq("active", true).order("material_code"),
     ]);
     setParts((partsRes.data as LibraryPart[]) ?? []);
     setMaterials((matsRes.data as any[]) ?? []);
@@ -405,7 +405,7 @@ export default function PartLibraryPage() {
               <label className="text-xs text-muted-foreground mb-1 block">Material</label>
               <select value={editPart.material_code || ""} onChange={e => setEditPart(p => ({ ...p, material_code: e.target.value || null }))} className={selectClass}>
                 <option value="">—</option>
-                {materials.map(m => <option key={m.material_code} value={m.material_code}>{m.material_code} — {m.display_name}</option>)}
+                {materials.map(m => <option key={m.material_code} value={m.material_code}>{m.material_code} — {m.colour_name || ""}</option>)}
               </select>
             </div>
 
