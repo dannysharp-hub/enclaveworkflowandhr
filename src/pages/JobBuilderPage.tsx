@@ -79,28 +79,25 @@ export default function JobBuilderPage() {
   // Apply product mappings to resolve material and grain defaults
   // Also validates material_code against the materials table to avoid FK violations
   const applyProductMappings = useCallback(async (importedParts: CsvPart[]) => {
-    const productCodes = [...new Set(importedParts.map(p => p.product_code))];
-    const { data: mappings } = await supabase
-      .from("product_mappings")
-      .select("*")
-      .in("product_code", productCodes);
-
-    const mappingMap = new Map((mappings ?? []).map((m: any) => [m.product_code, m]));
-
-    // Build a set of valid material_codes from the materials table
-    const validMaterialCodes = new Set(fullMaterials.map((m: any) => m.material_code));
+    // Build a map of valid material_codes from the materials table for direct matching
+    const materialsByCode = new Map(fullMaterials.map((m: any) => [m.material_code, m]));
 
     let unmatchedMaterials = new Set<string>();
+    let matchedCount = 0;
 
     const resolved = importedParts.map(p => {
-      const mapping = mappingMap.get(p.product_code);
-      // Resolve material_code: CSV value > mapping > null
-      let resolvedMaterial = p.material_code || mapping?.material_code || null;
-      // Validate against materials table — set to null if not a valid FK
-      if (resolvedMaterial && !validMaterialCodes.has(resolvedMaterial)) {
-        unmatchedMaterials.add(resolvedMaterial);
-        resolvedMaterial = null;
+      // Direct match: use the CSV "Material" value against material_products.material_code
+      const csvMaterial = (p.material_code || p.product_code || "").toString().trim();
+      const matchedMat = csvMaterial && csvMaterial !== "UNASSIGNED" ? materialsByCode.get(csvMaterial) : null;
+
+      let resolvedMaterial: string | null = null;
+      if (matchedMat) {
+        resolvedMaterial = matchedMat.material_code;
+        matchedCount++;
+      } else if (csvMaterial && csvMaterial !== "UNASSIGNED") {
+        unmatchedMaterials.add(csvMaterial);
       }
+
       return {
         part_id: p.part_id,
         product_code: p.product_code,
@@ -108,18 +105,22 @@ export default function JobBuilderPage() {
         width_mm: p.width_mm,
         quantity: p.quantity,
         material_code: resolvedMaterial,
-        grain_required: p.grain_required ?? mapping?.default_grain_required ?? false,
-        grain_axis: p.grain_axis || mapping?.default_grain_axis || "L",
-        rotation_allowed: p.rotation_allowed || mapping?.default_rotation_allowed || "any",
+        grain_required: p.grain_required ?? false,
+        grain_axis: p.grain_axis || null,
+        rotation_allowed: p.rotation_allowed || "any",
         dxf_file_reference: null,
         validation_status: "pending",
       } as PartData;
     });
 
+    if (matchedCount > 0) {
+      toast({ title: "Materials matched", description: `${matchedCount} part(s) auto-assigned materials from your materials library.` });
+    }
+
     if (unmatchedMaterials.size > 0) {
       toast({
         title: "Unmatched materials",
-        description: `${unmatchedMaterials.size} material(s) not found in your materials table and were cleared: ${[...unmatchedMaterials].join(", ")}. Add them in Materials page then re-assign.`,
+        description: `${unmatchedMaterials.size} material(s) not found: ${[...unmatchedMaterials].join(", ")}. Add them in Materials page then re-assign.`,
         variant: "destructive",
       });
     }
