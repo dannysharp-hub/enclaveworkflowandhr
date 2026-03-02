@@ -213,8 +213,8 @@ IMPORTANT NOTES:
 `;
 }
 
-export async function generateVCarveJobPack(options: JobPackOptions): Promise<void> {
-  const { jobId, jobCode, jobName, tenantId, groups } = options;
+export async function generateVCarveJobPack(options: JobPackOptions & { uploadToDrive?: boolean }): Promise<void> {
+  const { jobId, jobCode, jobName, tenantId, groups, uploadToDrive: shouldUpload } = options;
   const zip = new JSZip();
   const packName = `${jobCode}_VCarve_Pack`;
 
@@ -328,6 +328,17 @@ export async function generateVCarveJobPack(options: JobPackOptions): Promise<vo
 
   const blob = await zip.generateAsync({ type: "blob" });
   saveAs(blob, `${packName}.zip`);
+
+  // Upload to Drive if requested
+  if (shouldUpload) {
+    try {
+      const { uploadToDrive: upload } = await import("@/lib/driveUpload");
+      const timestamp = new Date().toISOString().slice(0, 10);
+      await upload(jobId, `${jobCode}-VCarvePack-${timestamp}.zip`, blob, "Exports", "application/zip");
+    } catch (err) {
+      console.warn("Drive upload failed (non-blocking):", err);
+    }
+  }
 }
 
 // Legacy export for backward compatibility

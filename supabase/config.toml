@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.google-drive-auth]
 verify_jwt = false
+
+[functions.google-drive-webhook]
+verify_jwt = false

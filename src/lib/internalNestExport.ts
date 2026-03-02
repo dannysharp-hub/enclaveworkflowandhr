@@ -34,7 +34,7 @@ interface InternalNestPackOptions {
   candidates?: NestCandidate[];
 }
 
-export async function generateInternalNestPack(options: InternalNestPackOptions): Promise<void> {
+export async function generateInternalNestPack(options: InternalNestPackOptions & { uploadToDrive?: boolean }): Promise<void> {
   const { jobId, jobCode, groupLabel, materialCode, thickness, colour, sheetWidth, sheetLength, result, parts, candidates } = options;
   const zip = new JSZip();
   const packName = `${jobCode}_InternalNest_${groupLabel}`;
@@ -133,6 +133,17 @@ export async function generateInternalNestPack(options: InternalNestPackOptions)
 
   const blob = await zip.generateAsync({ type: "blob" });
   saveAs(blob, `${packName}.zip`);
+
+  // Upload to Drive if requested
+  if (options.uploadToDrive) {
+    try {
+      const { uploadToDrive: upload } = await import("@/lib/driveUpload");
+      const timestamp = new Date().toISOString().slice(0, 10);
+      await upload(options.jobId, `${options.jobCode}-InternalNest-${options.groupLabel}-${timestamp}.zip`, blob, "Nesting", "application/zip");
+    } catch (err) {
+      console.warn("Drive upload failed (non-blocking):", err);
+    }
+  }
 }
 
 function generateSheetDxf(

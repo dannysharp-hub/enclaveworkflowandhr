@@ -1,0 +1,2 @@
+ALTER TABLE public.drive_file_index ADD CONSTRAINT drive_file_index_tenant_file_unique UNIQUE (tenant_id, drive_file_id);
+ALTER TABLE public.job_drive_links ADD CONSTRAINT job_drive_links_tenant_folder_unique UNIQUE (tenant_id, drive_folder_id);
