@@ -29,6 +29,9 @@ interface ProfileData {
   emergency_contact_relationship: string | null;
   avatar_url: string | null;
   role: string;
+  pay_type: string;
+  hourly_rate: number | null;
+  annual_salary: number | null;
 }
 
 interface Review {
@@ -535,6 +538,24 @@ export default function StaffProfilePage() {
             <span className="text-sm text-foreground font-mono">{profile.holiday_balance_days} / {profile.holiday_allowance_days} days</span>
           </div>
         </div>
+
+        {/* Pay Rate - Admin Only */}
+        {isAdmin && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
+            <div>
+              <span className={labelClass}>Pay Type</span>
+              <span className="text-sm text-foreground">{profile.pay_type === "salaried" ? "Salaried" : "Hourly"}</span>
+            </div>
+            <div>
+              <span className={labelClass}>{profile.pay_type === "salaried" ? "Annual Salary" : "Hourly Rate"}</span>
+              <span className="text-sm text-foreground font-mono">
+                {profile.pay_type === "salaried"
+                  ? (profile.annual_salary != null ? `£${Number(profile.annual_salary).toLocaleString()}` : "—")
+                  : (profile.hourly_rate != null ? `£${Number(profile.hourly_rate).toFixed(2)}/hr` : "—")}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Admin: Password Reset */}
         {isAdmin && (

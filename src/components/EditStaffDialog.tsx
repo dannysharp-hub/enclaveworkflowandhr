@@ -17,6 +17,9 @@ interface StaffProfile {
   holiday_balance_days: number;
   active: boolean;
   role: string;
+  pay_type?: string;
+  hourly_rate?: number | null;
+  annual_salary?: number | null;
 }
 
 interface Props {
@@ -36,6 +39,9 @@ export default function EditStaffDialog({ open, onOpenChange, staff, onSuccess }
     holiday_allowance_days: staff?.holiday_allowance_days ?? 25,
     active: staff?.active ?? true,
     role: staff?.role ?? "viewer",
+    pay_type: staff?.pay_type ?? "hourly",
+    hourly_rate: staff?.hourly_rate ?? null,
+    annual_salary: staff?.annual_salary ?? null,
   });
 
   // Sync form when staff changes
@@ -49,6 +55,9 @@ export default function EditStaffDialog({ open, onOpenChange, staff, onSuccess }
         holiday_allowance_days: staff.holiday_allowance_days,
         active: staff.active,
         role: staff.role,
+        pay_type: staff.pay_type ?? "hourly",
+        hourly_rate: staff.hourly_rate ?? null,
+        annual_salary: staff.annual_salary ?? null,
       });
     }
   });
@@ -70,6 +79,9 @@ export default function EditStaffDialog({ open, onOpenChange, staff, onSuccess }
           contracted_hours_per_week: form.contracted_hours_per_week,
           holiday_allowance_days: form.holiday_allowance_days,
           active: form.active,
+          pay_type: form.pay_type,
+          hourly_rate: form.pay_type === "hourly" ? form.hourly_rate : null,
+          annual_salary: form.pay_type === "salaried" ? form.annual_salary : null,
         },
       });
 
@@ -189,6 +201,49 @@ export default function EditStaffDialog({ open, onOpenChange, staff, onSuccess }
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
+            </div>
+          </div>
+          {/* Pay Rate */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>PAY TYPE</label>
+              <select
+                value={form.pay_type}
+                onChange={e => setForm(f => ({ ...f, pay_type: e.target.value }))}
+                className={selectClass}
+              >
+                <option value="hourly">Hourly</option>
+                <option value="salaried">Salaried</option>
+              </select>
+            </div>
+            <div>
+              {form.pay_type === "hourly" ? (
+                <>
+                  <label className={labelClass}>HOURLY RATE (£)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.hourly_rate ?? ""}
+                    onChange={e => setForm(f => ({ ...f, hourly_rate: e.target.value ? parseFloat(e.target.value) : null }))}
+                    className={inputClass}
+                    placeholder="12.50"
+                  />
+                </>
+              ) : (
+                <>
+                  <label className={labelClass}>ANNUAL SALARY (£)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={form.annual_salary ?? ""}
+                    onChange={e => setForm(f => ({ ...f, annual_salary: e.target.value ? parseFloat(e.target.value) : null }))}
+                    className={inputClass}
+                    placeholder="28000"
+                  />
+                </>
+              )}
             </div>
           </div>
           <button
