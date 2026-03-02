@@ -174,24 +174,32 @@ export default function JobBuilderPage() {
     if (!job) return;
     setSaving(true);
     try {
+      // Build a set of valid material codes to avoid FK violations
+      const validMaterialCodes = new Set(fullMaterials.map((m: any) => m.material_code));
+
       // Delete existing parts for this job, then insert fresh
-      await supabase.from("parts").delete().eq("job_id", job.id);
+      const { error: delError } = await supabase.from("parts").delete().eq("job_id", job.id);
+      if (delError) throw delError;
 
       if (parts.length > 0) {
-        const rows = parts.map(p => ({
-          job_id: job.id,
-          part_id: p.part_id,
-          product_code: p.product_code || "UNKNOWN",
-          length_mm: p.length_mm,
-          width_mm: p.width_mm,
-          quantity: p.quantity,
-          material_code: p.material_code,
-          grain_required: p.grain_required,
-          grain_axis: p.grain_axis,
-          rotation_allowed: p.rotation_allowed,
-          dxf_file_reference: p.dxf_file_reference,
-          validation_status: p.validation_status,
-        }));
+        const rows = parts.map(p => {
+          // Ensure material_code is valid FK or null
+          const safeMaterial = p.material_code && validMaterialCodes.has(p.material_code) ? p.material_code : null;
+          return {
+            job_id: job.id,
+            part_id: p.part_id,
+            product_code: p.product_code || "UNKNOWN",
+            length_mm: p.length_mm || 0,
+            width_mm: p.width_mm || 0,
+            quantity: p.quantity || 1,
+            material_code: safeMaterial,
+            grain_required: p.grain_required ?? false,
+            grain_axis: p.grain_axis || null,
+            rotation_allowed: p.rotation_allowed || "any",
+            dxf_file_reference: p.dxf_file_reference || null,
+            validation_status: p.validation_status || "pending",
+          };
+        });
         const { error } = await supabase.from("parts").insert(rows);
         if (error) throw error;
       }
@@ -204,11 +212,12 @@ export default function JobBuilderPage() {
 
       toast({ title: "Saved", description: `${parts.length} parts saved to ${job.job_id}` });
     } catch (err: any) {
+      console.error("Save parts error:", err);
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
-  }, [job, parts]);
+  }, [job, parts, fullMaterials]);
 
   const handleLibrarySelect = useCallback((libParts: any[]) => {
     const newParts: PartData[] = libParts.map((lp, i) => ({
