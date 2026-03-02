@@ -4,9 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload, FileText, Banknote } from "lucide-react";
+import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload, FileText, Banknote, Calendar } from "lucide-react";
 import JobCardTemplateManager from "@/components/JobCardTemplateManager";
 import PayrollSettingsTab from "@/pages/PayrollSettingsTab";
+import GoogleIntegrationSettings from "@/pages/GoogleIntegrationSettings";
 
 // ─── Types ────────────────────────────────────────────
 interface DepartmentConfig {
@@ -47,6 +48,7 @@ const TABS = [
   { key: "job-cards", label: "Job Cards", icon: FileText },
   { key: "payroll", label: "Payroll", icon: Banknote },
   { key: "client-portal", label: "Client Portal", icon: Building2 },
+  { key: "integrations", label: "Integrations", icon: Calendar },
   { key: "flags", label: "Feature Flags", icon: ToggleLeft },
 ] as const;
 
@@ -135,6 +137,7 @@ export default function SettingsPage() {
           {tab === "job-cards" && <JobCardTemplateManager />}
           {tab === "payroll" && <PayrollSettingsTab />}
           {tab === "client-portal" && <ClientPortalTab />}
+          {tab === "integrations" && <GoogleIntegrationSettings />}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
         </>
       )}
