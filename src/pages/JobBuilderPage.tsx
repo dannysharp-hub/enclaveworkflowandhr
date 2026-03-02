@@ -46,7 +46,7 @@ export default function JobBuilderPage() {
 
   const [job, setJob] = useState<JobInfo | null>(null);
   const [parts, setParts] = useState<PartData[]>([]);
-  const [materials, setMaterials] = useState<{ material_code: string; display_name: string }[]>([]);
+  const [materials, setMaterials] = useState<{ material_code: string; colour_name: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
@@ -61,13 +61,13 @@ export default function JobBuilderPage() {
     const [jobRes, partsRes, matsRes] = await Promise.all([
       supabase.from("jobs").select("id, job_id, job_name, status").eq("id", jobId).single(),
       supabase.from("parts").select("*").eq("job_id", jobId).order("part_id"),
-      supabase.from("materials").select("*").eq("active", true).order("material_code"),
+      supabase.from("material_products").select("*").eq("active", true).order("material_code"),
     ]);
 
     if (jobRes.data) setJob(jobRes.data as JobInfo);
     if (partsRes.data) setParts(partsRes.data as PartData[]);
     const allMats = (matsRes.data as any[]) ?? [];
-    setMaterials(allMats.map(m => ({ material_code: m.material_code, display_name: m.display_name })));
+    setMaterials(allMats.map(m => ({ material_code: m.material_code, colour_name: m.colour_name })));
     setFullMaterials(allMats);
     setLoading(false);
   }, [jobId]);

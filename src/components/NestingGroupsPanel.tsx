@@ -50,7 +50,7 @@ interface NestingGroup {
 interface Props {
   jobId: string;
   parts: PartData[];
-  materials: { material_code: string; display_name: string; sheet_length_mm?: number; sheet_width_mm?: number; grain_direction?: string; thickness_mm?: number; colour_name?: string }[];
+  materials: { material_code: string; colour_name: string | null; sheet_length_mm?: number; sheet_width_mm?: number; grain_default?: string | null; thickness_mm?: number }[];
   onUpdateParts?: (updates: { part_id: string; changes: Record<string, any> }[]) => void;
 }
 
@@ -115,7 +115,7 @@ export default function NestingGroupsPanel({ jobId, parts, materials, onUpdatePa
         margin_mm: 10,
         spacing_mm: 8,
         allow_rotation_90: !hasNoRotate,
-        grain_direction: matDef?.grain_direction || "length",
+        grain_direction: matDef?.grain_default || "length",
         nesting_engine: "vcarve",
         sort_strategy: "largest_first",
         optimisation_runs: 1,

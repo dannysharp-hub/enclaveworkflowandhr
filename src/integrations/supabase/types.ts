@@ -3255,6 +3255,167 @@ export type Database = {
           },
         ]
       }
+      material_cost_history: {
+        Row: {
+          cost_per_sheet: number
+          created_at: string
+          currency: string
+          effective_date: string
+          id: string
+          material_product_id: string
+          supplier_name: string | null
+          tenant_id: string
+        }
+        Insert: {
+          cost_per_sheet: number
+          created_at?: string
+          currency?: string
+          effective_date?: string
+          id?: string
+          material_product_id: string
+          supplier_name?: string | null
+          tenant_id: string
+        }
+        Update: {
+          cost_per_sheet?: number
+          created_at?: string
+          currency?: string
+          effective_date?: string
+          id?: string
+          material_product_id?: string
+          supplier_name?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_cost_history_material_product_id_fkey"
+            columns: ["material_product_id"]
+            isOneToOne: false
+            referencedRelation: "material_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_cost_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_products: {
+        Row: {
+          active: boolean
+          brand: string | null
+          colour_name: string | null
+          cost_per_sheet: number
+          created_at: string
+          currency: string
+          grain_default: string | null
+          id: string
+          material_code: string
+          material_type_id: string | null
+          notes: string | null
+          rotation_allowed_90_default: boolean
+          sheet_length_mm: number
+          sheet_width_mm: number
+          tenant_id: string
+          thickness_mm: number
+          updated_at: string
+          waste_factor_percent: number
+        }
+        Insert: {
+          active?: boolean
+          brand?: string | null
+          colour_name?: string | null
+          cost_per_sheet: number
+          created_at?: string
+          currency?: string
+          grain_default?: string | null
+          id?: string
+          material_code: string
+          material_type_id?: string | null
+          notes?: string | null
+          rotation_allowed_90_default?: boolean
+          sheet_length_mm?: number
+          sheet_width_mm?: number
+          tenant_id: string
+          thickness_mm: number
+          updated_at?: string
+          waste_factor_percent?: number
+        }
+        Update: {
+          active?: boolean
+          brand?: string | null
+          colour_name?: string | null
+          cost_per_sheet?: number
+          created_at?: string
+          currency?: string
+          grain_default?: string | null
+          id?: string
+          material_code?: string
+          material_type_id?: string | null
+          notes?: string | null
+          rotation_allowed_90_default?: boolean
+          sheet_length_mm?: number
+          sheet_width_mm?: number
+          tenant_id?: string
+          thickness_mm?: number
+          updated_at?: string
+          waste_factor_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_products_material_type_id_fkey"
+            columns: ["material_type_id"]
+            isOneToOne: false
+            referencedRelation: "material_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_types: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          tenant_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          tenant_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_types_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       materials: {
         Row: {
           active: boolean
@@ -3830,13 +3991,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "part_library"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "parts_material_code_fkey"
-            columns: ["material_code"]
-            isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["material_code"]
           },
           {
             foreignKeyName: "parts_tenant_id_fkey"

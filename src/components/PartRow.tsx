@@ -25,7 +25,7 @@ interface PartData {
 
 interface Props {
   part: PartData;
-  materials: { material_code: string; display_name: string }[];
+  materials: { material_code: string; colour_name: string | null }[];
   jobUuid: string;
   onUpdate: (partId: string, updates: Partial<PartData>) => void;
   onDelete: (partId: string) => void;
