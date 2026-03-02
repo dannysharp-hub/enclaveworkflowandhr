@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import FeatureGate from "@/components/FeatureGate";
+import RoleGate from "@/components/RoleGate";
 import Index from "./pages/Index";
 import JobsPage from "./pages/JobsPage";
 import StaffPage from "./pages/StaffPage";
@@ -44,6 +45,8 @@ import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import SupplierPerformancePage from "./pages/SupplierPerformancePage";
 import ProductionDriftPage from "./pages/ProductionDriftPage";
 import CapacityPlannerPage from "./pages/CapacityPlannerPage";
+import MyHoursPage from "./pages/MyHoursPage";
+import MyPayPage from "./pages/MyPayPage";
 import ClientPortalLoginPage from "./pages/portal/ClientPortalLoginPage";
 import ClientPortalDashboardPage from "./pages/portal/ClientPortalDashboardPage";
 import ClientPortalJobPage from "./pages/portal/ClientPortalJobPage";
@@ -86,10 +89,12 @@ const AppRoutes = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/my-work" element={<MyWorkPage />} />
+              <Route path="/my-hours" element={<MyHoursPage />} />
+              <Route path="/my-pay" element={<MyPayPage />} />
               <Route path="/workflow" element={<WorkflowPage />} />
               <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:jobId/builder" element={<JobBuilderPage />} />
-              <Route path="/production" element={<ProductionControlPage />} />
+              <Route path="/production" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionControlPage /></RoleGate>} />
               <Route path="/jobs/:jobId/install-signoff" element={<InstallSignOffPage />} />
               <Route path="/staff" element={<StaffPage />} />
               <Route path="/staff/:userId" element={<StaffProfilePage />} />
@@ -105,7 +110,7 @@ const AppRoutes = () => (
               <Route path="/remnants" element={<FeatureGate flag="enable_remnants" featureName="Remnants"><RemnantsPage /></FeatureGate>} />
               <Route path="/materials" element={<MaterialsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/reports" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ReportsPage /></RoleGate>} />
               <Route path="/quoting" element={<FeatureGate flag="enable_smart_quoting" featureName="Smart Quoting"><SmartQuotingPage /></FeatureGate>} />
               <Route path="/finance" element={<FeatureGate flag="enable_finance" featureName="Finance"><FinanceDashboardPage /></FeatureGate>} />
               <Route path="/finance/invoices" element={<FeatureGate flag="enable_finance" featureName="Finance"><InvoicesPage /></FeatureGate>} />
@@ -119,8 +124,8 @@ const AppRoutes = () => (
               <Route path="/finance/forecast" element={<FeatureGate flag="enable_finance" featureName="Finance"><CashflowForecastPage /></FeatureGate>} />
               <Route path="/purchasing" element={<PurchaseOrdersPage />} />
               <Route path="/purchasing/performance" element={<SupplierPerformancePage />} />
-              <Route path="/drift" element={<ProductionDriftPage />} />
-              <Route path="/capacity" element={<CapacityPlannerPage />} />
+              <Route path="/drift" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionDriftPage /></RoleGate>} />
+              <Route path="/capacity" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><CapacityPlannerPage /></RoleGate>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>
