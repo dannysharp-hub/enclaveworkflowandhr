@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package, ClipboardCheck, Library } from "lucide-react";
+import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package, ClipboardCheck, Library, FileBox } from "lucide-react";
+import BulkDxfUploadDialog from "@/components/BulkDxfUploadDialog";
 import CsvImportDialog from "@/components/CsvImportDialog";
 import PartRow from "@/components/PartRow";
 import PartLibraryPicker from "@/components/PartLibraryPicker";
@@ -53,6 +54,7 @@ export default function JobBuilderPage() {
   const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [fullMaterials, setFullMaterials] = useState<any[]>([]);
+  const [bulkDxfOpen, setBulkDxfOpen] = useState(false);
 
   const fetchJob = useCallback(async () => {
     if (!jobId) return;
@@ -150,6 +152,13 @@ export default function JobBuilderPage() {
     setParts(prev => prev.map(p => {
       const upd = updates.find(u => u.part_id === p.part_id);
       return upd ? { ...p, ...upd.changes } : p;
+    }));
+  }, []);
+
+  const handleDxfLinked = useCallback((updates: { part_id: string; dxf_file_reference: string }[]) => {
+    setParts(prev => prev.map(p => {
+      const upd = updates.find(u => u.part_id === p.part_id);
+      return upd ? { ...p, dxf_file_reference: upd.dxf_file_reference } : p;
     }));
   }, []);
 
@@ -350,6 +359,9 @@ export default function JobBuilderPage() {
               <button onClick={() => setCsvDialogOpen(true)} className="flex items-center gap-2 h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-muted/20 transition-colors">
                 <FileSpreadsheet size={14} /> Import CSV
               </button>
+              <button onClick={() => setBulkDxfOpen(true)} className="flex items-center gap-2 h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-muted/20 transition-colors">
+                <FileBox size={14} /> Bulk DXFs
+              </button>
               <button onClick={addBlankPart} className="flex items-center gap-2 h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-muted/20 transition-colors">
                 <Plus size={14} /> Add Part
               </button>
@@ -481,6 +493,7 @@ export default function JobBuilderPage() {
 
       <CsvImportDialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen} onImport={handleCsvImport} />
       <PartLibraryPicker open={libraryPickerOpen} onOpenChange={setLibraryPickerOpen} onSelect={handleLibrarySelect} />
+      <BulkDxfUploadDialog open={bulkDxfOpen} onOpenChange={setBulkDxfOpen} jobId={job.id} parts={parts} onDxfLinked={handleDxfLinked} />
     </div>
   );
 }
