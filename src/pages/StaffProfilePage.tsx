@@ -154,6 +154,11 @@ export default function StaffProfilePage() {
   });
   const [saving, setSaving] = useState(false);
 
+  // Edit state for pay rate (admin only)
+  const [editingPay, setEditingPay] = useState(false);
+  const [payForm, setPayForm] = useState({ pay_type: "hourly", hourly_rate: null as number | null, annual_salary: null as number | null });
+  const [savingPay, setSavingPay] = useState(false);
+
   // Emergency contact edit state
   const [editingEmergency, setEditingEmergency] = useState(false);
   const [emergencyForm, setEmergencyForm] = useState({ emergency_contact_name: "", emergency_contact_phone: "", emergency_contact_relationship: "" });
@@ -229,6 +234,11 @@ export default function StaffProfilePage() {
         emergency_contact_name: p.emergency_contact_name ?? "",
         emergency_contact_phone: p.emergency_contact_phone ?? "",
         emergency_contact_relationship: p.emergency_contact_relationship ?? "",
+      });
+      setPayForm({
+        pay_type: p.pay_type ?? "hourly",
+        hourly_rate: p.hourly_rate ?? null,
+        annual_salary: p.annual_salary ?? null,
       });
     }
     setReviews((reviewsRes.data as any) ?? []);
@@ -541,19 +551,118 @@ export default function StaffProfilePage() {
 
         {/* Pay Rate - Admin Only */}
         {isAdmin && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
-            <div>
-              <span className={labelClass}>Pay Type</span>
-              <span className="text-sm text-foreground">{profile.pay_type === "salaried" ? "Salaried" : "Hourly"}</span>
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard size={14} className="text-primary" />
+                <span className="text-xs font-mono font-bold text-foreground uppercase tracking-wider">Pay Rate</span>
+              </div>
+              {!editingPay && (
+                <button onClick={() => setEditingPay(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
             </div>
-            <div>
-              <span className={labelClass}>{profile.pay_type === "salaried" ? "Annual Salary" : "Hourly Rate"}</span>
-              <span className="text-sm text-foreground font-mono">
-                {profile.pay_type === "salaried"
-                  ? (profile.annual_salary != null ? `£${Number(profile.annual_salary).toLocaleString()}` : "—")
-                  : (profile.hourly_rate != null ? `£${Number(profile.hourly_rate).toFixed(2)}/hr` : "—")}
-              </span>
-            </div>
+            {editingPay ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>Pay Type</label>
+                    <select
+                      value={payForm.pay_type}
+                      onChange={e => setPayForm(f => ({ ...f, pay_type: e.target.value }))}
+                      className={inputClass + " appearance-none"}
+                    >
+                      <option value="hourly">Hourly</option>
+                      <option value="salaried">Salaried</option>
+                    </select>
+                  </div>
+                  <div>
+                    {payForm.pay_type === "hourly" ? (
+                      <>
+                        <label className={labelClass}>Hourly Rate (£)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={payForm.hourly_rate ?? ""}
+                          onChange={e => setPayForm(f => ({ ...f, hourly_rate: e.target.value ? parseFloat(e.target.value) : null }))}
+                          className={inputClass}
+                          placeholder="12.50"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <label className={labelClass}>Annual Salary (£)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={100}
+                          value={payForm.annual_salary ?? ""}
+                          onChange={e => setPayForm(f => ({ ...f, annual_salary: e.target.value ? parseFloat(e.target.value) : null }))}
+                          className={inputClass}
+                          placeholder="28000"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!profile) return;
+                      setSavingPay(true);
+                      try {
+                        const res = await supabase.functions.invoke("manage-staff?action=update-profile", {
+                          body: {
+                            user_id: profile.user_id,
+                            pay_type: payForm.pay_type,
+                            hourly_rate: payForm.pay_type === "hourly" ? payForm.hourly_rate : null,
+                            annual_salary: payForm.pay_type === "salaried" ? payForm.annual_salary : null,
+                          },
+                        });
+                        if (res.data?.error) throw new Error(res.data.error);
+                        toast({ title: "Saved", description: "Pay rate updated" });
+                        setEditingPay(false);
+                        fetchAll();
+                      } catch (err: any) {
+                        toast({ title: "Error", description: err.message, variant: "destructive" });
+                      } finally {
+                        setSavingPay(false);
+                      }
+                    }}
+                    disabled={savingPay}
+                    className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Save size={12} /> {savingPay ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingPay(false);
+                      if (profile) setPayForm({ pay_type: profile.pay_type, hourly_rate: profile.hourly_rate, annual_salary: profile.annual_salary });
+                    }}
+                    className="h-8 rounded-md border border-border px-3 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+                  >
+                    <X size={12} /> Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <span className={labelClass}>Pay Type</span>
+                  <span className="text-sm text-foreground">{profile.pay_type === "salaried" ? "Salaried" : "Hourly"}</span>
+                </div>
+                <div>
+                  <span className={labelClass}>{profile.pay_type === "salaried" ? "Annual Salary" : "Hourly Rate"}</span>
+                  <span className="text-sm text-foreground font-mono">
+                    {profile.pay_type === "salaried"
+                      ? (profile.annual_salary != null ? `£${Number(profile.annual_salary).toLocaleString()}` : "—")
+                      : (profile.hourly_rate != null ? `£${Number(profile.hourly_rate).toFixed(2)}/hr` : "—")}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
