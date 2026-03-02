@@ -800,6 +800,98 @@ export type Database = {
           },
         ]
       }
+      drift_reasons: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          logged_at: string
+          logged_by: string | null
+          notes: string | null
+          reason_category: string
+          stage_name: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          logged_at?: string
+          logged_by?: string | null
+          notes?: string | null
+          reason_category?: string
+          stage_name: string
+          tenant_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          logged_at?: string
+          logged_by?: string | null
+          notes?: string | null
+          reason_category?: string
+          stage_name?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drift_reasons_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drift_reasons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drift_settings: {
+        Row: {
+          created_at: string
+          critical_threshold_percent: number
+          id: string
+          minimum_margin_threshold_percent: number
+          tenant_id: string
+          updated_at: string
+          use_drift_adjustment_in_quoting: boolean
+          warning_threshold_percent: number
+        }
+        Insert: {
+          created_at?: string
+          critical_threshold_percent?: number
+          id?: string
+          minimum_margin_threshold_percent?: number
+          tenant_id: string
+          updated_at?: string
+          use_drift_adjustment_in_quoting?: boolean
+          warning_threshold_percent?: number
+        }
+        Update: {
+          created_at?: string
+          critical_threshold_percent?: number
+          id?: string
+          minimum_margin_threshold_percent?: number
+          tenant_id?: string
+          updated_at?: string
+          use_drift_adjustment_in_quoting?: boolean
+          warning_threshold_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drift_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_batches: {
         Row: {
           created_at: string
@@ -1562,6 +1654,69 @@ export type Database = {
           },
         ]
       }
+      job_drift_status: {
+        Row: {
+          assembly_variance_percent: number
+          cnc_variance_hours: number
+          cnc_variance_percent: number
+          created_at: string
+          drift_status: string
+          id: string
+          install_variance_percent: number
+          job_id: string
+          last_evaluated_at: string
+          primary_overrun_stage: string | null
+          spray_variance_percent: number
+          tenant_id: string
+          total_variance_percent: number
+        }
+        Insert: {
+          assembly_variance_percent?: number
+          cnc_variance_hours?: number
+          cnc_variance_percent?: number
+          created_at?: string
+          drift_status?: string
+          id?: string
+          install_variance_percent?: number
+          job_id: string
+          last_evaluated_at?: string
+          primary_overrun_stage?: string | null
+          spray_variance_percent?: number
+          tenant_id?: string
+          total_variance_percent?: number
+        }
+        Update: {
+          assembly_variance_percent?: number
+          cnc_variance_hours?: number
+          cnc_variance_percent?: number
+          created_at?: string
+          drift_status?: string
+          id?: string
+          install_variance_percent?: number
+          job_id?: string
+          last_evaluated_at?: string
+          primary_overrun_stage?: string | null
+          spray_variance_percent?: number
+          tenant_id?: string
+          total_variance_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_drift_status_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_drift_status_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_financials: {
         Row: {
           created_at: string
@@ -1914,6 +2069,120 @@ export type Database = {
           },
           {
             foreignKeyName: "job_stages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_time_actuals: {
+        Row: {
+          actual_assembly_hours: number
+          actual_cnc_hours: number
+          actual_install_hours: number
+          actual_spray_hours: number
+          actual_total_hours: number
+          created_at: string
+          id: string
+          job_id: string
+          last_updated: string
+          tenant_id: string
+        }
+        Insert: {
+          actual_assembly_hours?: number
+          actual_cnc_hours?: number
+          actual_install_hours?: number
+          actual_spray_hours?: number
+          actual_total_hours?: number
+          created_at?: string
+          id?: string
+          job_id: string
+          last_updated?: string
+          tenant_id?: string
+        }
+        Update: {
+          actual_assembly_hours?: number
+          actual_cnc_hours?: number
+          actual_install_hours?: number
+          actual_spray_hours?: number
+          actual_total_hours?: number
+          created_at?: string
+          id?: string
+          job_id?: string
+          last_updated?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_time_actuals_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_time_actuals_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_time_plans: {
+        Row: {
+          based_on_baseline: boolean
+          created_at: string
+          id: string
+          job_id: string
+          plan_created_at: string
+          planned_assembly_hours: number
+          planned_cnc_hours: number
+          planned_install_hours: number
+          planned_machine_hours: number
+          planned_spray_hours: number
+          planned_total_hours: number
+          tenant_id: string
+        }
+        Insert: {
+          based_on_baseline?: boolean
+          created_at?: string
+          id?: string
+          job_id: string
+          plan_created_at?: string
+          planned_assembly_hours?: number
+          planned_cnc_hours?: number
+          planned_install_hours?: number
+          planned_machine_hours?: number
+          planned_spray_hours?: number
+          planned_total_hours?: number
+          tenant_id?: string
+        }
+        Update: {
+          based_on_baseline?: boolean
+          created_at?: string
+          id?: string
+          job_id?: string
+          plan_created_at?: string
+          planned_assembly_hours?: number
+          planned_cnc_hours?: number
+          planned_install_hours?: number
+          planned_machine_hours?: number
+          planned_spray_hours?: number
+          planned_total_hours?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_time_plans_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_time_plans_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -3346,6 +3615,56 @@ export type Database = {
           },
           {
             foreignKeyName: "stage_skill_requirements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stage_time_baselines: {
+        Row: {
+          avg_hours: number
+          avg_hours_per_sheet: number | null
+          avg_hours_per_unit: number | null
+          confidence_score: number
+          created_at: string
+          id: string
+          job_type: string
+          last_updated: string
+          sample_size: number
+          stage_name: string
+          tenant_id: string
+        }
+        Insert: {
+          avg_hours?: number
+          avg_hours_per_sheet?: number | null
+          avg_hours_per_unit?: number | null
+          confidence_score?: number
+          created_at?: string
+          id?: string
+          job_type?: string
+          last_updated?: string
+          sample_size?: number
+          stage_name: string
+          tenant_id: string
+        }
+        Update: {
+          avg_hours?: number
+          avg_hours_per_sheet?: number | null
+          avg_hours_per_unit?: number | null
+          confidence_score?: number
+          created_at?: string
+          id?: string
+          job_type?: string
+          last_updated?: string
+          sample_size?: number
+          stage_name?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_time_baselines_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
