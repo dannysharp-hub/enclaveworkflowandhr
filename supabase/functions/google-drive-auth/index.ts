@@ -6,6 +6,141 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Helper: process queue for a specific tenant
+async function processQueueForTenant(supabaseAdmin: any, tenantId: string): Promise<number> {
+  const { data: items } = await supabaseAdmin
+    .from("drive_sync_queue")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("status", "queued")
+    .lte("run_after", new Date().toISOString())
+    .order("priority")
+    .order("created_at")
+    .limit(10);
+
+  if (!items || items.length === 0) return 0;
+
+  // Get access token for this tenant
+  const { data: tokenRow } = await supabaseAdmin
+    .from("google_oauth_tokens")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!tokenRow) return 0;
+
+  let accessToken: string;
+  const now = new Date();
+  const expiresAt = new Date(tokenRow.expires_at);
+
+  if (expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
+    accessToken = atob(tokenRow.access_token_encrypted);
+  } else {
+    const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+    const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+    const refreshToken = atob(tokenRow.refresh_token_encrypted);
+
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) return 0;
+
+    accessToken = data.access_token;
+    await supabaseAdmin.from("google_oauth_tokens").update({
+      access_token_encrypted: btoa(data.access_token),
+      expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
+      token_version: tokenRow.token_version + 1,
+    }).eq("id", tokenRow.id);
+  }
+
+  let processed = 0;
+
+  for (const item of items) {
+    try {
+      await supabaseAdmin.from("drive_sync_queue")
+        .update({ status: "processing", attempts: item.attempts + 1 })
+        .eq("id", item.id);
+
+      if (item.action === "scan_job_folder" && item.job_id) {
+        const { data: link } = await supabaseAdmin
+          .from("job_drive_links")
+          .select("drive_folder_id")
+          .eq("tenant_id", tenantId)
+          .eq("job_id", item.job_id)
+          .single();
+
+        if (link) {
+          const { data: settings } = await supabaseAdmin
+            .from("google_drive_integration_settings")
+            .select("include_subfolders")
+            .eq("tenant_id", tenantId)
+            .single();
+
+          // Inline file listing for queue processor
+          const allFiles: any[] = [];
+          const listFiles = async (folderId: string, recurse: boolean) => {
+            const query = `'${folderId}' in parents and trashed=false`;
+            const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents)&pageSize=500`;
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+            const data = await res.json();
+            if (!res.ok) return;
+            for (const file of (data.files || [])) {
+              if (file.mimeType === "application/vnd.google-apps.folder") {
+                if (recurse) await listFiles(file.id, true);
+              } else {
+                allFiles.push(file);
+              }
+            }
+          };
+          await listFiles(link.drive_folder_id, settings?.include_subfolders ?? true);
+
+          const nowStr = new Date().toISOString();
+          for (const file of allFiles) {
+            await supabaseAdmin.from("drive_file_index").upsert({
+              tenant_id: tenantId,
+              job_id: item.job_id,
+              drive_file_id: file.id,
+              drive_parent_folder_id: file.parents?.[0] || link.drive_folder_id,
+              file_name: file.name,
+              mime_type: file.mimeType,
+              file_size_bytes: file.size ? parseInt(file.size) : null,
+              drive_modified_time: file.modifiedTime || null,
+              drive_created_time: file.createdTime || null,
+              drive_web_view_link: file.webViewLink || null,
+              detected_type: detectFileType(file.name, file.mimeType),
+              detected_stage: detectStage(file.name),
+              status: "active",
+              last_seen_at: nowStr,
+            }, { onConflict: "tenant_id,drive_file_id" });
+          }
+        }
+      }
+
+      await supabaseAdmin.from("drive_sync_queue")
+        .update({ status: "done" })
+        .eq("id", item.id);
+      processed++;
+    } catch (err: any) {
+      const newAttempts = item.attempts + 1;
+      await supabaseAdmin.from("drive_sync_queue").update({
+        status: newAttempts >= item.max_attempts ? "failed" : "queued",
+        last_error: err.message,
+        run_after: new Date(Date.now() + Math.pow(2, newAttempts) * 60000).toISOString(),
+      }).eq("id", item.id);
+    }
+  }
+
+  return processed;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -16,7 +151,35 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Auth
+  const body = await req.json().catch(() => ({}));
+  const action = body.action as string;
+
+  // ─── CRON: process_queue_all — no user auth needed, processes all tenants ───
+  if (action === "process_queue_all") {
+    // Get all tenants with connected Drive
+    const { data: tenants } = await supabaseAdmin
+      .from("google_drive_integration_settings")
+      .select("tenant_id")
+      .eq("is_connected", true);
+
+    if (!tenants || tenants.length === 0) {
+      return new Response(JSON.stringify({ processed: 0, tenants: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let totalProcessed = 0;
+    for (const t of tenants) {
+      const result = await processQueueForTenant(supabaseAdmin, t.tenant_id);
+      totalProcessed += result;
+    }
+
+    return new Response(JSON.stringify({ processed: totalProcessed, tenants: tenants.length }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Auth for all other actions
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -41,13 +204,10 @@ Deno.serve(async (req) => {
   }
   const tenantId = profile.tenant_id;
 
-  // Role check — admin for config actions, supervisor+ for read/sync
+  // Role check
   const { data: roleData } = await supabaseAdmin
     .from("user_roles").select("role").eq("user_id", user.id).single();
   const userRole = roleData?.role || "viewer";
-
-  const body = await req.json().catch(() => ({}));
-  const action = body.action as string;
 
   // Actions that require admin
   const adminActions = ["setup", "disconnect", "set_root_folder", "update_settings", "start_watch", "stop_watch"];

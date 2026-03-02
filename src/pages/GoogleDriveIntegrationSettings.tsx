@@ -523,14 +523,56 @@ export default function GoogleDriveIntegrationSettings() {
 
               <div>
                 <label className={labelClass}>Sync Mode</label>
-                <select
-                  className={inputClass}
-                  value={settings?.sync_mode || "polling"}
-                  onChange={e => handleUpdateSetting("sync_mode", e.target.value)}
-                >
-                  <option value="polling">Polling</option>
-                  <option value="push_notifications">Push Notifications (requires webhook)</option>
-                </select>
+                <div className="flex items-center gap-3">
+                  <select
+                    className={cn(inputClass, "flex-1")}
+                    value={settings?.sync_mode || "polling"}
+                    onChange={e => handleUpdateSetting("sync_mode", e.target.value)}
+                  >
+                    <option value="polling">Polling (every 5 min via cron)</option>
+                    <option value="push_notifications">Push Notifications (Google webhook)</option>
+                  </select>
+                  {settings?.sync_mode === "push_notifications" ? (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { error } = await supabase.functions.invoke("google-drive-auth", {
+                            body: { action: "stop_watch" },
+                          });
+                          if (error) throw error;
+                          toast({ title: "Watch stopped" });
+                          fetchStatus();
+                        } catch (err: any) {
+                          toast({ title: "Error", description: err.message, variant: "destructive" });
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-md border border-destructive text-xs font-medium text-destructive hover:bg-destructive/10"
+                    >
+                      Stop Watch
+                    </button>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+                            body: { action: "start_watch" },
+                          });
+                          if (error) throw error;
+                          toast({ title: "Watch started", description: `Expires: ${data.expiration ? new Date(parseInt(data.expiration)).toLocaleString() : "7 days"}` });
+                          fetchStatus();
+                        } catch (err: any) {
+                          toast({ title: "Error", description: err.message, variant: "destructive" });
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    >
+                      Start Watch
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Push notifications receive real-time Drive changes via webhook. Polling runs every 5 minutes automatically.
+                </p>
               </div>
 
               <div>
