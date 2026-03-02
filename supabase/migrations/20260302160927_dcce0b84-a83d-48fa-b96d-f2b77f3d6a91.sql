@@ -1,0 +1,2 @@
+ALTER TABLE public.production_readiness_status DROP CONSTRAINT production_readiness_status_job_id_fkey;
+ALTER TABLE public.production_readiness_status ADD CONSTRAINT production_readiness_status_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE CASCADE;
