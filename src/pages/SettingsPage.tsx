@@ -8,6 +8,7 @@ import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Chec
 import JobCardTemplateManager from "@/components/JobCardTemplateManager";
 import PayrollSettingsTab from "@/pages/PayrollSettingsTab";
 import GoogleIntegrationSettings from "@/pages/GoogleIntegrationSettings";
+import GoogleDriveIntegrationSettings from "@/pages/GoogleDriveIntegrationSettings";
 
 // ─── Types ────────────────────────────────────────────
 interface DepartmentConfig {
@@ -137,7 +138,12 @@ export default function SettingsPage() {
           {tab === "job-cards" && <JobCardTemplateManager />}
           {tab === "payroll" && <PayrollSettingsTab />}
           {tab === "client-portal" && <ClientPortalTab />}
-          {tab === "integrations" && <GoogleIntegrationSettings />}
+          {tab === "integrations" && (
+            <div className="space-y-10">
+              <GoogleIntegrationSettings />
+              <GoogleDriveIntegrationSettings />
+            </div>
+          )}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
         </>
       )}

@@ -1131,6 +1131,204 @@ export type Database = {
           },
         ]
       }
+      drive_file_index: {
+        Row: {
+          checksum: string | null
+          created_at: string
+          detected_stage: string
+          detected_type: string
+          drive_created_time: string | null
+          drive_file_id: string
+          drive_modified_time: string | null
+          drive_parent_folder_id: string | null
+          drive_web_view_link: string | null
+          file_name: string
+          file_size_bytes: number | null
+          id: string
+          job_id: string
+          last_seen_at: string
+          mime_type: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          checksum?: string | null
+          created_at?: string
+          detected_stage?: string
+          detected_type?: string
+          drive_created_time?: string | null
+          drive_file_id: string
+          drive_modified_time?: string | null
+          drive_parent_folder_id?: string | null
+          drive_web_view_link?: string | null
+          file_name: string
+          file_size_bytes?: number | null
+          id?: string
+          job_id: string
+          last_seen_at?: string
+          mime_type?: string | null
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          checksum?: string | null
+          created_at?: string
+          detected_stage?: string
+          detected_type?: string
+          drive_created_time?: string | null
+          drive_file_id?: string
+          drive_modified_time?: string | null
+          drive_parent_folder_id?: string | null
+          drive_web_view_link?: string | null
+          file_name?: string
+          file_size_bytes?: number | null
+          id?: string
+          job_id?: string
+          last_seen_at?: string
+          mime_type?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drive_file_index_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drive_file_index_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drive_sync_audit: {
+        Row: {
+          action: string
+          actor_staff_id: string | null
+          created_at: string
+          drive_file_id: string | null
+          drive_folder_id: string | null
+          id: string
+          job_id: string | null
+          payload_after_json: Json | null
+          payload_before_json: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          actor_staff_id?: string | null
+          created_at?: string
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          id?: string
+          job_id?: string | null
+          payload_after_json?: Json | null
+          payload_before_json?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          actor_staff_id?: string | null
+          created_at?: string
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          id?: string
+          job_id?: string | null
+          payload_after_json?: Json | null
+          payload_before_json?: Json | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drive_sync_audit_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drive_sync_audit_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drive_sync_queue: {
+        Row: {
+          action: string
+          attempts: number
+          created_at: string
+          drive_file_id: string | null
+          drive_folder_id: string | null
+          id: string
+          job_id: string | null
+          last_error: string | null
+          max_attempts: number
+          payload_json: Json | null
+          priority: string
+          run_after: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          attempts?: number
+          created_at?: string
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          id?: string
+          job_id?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          payload_json?: Json | null
+          priority?: string
+          run_after?: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          attempts?: number
+          created_at?: string
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          id?: string
+          job_id?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          payload_json?: Json | null
+          priority?: string
+          run_after?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drive_sync_queue_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drive_sync_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dxf_extraction_log: {
         Row: {
           bbox_confidence: string | null
@@ -1457,6 +1655,107 @@ export type Database = {
             foreignKeyName: "google_calendar_mappings_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_drive_integration_settings: {
+        Row: {
+          auto_attach_dxfs: boolean
+          auto_create_jobs_from_folders: boolean
+          auto_index_files: boolean
+          auto_upload_exports: boolean
+          created_at: string
+          detect_cost_sheets: boolean
+          detect_dxfs: boolean
+          detect_photos: boolean
+          export_subfolder_cnc: string
+          export_subfolder_exports: string
+          export_subfolder_labels: string
+          export_subfolder_nesting: string
+          folder_name_pattern: string
+          google_user_email: string | null
+          google_user_id: string | null
+          granted_scopes: Json | null
+          include_subfolders: boolean
+          is_connected: boolean
+          job_number_parse_regex: string
+          last_error_message: string | null
+          last_sync_at: string | null
+          polling_interval_minutes: number
+          projects_root_folder_id: string | null
+          projects_root_folder_name: string | null
+          status: string
+          sync_mode: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_attach_dxfs?: boolean
+          auto_create_jobs_from_folders?: boolean
+          auto_index_files?: boolean
+          auto_upload_exports?: boolean
+          created_at?: string
+          detect_cost_sheets?: boolean
+          detect_dxfs?: boolean
+          detect_photos?: boolean
+          export_subfolder_cnc?: string
+          export_subfolder_exports?: string
+          export_subfolder_labels?: string
+          export_subfolder_nesting?: string
+          folder_name_pattern?: string
+          google_user_email?: string | null
+          google_user_id?: string | null
+          granted_scopes?: Json | null
+          include_subfolders?: boolean
+          is_connected?: boolean
+          job_number_parse_regex?: string
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          polling_interval_minutes?: number
+          projects_root_folder_id?: string | null
+          projects_root_folder_name?: string | null
+          status?: string
+          sync_mode?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_attach_dxfs?: boolean
+          auto_create_jobs_from_folders?: boolean
+          auto_index_files?: boolean
+          auto_upload_exports?: boolean
+          created_at?: string
+          detect_cost_sheets?: boolean
+          detect_dxfs?: boolean
+          detect_photos?: boolean
+          export_subfolder_cnc?: string
+          export_subfolder_exports?: string
+          export_subfolder_labels?: string
+          export_subfolder_nesting?: string
+          folder_name_pattern?: string
+          google_user_email?: string | null
+          google_user_id?: string | null
+          granted_scopes?: Json | null
+          include_subfolders?: boolean
+          is_connected?: boolean
+          job_number_parse_regex?: string
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          polling_interval_minutes?: number
+          projects_root_folder_id?: string | null
+          projects_root_folder_name?: string | null
+          status?: string
+          sync_mode?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_drive_integration_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -2152,6 +2451,57 @@ export type Database = {
           },
           {
             foreignKeyName: "job_drift_status_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_drive_links: {
+        Row: {
+          created_at: string
+          drive_folder_id: string
+          drive_folder_name: string
+          drive_folder_url: string | null
+          drive_path_cache: string | null
+          id: string
+          job_id: string
+          last_indexed_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          drive_folder_id: string
+          drive_folder_name?: string
+          drive_folder_url?: string | null
+          drive_path_cache?: string | null
+          id?: string
+          job_id: string
+          last_indexed_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          drive_folder_id?: string
+          drive_folder_name?: string
+          drive_folder_url?: string | null
+          drive_path_cache?: string | null
+          id?: string
+          job_id?: string
+          last_indexed_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_drive_links_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_drive_links_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
