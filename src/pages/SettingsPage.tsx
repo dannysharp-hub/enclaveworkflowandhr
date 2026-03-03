@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload, FileText, Banknote, Calendar } from "lucide-react";
+import { Building2, Kanban, Cpu, ToggleLeft, Save, Plus, Trash2, Pencil, X, Check, Palette, Upload, FileText, Banknote, Calendar, ShoppingCart } from "lucide-react";
 import JobCardTemplateManager from "@/components/JobCardTemplateManager";
 import PayrollSettingsTab from "@/pages/PayrollSettingsTab";
 import GoogleIntegrationSettings from "@/pages/GoogleIntegrationSettings";
@@ -48,6 +48,7 @@ const TABS = [
   { key: "machines", label: "Machines", icon: Cpu },
   { key: "job-cards", label: "Job Cards", icon: FileText },
   { key: "payroll", label: "Payroll", icon: Banknote },
+  { key: "purchasing", label: "Purchasing", icon: ShoppingCart },
   { key: "client-portal", label: "Client Portal", icon: Building2 },
   { key: "integrations", label: "Integrations", icon: Calendar },
   { key: "flags", label: "Feature Flags", icon: ToggleLeft },
@@ -137,6 +138,7 @@ export default function SettingsPage() {
           {tab === "machines" && <MachinesTab data={machines} departments={departments} onRefresh={fetchAll} />}
           {tab === "job-cards" && <JobCardTemplateManager />}
           {tab === "payroll" && <PayrollSettingsTab />}
+          {tab === "purchasing" && <PurchasingSettingsTab />}
           {tab === "client-portal" && <ClientPortalTab />}
           {tab === "integrations" && (
             <div className="space-y-10">
@@ -793,6 +795,187 @@ function FlagsTab({ data, onRefresh }: { data: FeatureFlag[]; onRefresh: () => v
           </div>
         ))}
         {data.length === 0 && <div className="px-4 py-8 text-center text-muted-foreground">No feature flags configured</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Purchasing Settings Tab ─────────────────────────
+function PurchasingSettingsTab() {
+  const [settings, setSettings] = useState<any>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await (supabase.from("purchasing_settings") as any).select("*").limit(1).maybeSingle();
+      setSettings(data || {
+        rfq_auto_generate_on_buylist: true,
+        rfq_auto_send: false,
+        rfq_send_mode: "all_matching",
+        rfq_top_n: 3,
+        default_required_by_days_from_now: 7,
+        include_csv_attachment: true,
+        include_pdf_attachment: true,
+        email_provider: "google",
+        from_display_name: "",
+        from_email: "",
+        cc_internal_emails: [],
+        default_delivery_address: "",
+        po_number_prefix: "PO",
+      });
+      setLoaded(true);
+    };
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (settings.id) {
+        const { error } = await (supabase.from("purchasing_settings") as any).update({
+          rfq_auto_generate_on_buylist: settings.rfq_auto_generate_on_buylist,
+          rfq_auto_send: settings.rfq_auto_send,
+          rfq_send_mode: settings.rfq_send_mode,
+          rfq_top_n: settings.rfq_top_n,
+          default_required_by_days_from_now: settings.default_required_by_days_from_now,
+          include_csv_attachment: settings.include_csv_attachment,
+          include_pdf_attachment: settings.include_pdf_attachment,
+          email_provider: settings.email_provider,
+          from_display_name: settings.from_display_name || null,
+          from_email: settings.from_email || null,
+          cc_internal_emails: settings.cc_internal_emails?.length > 0 ? settings.cc_internal_emails : null,
+          default_delivery_address: settings.default_delivery_address || null,
+          po_number_prefix: settings.po_number_prefix || "PO",
+        }).eq("id", settings.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase.from("purchasing_settings") as any).insert({
+          rfq_auto_generate_on_buylist: settings.rfq_auto_generate_on_buylist,
+          rfq_auto_send: settings.rfq_auto_send,
+          rfq_send_mode: settings.rfq_send_mode,
+          rfq_top_n: settings.rfq_top_n,
+          default_required_by_days_from_now: settings.default_required_by_days_from_now,
+          email_provider: settings.email_provider,
+          from_display_name: settings.from_display_name || null,
+          from_email: settings.from_email || null,
+          cc_internal_emails: settings.cc_internal_emails?.length > 0 ? settings.cc_internal_emails : null,
+          default_delivery_address: settings.default_delivery_address || null,
+          po_number_prefix: settings.po_number_prefix || "PO",
+        });
+        if (error) throw error;
+      }
+      toast({ title: "Purchasing settings saved" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const update = (key: string, value: any) => setSettings((s: any) => ({ ...s, [key]: value }));
+
+  if (!loaded) return null;
+
+  return (
+    <div className="space-y-6">
+      <h3 className="font-mono text-sm font-bold text-foreground">Purchasing & RFQ Settings</h3>
+
+      <div className="glass-panel rounded-lg p-6 space-y-6 max-w-2xl">
+        {/* RFQ Automation */}
+        <div>
+          <h4 className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider mb-3">RFQ Automation</h4>
+          <div className="space-y-3">
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-foreground">Auto-generate RFQ when buylist is created</span>
+              <button onClick={() => update("rfq_auto_generate_on_buylist", !settings.rfq_auto_generate_on_buylist)}
+                className={cn("relative w-11 h-6 rounded-full transition-colors", settings.rfq_auto_generate_on_buylist ? "bg-primary" : "bg-muted")}>
+                <span className={cn("absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-background shadow transition-transform", settings.rfq_auto_generate_on_buylist && "translate-x-5")} />
+              </button>
+            </label>
+            <label className="flex items-center justify-between">
+              <span className="text-sm text-foreground">Auto-send RFQ emails (requires email integration)</span>
+              <button onClick={() => update("rfq_auto_send", !settings.rfq_auto_send)}
+                className={cn("relative w-11 h-6 rounded-full transition-colors", settings.rfq_auto_send ? "bg-primary" : "bg-muted")}>
+                <span className={cn("absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-background shadow transition-transform", settings.rfq_auto_send && "translate-x-5")} />
+              </button>
+            </label>
+          </div>
+        </div>
+
+        {/* Supplier Matching */}
+        <div>
+          <h4 className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider mb-3">Supplier Matching</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Send Mode</label>
+              <select className={inputClass} value={settings.rfq_send_mode} onChange={e => update("rfq_send_mode", e.target.value)}>
+                <option value="all_matching">All Matching</option>
+                <option value="preferred_only">Preferred Only</option>
+                <option value="top_n">Top N</option>
+              </select>
+            </div>
+            {settings.rfq_send_mode === "top_n" && (
+              <div>
+                <label className={labelClass}>Top N Suppliers</label>
+                <input type="number" min={1} max={10} className={inputClass} value={settings.rfq_top_n} onChange={e => update("rfq_top_n", parseInt(e.target.value) || 3)} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Email Settings */}
+        <div>
+          <h4 className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider mb-3">Email Settings</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Email Provider</label>
+              <select className={inputClass} value={settings.email_provider} onChange={e => update("email_provider", e.target.value)}>
+                <option value="google">Google Workspace</option>
+                <option value="smtp">SMTP (coming soon)</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>From Display Name</label>
+              <input className={inputClass} value={settings.from_display_name || ""} onChange={e => update("from_display_name", e.target.value)} placeholder="e.g. Purchasing Dept" />
+            </div>
+            <div>
+              <label className={labelClass}>From Email</label>
+              <input className={inputClass} type="email" value={settings.from_email || ""} onChange={e => update("from_email", e.target.value)} placeholder="e.g. orders@company.com" />
+            </div>
+            <div>
+              <label className={labelClass}>CC Internal Emails (comma-separated)</label>
+              <input className={inputClass} value={(settings.cc_internal_emails || []).join(", ")}
+                onChange={e => update("cc_internal_emails", e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))}
+                placeholder="e.g. boss@company.com"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Defaults */}
+        <div>
+          <h4 className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider mb-3">Defaults</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Required-by (days from now)</label>
+              <input type="number" min={1} className={inputClass} value={settings.default_required_by_days_from_now} onChange={e => update("default_required_by_days_from_now", parseInt(e.target.value) || 7)} />
+            </div>
+            <div>
+              <label className={labelClass}>PO Number Prefix</label>
+              <input className={inputClass} value={settings.po_number_prefix || "PO"} onChange={e => update("po_number_prefix", e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className={labelClass}>Default Delivery Address</label>
+              <input className={inputClass} value={settings.default_delivery_address || ""} onChange={e => update("default_delivery_address", e.target.value)} placeholder="Delivery postcode or address" />
+            </div>
+          </div>
+        </div>
+
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          <Save size={14} /> {saving ? "Saving…" : "Save Purchasing Settings"}
+        </button>
       </div>
     </div>
   );
