@@ -10,11 +10,11 @@ const ALL_ROLES: AppRole[] = ["admin", "supervisor", "office", "production", "in
  * Sets an override in AuthContext without touching the database.
  */
 export default function RoleSwitcher() {
-  const { userRole, roleOverride, setRoleOverride } = useAuth();
+  const { realRole, userRole, roleOverride, setRoleOverride } = useAuth();
   const [open, setOpen] = useState(false);
 
   // Only real admins can use this
-  if (userRole !== "admin") return null;
+  if (realRole !== "admin") return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999]">
