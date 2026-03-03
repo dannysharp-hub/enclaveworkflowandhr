@@ -56,6 +56,8 @@ import SupplierPortalLoginPage from "./pages/portal/SupplierPortalLoginPage";
 import SupplierPortalDashboardPage from "./pages/portal/SupplierPortalDashboardPage";
 import NotFound from "./pages/NotFound";
 
+import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
+
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -76,7 +78,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<LoginPage />} />
-    {/* Client Portal routes (separate from main app) */}
+    {/* Client Portal routes */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
     <Route path="/portal/job/:jobId" element={<ClientPortalJobPage />} />
@@ -89,6 +91,7 @@ const AppRoutes = () => (
         <ProtectedRoute>
           <AppLayout>
             <Routes>
+              {/* Open to all authenticated */}
               <Route path="/" element={<Index />} />
               <Route path="/my-work" element={<MyWorkPage />} />
               <Route path="/my-hours" element={<MyHoursPage />} />
@@ -96,11 +99,7 @@ const AppRoutes = () => (
               <Route path="/workflow" element={<WorkflowPage />} />
               <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:jobId/builder" element={<JobBuilderPage />} />
-              <Route path="/part-library" element={<PartLibraryPage />} />
-              <Route path="/production" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionControlPage /></RoleGate>} />
               <Route path="/jobs/:jobId/install-signoff" element={<InstallSignOffPage />} />
-              <Route path="/staff" element={<StaffPage />} />
-              <Route path="/staff/:userId" element={<StaffProfilePage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/holiday-calendar" element={<HolidayCalendarPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
@@ -112,24 +111,45 @@ const AppRoutes = () => (
               <Route path="/whos-in" element={<WhosInPage />} />
               <Route path="/remnants" element={<FeatureGate flag="enable_remnants" featureName="Remnants"><RemnantsPage /></FeatureGate>} />
               <Route path="/materials" element={<MaterialsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/reports" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ReportsPage /></RoleGate>} />
-              <Route path="/quoting" element={<FeatureGate flag="enable_smart_quoting" featureName="Smart Quoting"><SmartQuotingPage /></FeatureGate>} />
-              <Route path="/finance" element={<FeatureGate flag="enable_finance" featureName="Finance"><FinanceDashboardPage /></FeatureGate>} />
-              <Route path="/finance/invoices" element={<FeatureGate flag="enable_finance" featureName="Finance"><InvoicesPage /></FeatureGate>} />
-              <Route path="/finance/bills" element={<FeatureGate flag="enable_finance" featureName="Finance"><BillsPage /></FeatureGate>} />
-              <Route path="/finance/wages" element={<FeatureGate flag="enable_finance" featureName="Finance"><WagesPage /></FeatureGate>} />
-              <Route path="/finance/overheads" element={<FeatureGate flag="enable_finance" featureName="Finance"><OverheadsPage /></FeatureGate>} />
-              <Route path="/finance/customers" element={<FeatureGate flag="enable_finance" featureName="Finance"><CustomersPage /></FeatureGate>} />
-              <Route path="/finance/suppliers" element={<FeatureGate flag="enable_finance" featureName="Finance"><SuppliersPage /></FeatureGate>} />
-              <Route path="/finance/pandle" element={<FeatureGate flag="enable_finance" featureName="Finance"><PandlePage /></FeatureGate>} />
-              <Route path="/finance/pandle/export" element={<FeatureGate flag="enable_finance" featureName="Finance"><PandleExportPage /></FeatureGate>} />
-              <Route path="/finance/forecast" element={<FeatureGate flag="enable_finance" featureName="Finance"><CashflowForecastPage /></FeatureGate>} />
-              <Route path="/purchasing" element={<PurchaseOrdersPage />} />
-              <Route path="/purchasing/performance" element={<SupplierPerformancePage />} />
-              <Route path="/drift" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionDriftPage /></RoleGate>} />
-              <Route path="/capacity" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><CapacityPlannerPage /></RoleGate>} />
-              <Route path="/ai-inbox" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><AiInboxPage /></RoleGate>} />
+              <Route path="/part-library" element={<PartLibraryPage />} />
+
+              {/* Production management — admin/supervisor/office only */}
+              <Route path="/production" element={<RoleGate allowedRoles={PRODUCTION_MGMT_ROLES}><ProductionControlPage /></RoleGate>} />
+              <Route path="/drift" element={<RoleGate allowedRoles={PRODUCTION_MGMT_ROLES}><ProductionDriftPage /></RoleGate>} />
+              <Route path="/capacity" element={<RoleGate allowedRoles={PRODUCTION_MGMT_ROLES}><CapacityPlannerPage /></RoleGate>} />
+
+              {/* Staff admin — admin/supervisor/office */}
+              <Route path="/staff" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffPage /></RoleGate>} />
+              <Route path="/staff/:userId" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffProfilePage /></RoleGate>} />
+
+              {/* Finance — admin/office/finance */}
+              <Route path="/finance" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><FinanceDashboardPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/invoices" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><InvoicesPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/bills" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><BillsPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/wages" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><WagesPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/overheads" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><OverheadsPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/customers" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><CustomersPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/suppliers" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><SuppliersPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/pandle" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><PandlePage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/pandle/export" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><PandleExportPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/forecast" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><CashflowForecastPage /></RoleGate></FeatureGate>} />
+
+              {/* Purchasing — admin/office/finance */}
+              <Route path="/purchasing" element={<RoleGate allowedRoles={[...ADMIN_ROLES, "finance"]}><PurchaseOrdersPage /></RoleGate>} />
+              <Route path="/purchasing/performance" element={<RoleGate allowedRoles={[...ADMIN_ROLES, "finance"]}><SupplierPerformancePage /></RoleGate>} />
+
+              {/* Quoting */}
+              <Route path="/quoting" element={<FeatureGate flag="enable_smart_quoting" featureName="Smart Quoting"><RoleGate allowedRoles={[...ADMIN_ROLES, "finance"]}><SmartQuotingPage /></RoleGate></FeatureGate>} />
+
+              {/* Reports — admin/supervisor/office */}
+              <Route path="/reports" element={<RoleGate allowedRoles={REPORTING_ROLES}><ReportsPage /></RoleGate>} />
+
+              {/* AI Inbox — admin/supervisor/office */}
+              <Route path="/ai-inbox" element={<RoleGate allowedRoles={AI_INBOX_ROLES}><AiInboxPage /></RoleGate>} />
+
+              {/* Settings — admin only */}
+              <Route path="/settings" element={<RoleGate allowedRoles={["admin"]}><SettingsPage /></RoleGate>} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>
