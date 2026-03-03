@@ -56,6 +56,9 @@ export const MODULE_VISIBILITY: Record<string, AppRole[]> = {
   // Settings
   "/settings": SETTINGS_ROLES,
 
+  // Export Centre
+  "/export-centre": SETTINGS_ROLES,
+
   // Quoting (has margin data)
   "/quoting": [...ADMIN_ROLES, "finance"],
 

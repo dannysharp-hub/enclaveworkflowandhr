@@ -49,6 +49,7 @@ import CapacityPlannerPage from "./pages/CapacityPlannerPage";
 import AiInboxPage from "./pages/AiInboxPage";
 import HrAdminPage from "./pages/HrAdminPage";
 import MyHoursPage from "./pages/MyHoursPage";
+import ExportCentrePage from "./pages/ExportCentrePage";
 import MyPayPage from "./pages/MyPayPage";
 import ClientPortalLoginPage from "./pages/portal/ClientPortalLoginPage";
 import ClientPortalDashboardPage from "./pages/portal/ClientPortalDashboardPage";
@@ -123,7 +124,7 @@ const AppRoutes = () => (
               <Route path="/staff" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffPage /></RoleGate>} />
               <Route path="/staff/:userId" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffProfilePage /></RoleGate>} />
               <Route path="/hr-admin" element={<RoleGate allowedRoles={ADMIN_ROLES}><HrAdminPage /></RoleGate>} />
-              <Route path="/staff/:userId" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffProfilePage /></RoleGate>} />
+              <Route path="/export-centre" element={<RoleGate allowedRoles={["admin"]}><ExportCentrePage /></RoleGate>} />
 
               {/* Finance — admin/office/finance */}
               <Route path="/finance" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><FinanceDashboardPage /></RoleGate></FeatureGate>} />

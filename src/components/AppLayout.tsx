@@ -57,6 +57,7 @@ const navItems: NavItem[] = [
   { to: "/capacity", label: "Capacity", icon: Factory },
   { to: "/ai-inbox", label: "AI Inbox", icon: Brain },
   { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/export-centre", label: "Export Centre", icon: FileSpreadsheet },
 ];
 
 const financeGroup: NavGroup = {
