@@ -16,6 +16,7 @@ import JobFinancePanel from "@/components/JobFinancePanel";
 import JobIssuesPanel from "@/components/JobIssuesPanel";
 import JobCardPanel from "@/components/JobCardPanel";
 import JobDrivePanel from "@/components/JobDrivePanel";
+import JobPurchasingTab from "@/components/JobPurchasingTab";
 
 interface PartData {
   id?: string;
@@ -484,6 +485,9 @@ export default function JobBuilderPage() {
 
       {/* Issues Panel */}
       {job && <JobIssuesPanel jobId={job.id} jobCode={job.job_id} readOnly={!canEdit} />}
+
+      {/* Purchasing / RFQ Panel */}
+      {job && canEdit && <JobPurchasingTab jobId={job.id} jobNumber={job.job_id} />}
 
       {/* Finance Panel */}
       {flags.enable_finance && job && (

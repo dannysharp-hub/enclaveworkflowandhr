@@ -5196,6 +5196,7 @@ export type Database = {
           notes: string | null
           order_date: string
           po_number: string
+          rfq_id: string | null
           status: string
           supplier_id: string
           tenant_id: string
@@ -5220,6 +5221,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           po_number: string
+          rfq_id?: string | null
           status?: string
           supplier_id: string
           tenant_id: string
@@ -5244,6 +5246,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           po_number?: string
+          rfq_id?: string | null
           status?: string
           supplier_id?: string
           tenant_id?: string
@@ -5269,6 +5272,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "purchase_orders_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_requests"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_orders_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
@@ -5288,36 +5298,72 @@ export type Database = {
         Row: {
           approver_role: string | null
           auto_approve_under_amount: boolean | null
+          cc_internal_emails: Json | null
           created_at: string
           default_delivery_address: string | null
+          default_required_by_days_from_now: number
+          email_provider: string
+          from_display_name: string | null
+          from_email: string | null
+          group_lines_by_material: boolean
           id: string
+          include_csv_attachment: boolean
+          include_pdf_attachment: boolean
           po_number_next_seq: number | null
           po_number_prefix: string | null
           require_po_approval_over_amount: number | null
+          rfq_auto_generate_on_buylist: boolean
+          rfq_auto_send: boolean
+          rfq_send_mode: string
+          rfq_top_n: number
           tenant_id: string
           updated_at: string
         }
         Insert: {
           approver_role?: string | null
           auto_approve_under_amount?: boolean | null
+          cc_internal_emails?: Json | null
           created_at?: string
           default_delivery_address?: string | null
+          default_required_by_days_from_now?: number
+          email_provider?: string
+          from_display_name?: string | null
+          from_email?: string | null
+          group_lines_by_material?: boolean
           id?: string
+          include_csv_attachment?: boolean
+          include_pdf_attachment?: boolean
           po_number_next_seq?: number | null
           po_number_prefix?: string | null
           require_po_approval_over_amount?: number | null
+          rfq_auto_generate_on_buylist?: boolean
+          rfq_auto_send?: boolean
+          rfq_send_mode?: string
+          rfq_top_n?: number
           tenant_id: string
           updated_at?: string
         }
         Update: {
           approver_role?: string | null
           auto_approve_under_amount?: boolean | null
+          cc_internal_emails?: Json | null
           created_at?: string
           default_delivery_address?: string | null
+          default_required_by_days_from_now?: number
+          email_provider?: string
+          from_display_name?: string | null
+          from_email?: string | null
+          group_lines_by_material?: boolean
           id?: string
+          include_csv_attachment?: boolean
+          include_pdf_attachment?: boolean
           po_number_next_seq?: number | null
           po_number_prefix?: string | null
           require_po_approval_over_amount?: number | null
+          rfq_auto_generate_on_buylist?: boolean
+          rfq_auto_send?: boolean
+          rfq_send_mode?: string
+          rfq_top_n?: number
           tenant_id?: string
           updated_at?: string
         }
@@ -5653,6 +5699,251 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reviews_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          rfq_id: string
+          storage_ref: string
+          supplier_id: string | null
+          tenant_id: string
+          type: string
+          uploaded_by_staff_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          rfq_id: string
+          storage_ref: string
+          supplier_id?: string | null
+          tenant_id: string
+          type?: string
+          uploaded_by_staff_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          rfq_id?: string
+          storage_ref?: string
+          supplier_id?: string | null
+          tenant_id?: string
+          type?: string
+          uploaded_by_staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_attachments_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_attachments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_attachments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_line_items: {
+        Row: {
+          brand: string | null
+          colour_name: string | null
+          created_at: string
+          decor_code: string | null
+          id: string
+          material_key: string
+          notes: string | null
+          quantity_sheets: number
+          rfq_id: string
+          sheet_size_key: string
+          tenant_id: string
+          thickness_mm: number
+        }
+        Insert: {
+          brand?: string | null
+          colour_name?: string | null
+          created_at?: string
+          decor_code?: string | null
+          id?: string
+          material_key: string
+          notes?: string | null
+          quantity_sheets?: number
+          rfq_id: string
+          sheet_size_key: string
+          tenant_id: string
+          thickness_mm: number
+        }
+        Update: {
+          brand?: string | null
+          colour_name?: string | null
+          created_at?: string
+          decor_code?: string | null
+          id?: string
+          material_key?: string
+          notes?: string | null
+          quantity_sheets?: number
+          rfq_id?: string
+          sheet_size_key?: string
+          tenant_id?: string
+          thickness_mm?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_line_items_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_line_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_recipients: {
+        Row: {
+          created_at: string
+          email_message_id: string | null
+          id: string
+          is_selected: boolean
+          last_error: string | null
+          quote_received_at: string | null
+          quoted_lead_time_days: number | null
+          quoted_total: number | null
+          rfq_id: string
+          send_status: string
+          sent_at: string | null
+          supplier_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_message_id?: string | null
+          id?: string
+          is_selected?: boolean
+          last_error?: string | null
+          quote_received_at?: string | null
+          quoted_lead_time_days?: number | null
+          quoted_total?: number | null
+          rfq_id: string
+          send_status?: string
+          sent_at?: string | null
+          supplier_id: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          email_message_id?: string | null
+          id?: string
+          is_selected?: boolean
+          last_error?: string | null
+          quote_received_at?: string | null
+          quoted_lead_time_days?: number | null
+          quoted_total?: number | null
+          rfq_id?: string
+          send_status?: string
+          sent_at?: string | null
+          supplier_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_recipients_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_recipients_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_recipients_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_requests: {
+        Row: {
+          created_at: string
+          created_by_staff_id: string | null
+          delivery_address_text: string | null
+          id: string
+          job_id: string | null
+          notes: string | null
+          required_by_date: string | null
+          rfq_number: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_staff_id?: string | null
+          delivery_address_text?: string | null
+          id?: string
+          job_id?: string | null
+          notes?: string | null
+          required_by_date?: string | null
+          rfq_number: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_staff_id?: string | null
+          delivery_address_text?: string | null
+          id?: string
+          job_id?: string | null
+          notes?: string | null
+          required_by_date?: string | null
+          rfq_number?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_requests_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -6321,6 +6612,69 @@ export type Database = {
           },
         ]
       }
+      supplier_capabilities: {
+        Row: {
+          created_at: string
+          finishes: Json | null
+          id: string
+          material_brand: string
+          material_range: string | null
+          sheet_size_key: string | null
+          supplier_id: string
+          supports_edge_band: boolean
+          supports_prefinished: boolean
+          supports_raw_mdf: boolean
+          supports_veneer: boolean
+          tenant_id: string
+          thickness_mm: number | null
+        }
+        Insert: {
+          created_at?: string
+          finishes?: Json | null
+          id?: string
+          material_brand?: string
+          material_range?: string | null
+          sheet_size_key?: string | null
+          supplier_id: string
+          supports_edge_band?: boolean
+          supports_prefinished?: boolean
+          supports_raw_mdf?: boolean
+          supports_veneer?: boolean
+          tenant_id: string
+          thickness_mm?: number | null
+        }
+        Update: {
+          created_at?: string
+          finishes?: Json | null
+          id?: string
+          material_brand?: string
+          material_range?: string | null
+          sheet_size_key?: string | null
+          supplier_id?: string
+          supports_edge_band?: boolean
+          supports_prefinished?: boolean
+          supports_raw_mdf?: boolean
+          supports_veneer?: boolean
+          tenant_id?: string
+          thickness_mm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_capabilities_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_capabilities_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_performance: {
         Row: {
           average_delivery_delay_days: number
@@ -6539,10 +6893,16 @@ export type Database = {
           active: boolean
           address: string | null
           created_at: string
+          delivery_days: Json | null
           email: string | null
           id: string
+          is_preferred: boolean
+          lead_time_days_default: number | null
+          min_order_value: number | null
           name: string
+          notes: string | null
           phone: string | null
+          rfq_email: string | null
           tenant_id: string
           updated_at: string
         }
@@ -6550,10 +6910,16 @@ export type Database = {
           active?: boolean
           address?: string | null
           created_at?: string
+          delivery_days?: Json | null
           email?: string | null
           id?: string
+          is_preferred?: boolean
+          lead_time_days_default?: number | null
+          min_order_value?: number | null
           name: string
+          notes?: string | null
           phone?: string | null
+          rfq_email?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -6561,10 +6927,16 @@ export type Database = {
           active?: boolean
           address?: string | null
           created_at?: string
+          delivery_days?: Json | null
           email?: string | null
           id?: string
+          is_preferred?: boolean
+          lead_time_days_default?: number | null
+          min_order_value?: number | null
           name?: string
+          notes?: string | null
           phone?: string | null
+          rfq_email?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -6936,6 +7308,7 @@ export type Database = {
           missing_skills: Json
         }[]
       }
+      generate_rfq_number: { Args: { _tenant_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
