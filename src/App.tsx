@@ -47,6 +47,7 @@ import SupplierPerformancePage from "./pages/SupplierPerformancePage";
 import ProductionDriftPage from "./pages/ProductionDriftPage";
 import CapacityPlannerPage from "./pages/CapacityPlannerPage";
 import AiInboxPage from "./pages/AiInboxPage";
+import HrAdminPage from "./pages/HrAdminPage";
 import MyHoursPage from "./pages/MyHoursPage";
 import MyPayPage from "./pages/MyPayPage";
 import ClientPortalLoginPage from "./pages/portal/ClientPortalLoginPage";
@@ -120,6 +121,8 @@ const AppRoutes = () => (
 
               {/* Staff admin — admin/supervisor/office */}
               <Route path="/staff" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffPage /></RoleGate>} />
+              <Route path="/staff/:userId" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffProfilePage /></RoleGate>} />
+              <Route path="/hr-admin" element={<RoleGate allowedRoles={ADMIN_ROLES}><HrAdminPage /></RoleGate>} />
               <Route path="/staff/:userId" element={<RoleGate allowedRoles={ADMIN_ROLES}><StaffProfilePage /></RoleGate>} />
 
               {/* Finance — admin/office/finance */}
