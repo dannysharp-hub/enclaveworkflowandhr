@@ -45,6 +45,8 @@ const STATUS_COLORS: Record<string, string> = {
   acknowledged: "bg-primary/15 text-primary",
   partially_received: "bg-warning/15 text-warning",
   received: "bg-primary/15 text-primary",
+  booked_in: "bg-chart-4/15 text-chart-4",
+  received_correct: "bg-chart-2/15 text-chart-2",
   cancelled: "bg-destructive/15 text-destructive",
 };
 
@@ -149,6 +151,8 @@ export default function PurchaseOrdersPage() {
           <option value="acknowledged">Acknowledged</option>
           <option value="partially_received">Partially Received</option>
           <option value="received">Received</option>
+          <option value="booked_in">Booked In</option>
+          <option value="received_correct">Received & Correct ✅</option>
           <option value="cancelled">Cancelled</option>
         </select>
       </div>
@@ -600,7 +604,17 @@ function PODetailDialog({ po, onClose, onUpdate, canManage }: {
                       <Send size={12} /> Send to Supplier
                     </button>
                   )}
-                  {po.status !== "cancelled" && po.status !== "received" && (
+                  {po.status === "received" && (
+                    <button onClick={() => handleStatusChange("booked_in")} className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-chart-4/15 text-chart-4 text-xs font-medium hover:bg-chart-4/25">
+                      <Package size={12} /> Book In
+                    </button>
+                  )}
+                  {po.status === "booked_in" && (
+                    <button onClick={() => handleStatusChange("received_correct")} className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-chart-2/15 text-chart-2 text-xs font-medium hover:bg-chart-2/25">
+                      <CheckCircle2 size={12} /> Confirm Received & Correct ✅
+                    </button>
+                  )}
+                  {!["cancelled", "received_correct"].includes(po.status) && (
                     <button onClick={() => handleStatusChange("cancelled")} className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-destructive/30 text-xs text-destructive hover:bg-destructive/10">
                       Cancel PO
                     </button>

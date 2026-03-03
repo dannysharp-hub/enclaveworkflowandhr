@@ -19,24 +19,35 @@ export interface ReadinessResult {
 // ─── Calculate readiness for a single job ─────────────────
 export async function calculateReadiness(jobId: string): Promise<ReadinessResult> {
   // Fetch all needed data in parallel
-  const [partsRes, stagesRes, issuesRes, mappingsRes] = await Promise.all([
+  const [partsRes, stagesRes, issuesRes, mappingsRes, posRes] = await Promise.all([
     supabase.from("parts").select("id, material_code, product_code").eq("job_id", jobId),
     supabase.from("job_stages").select("id, stage_name, status, due_date").eq("job_id", jobId),
     supabase.from("job_issues").select("id, severity, status").eq("job_id", jobId).eq("status", "open"),
     supabase.from("product_mappings").select("product_code, material_code"),
+    (supabase.from("purchase_orders") as any).select("id, status").eq("job_id", jobId),
   ]);
 
   const parts = partsRes.data ?? [];
   const stages = stagesRes.data ?? [];
   const openIssues = issuesRes.data ?? [];
   const mappings = mappingsRes.data ?? [];
+  const purchaseOrders = posRes.data ?? [];
   const blockers: string[] = [];
   const today = new Date().toISOString().split("T")[0];
+
+  // ── PO status check ──
+  const activePOs = purchaseOrders.filter((po: any) => !["cancelled"].includes(po.status));
+  const allPOsReceivedCorrect = activePOs.length > 0 && activePOs.every((po: any) => po.status === "received_correct");
+  const hasPendingPOs = activePOs.some((po: any) => !["received_correct", "received", "booked_in"].includes(po.status));
+
+  if (hasPendingPOs) blockers.push(`${activePOs.filter((po: any) => !["received_correct", "received", "booked_in"].includes(po.status)).length} PO(s) not yet received`);
 
   // ── Materials Ready ──
   const missingMaterials = parts.filter(p => !p.material_code);
   const missingMappings = parts.filter(p => p.product_code && !mappings.some(m => m.product_code === p.product_code));
-  const materials_ready = parts.length > 0 && missingMaterials.length === 0 && missingMappings.length === 0;
+  const materialsDefinedOk = parts.length > 0 && missingMaterials.length === 0 && missingMappings.length === 0;
+  // Materials are truly ready only when all POs are received & correct (or no POs exist)
+  const materials_ready = materialsDefinedOk && (activePOs.length === 0 || allPOsReceivedCorrect);
   if (parts.length === 0) blockers.push("No parts defined");
   if (missingMaterials.length > 0) blockers.push(`${missingMaterials.length} parts missing material`);
   if (missingMappings.length > 0) blockers.push(`${missingMappings.length} unmapped products`);
@@ -47,7 +58,6 @@ export async function calculateReadiness(jobId: string): Promise<ReadinessResult
   const stageExists = (name: string) => stages.some(s => s.stage_name === name);
 
   // ── CNC Ready ──
-  const cncStage = stageStatus("CNC");
   const highIssues = openIssues.filter(i => i.severity === "high" || i.severity === "critical");
   const cnc_ready = materials_ready && highIssues.length === 0;
   if (!materials_ready && stageExists("CNC")) blockers.push("CNC blocked: materials incomplete");
@@ -84,7 +94,8 @@ export async function calculateReadiness(jobId: string): Promise<ReadinessResult
   let score = 100;
   score -= highIssues.length * 10;
   score -= openIssues.filter(i => i.severity === "medium").length * 5;
-  if (!materials_ready) score -= 10;
+  if (!materialsDefinedOk) score -= 10;
+  if (hasPendingPOs) score -= 15;
   if (!cnc_ready && stageExists("CNC")) score -= 10;
   if (!installScheduled && stageExists("Install")) score -= 10;
   score -= overdueStages.length * 5;
@@ -108,7 +119,6 @@ export async function calculateReadiness(jobId: string): Promise<ReadinessResult
 export async function persistReadiness(result: ReadinessResult) {
   const payload = { ...result, last_calculated_at: new Date().toISOString() };
 
-  // Upsert by job_id (unique constraint)
   const { data: existing } = await (supabase.from("production_readiness_status") as any)
     .select("id").eq("job_id", result.job_id).maybeSingle();
 
