@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Kanban, ClipboardList,
   Package, ShieldCheck, GraduationCap, Zap, Sun, ShieldAlert,
   ClipboardCheck, Palmtree, Settings, ChevronDown, Activity, BarChart3,
-  BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download, TrendingUp, TrendingDown, Factory, Timer, Banknote,
+  BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet, Download, TrendingUp, TrendingDown, Factory, Timer, Banknote, Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +53,7 @@ const navItems: NavItem[] = [
   { to: "/purchasing", label: "Purchase Orders", icon: Truck },
   { to: "/drift", label: "Drift Control", icon: TrendingDown, adminOnly: true },
   { to: "/capacity", label: "Capacity", icon: Factory, adminOnly: true },
+  { to: "/ai-inbox", label: "AI Inbox", icon: Brain, adminOnly: true },
   { to: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
 ];
 
