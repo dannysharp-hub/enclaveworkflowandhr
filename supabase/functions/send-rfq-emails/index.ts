@@ -117,22 +117,121 @@ async function sendViaGmail(accessToken: string, rawEmail: string): Promise<{ me
   return { messageId: data.id };
 }
 
-// ─── Build RFQ email content ───
+// ─── Detect if RFQ is spray-specific ───
+function isSprayRfq(lines: any[], supplierGroup: string | null): boolean {
+  if (supplierGroup === "spray_shop") return true;
+  return lines.every(l => l.category === "paint_spray_subcontract" || l.spec_json?.is_spray_required);
+}
+
+// ─── Build Spray RFQ email content ───
+function buildSprayRfqEmail(opts: {
+  rfqNumber: string; jobNumber: string; jobName: string; supplierName: string;
+  requiredByDate: string | null; deliveryAddress: string | null;
+  lines: any[]; notes: string | null; fromName: string; fromEmail: string;
+}): { subject: string; bodyHtml: string; bodyText: string } {
+  const subject = `Spray RFQ – ${opts.jobNumber} – ${opts.jobName} – Spray Finish Quote Request`;
+
+  const linesText = opts.lines.map(l => {
+    const spec = l.spec_json || {};
+    const spraySpec = l.spray_spec_json || spec;
+    return `  ${l.item_name || l.material_key} | ${spraySpec.colour_name || l.colour_name || "TBC"} | ${spraySpec.finish_type || "Satin"} | ${spec.material_type || spec.thickness_mm ? spec.thickness_mm + "mm" : "—"} | ${spec.length_mm || "—"}×${spec.width_mm || "—"}mm | Qty: ${l.quantity_sheets || l.quantity || 1}`;
+  }).join("\n");
+
+  const linesHtml = opts.lines.map(l => {
+    const spec = l.spec_json || {};
+    const spraySpec = l.spray_spec_json || spec;
+    return `<tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${l.item_name || l.material_key}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:600;">${spraySpec.colour_name || l.colour_name || "TBC"}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${spraySpec.finish_type || "Satin"}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${spec.material_type || (spec.thickness_mm ? spec.thickness_mm + "mm MDF" : "MDF")}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${spec.length_mm || "—"} × ${spec.width_mm || "—"}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;font-weight:600;">${l.quantity_sheets || l.quantity || 1}</td>
+    </tr>`;
+  }).join("");
+
+  const requiredBy = opts.requiredByDate ? `Required by: ${opts.requiredByDate}` : "";
+  const delivery = opts.deliveryAddress ? `Collection/Delivery: ${opts.deliveryAddress}` : "";
+
+  const bodyText = `Dear ${opts.supplierName},
+
+We would like to request a spray/paint finish quotation for the following items for ${opts.rfqNumber} (Job: ${opts.jobNumber} – ${opts.jobName}).
+
+${requiredBy}
+${delivery}
+
+Spray Items:
+${linesText}
+
+${opts.notes ? `Special Instructions / Masking Notes: ${opts.notes}` : ""}
+
+Please reply with:
+- Price per piece and total (ex VAT)
+- Lead time (working days)
+- Collection/delivery arrangements
+- Any masking or prep requirements from our end
+
+Kind regards,
+${opts.fromName}
+${opts.fromEmail}`;
+
+  const bodyHtml = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:680px;margin:0 auto;color:#1a1a2e;">
+  <div style="padding:24px 0;border-bottom:2px solid #7c3aed;">
+    <h2 style="margin:0;font-size:18px;font-weight:700;color:#7c3aed;">🎨 ${opts.rfqNumber} — Spray Finish Quote Request</h2>
+    <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">Job: ${opts.jobNumber} — ${opts.jobName}</p>
+  </div>
+
+  <div style="padding:20px 0;">
+    <p style="font-size:14px;margin:0 0 16px;">Dear ${opts.supplierName},</p>
+    <p style="font-size:14px;margin:0 0 16px;">We would like to request a <strong>spray/paint finish quotation</strong> for the following items:</p>
+
+    ${requiredBy ? `<p style="font-size:13px;margin:0 0 8px;"><strong>Required by:</strong> ${opts.requiredByDate}</p>` : ""}
+    ${delivery ? `<p style="font-size:13px;margin:0 0 16px;"><strong>Collection/Delivery:</strong> ${opts.deliveryAddress}</p>` : ""}
+
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <thead>
+        <tr style="background:#f5f3ff;">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#7c3aed;border-bottom:2px solid #ddd8fe;">Item</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#7c3aed;border-bottom:2px solid #ddd8fe;">Colour</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#7c3aed;border-bottom:2px solid #ddd8fe;">Finish</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#7c3aed;border-bottom:2px solid #ddd8fe;">Substrate</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#7c3aed;border-bottom:2px solid #ddd8fe;">Dimensions (mm)</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;text-transform:uppercase;color:#7c3aed;border-bottom:2px solid #ddd8fe;">Qty</th>
+        </tr>
+      </thead>
+      <tbody>${linesHtml}</tbody>
+    </table>
+
+    ${opts.notes ? `<div style="margin:16px 0;padding:12px;background:#fef3c7;border-radius:6px;border-left:4px solid #f59e0b;"><p style="font-size:13px;margin:0;"><strong>⚠ Special Instructions / Masking Notes:</strong><br>${opts.notes}</p></div>` : ""}
+
+    <div style="margin:24px 0;padding:16px;background:#f5f3ff;border-radius:6px;border:1px solid #ddd8fe;">
+      <p style="font-size:13px;margin:0;font-weight:600;color:#7c3aed;">Please reply with:</p>
+      <ul style="font-size:13px;margin:8px 0 0;padding-left:20px;">
+        <li>Price per piece and total (ex VAT)</li>
+        <li>Lead time (working days)</li>
+        <li>Collection/delivery arrangements</li>
+        <li>Any masking or prep requirements from our end</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="padding:16px 0;border-top:1px solid #e5e7eb;font-size:13px;color:#6b7280;">
+    <p style="margin:0;">Kind regards,<br><strong>${opts.fromName}</strong><br>${opts.fromEmail}</p>
+  </div>
+</div>`;
+
+  return { subject, bodyHtml, bodyText };
+}
+
+// ─── Build standard RFQ email content ───
 function buildRfqEmail(opts: {
-  rfqNumber: string;
-  jobNumber: string;
-  jobName: string;
-  supplierName: string;
-  requiredByDate: string | null;
-  deliveryAddress: string | null;
-  lines: any[];
-  notes: string | null;
-  fromName: string;
-  fromEmail: string;
+  rfqNumber: string; jobNumber: string; jobName: string; supplierName: string;
+  requiredByDate: string | null; deliveryAddress: string | null;
+  lines: any[]; notes: string | null; fromName: string; fromEmail: string;
 }): { subject: string; bodyHtml: string; bodyText: string } {
   const subject = `RFQ – ${opts.jobNumber} – ${opts.jobName} – Materials Quote Request`;
 
-  // Build line items table
   const linesText = opts.lines.map(l =>
     `  ${l.material_key} | ${l.colour_name || "—"} | ${l.thickness_mm}mm | ${l.sheet_size_key} | Qty: ${l.quantity_sheets}`
   ).join("\n");
@@ -328,7 +427,10 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const { subject, bodyHtml, bodyText } = buildRfqEmail({
+        // Choose spray or standard template
+        const useSprayTemplate = isSprayRfq(lines || [], rfq.supplier_group);
+        const buildFn = useSprayTemplate ? buildSprayRfqEmail : buildRfqEmail;
+        const { subject, bodyHtml, bodyText } = buildFn({
           rfqNumber: rfq.rfq_number,
           jobNumber: rfq.jobs?.job_id || "—",
           jobName: rfq.jobs?.job_name || "—",
