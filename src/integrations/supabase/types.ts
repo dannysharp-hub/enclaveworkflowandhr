@@ -285,6 +285,91 @@ export type Database = {
           },
         ]
       }
+      buylist_line_items: {
+        Row: {
+          brand: string | null
+          category: Database["public"]["Enums"]["buylist_category"]
+          created_at: string
+          id: string
+          is_spray_required: boolean
+          item_name: string
+          job_id: string
+          notes: string | null
+          quantity: number
+          sku_code: string | null
+          source_part_id: string | null
+          source_type: string
+          spec_json: Json | null
+          spray_spec_json: Json | null
+          supplier_group: Database["public"]["Enums"]["supplier_group"]
+          tenant_id: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          category?: Database["public"]["Enums"]["buylist_category"]
+          created_at?: string
+          id?: string
+          is_spray_required?: boolean
+          item_name: string
+          job_id: string
+          notes?: string | null
+          quantity?: number
+          sku_code?: string | null
+          source_part_id?: string | null
+          source_type?: string
+          spec_json?: Json | null
+          spray_spec_json?: Json | null
+          supplier_group?: Database["public"]["Enums"]["supplier_group"]
+          tenant_id: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          category?: Database["public"]["Enums"]["buylist_category"]
+          created_at?: string
+          id?: string
+          is_spray_required?: boolean
+          item_name?: string
+          job_id?: string
+          notes?: string | null
+          quantity?: number
+          sku_code?: string | null
+          source_part_id?: string | null
+          source_type?: string
+          spec_json?: Json | null
+          spray_spec_json?: Json | null
+          supplier_group?: Database["public"]["Enums"]["supplier_group"]
+          tenant_id?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buylist_line_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buylist_line_items_source_part_id_fkey"
+            columns: ["source_part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buylist_line_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           assigned_staff_ids: string[] | null
@@ -3836,16 +3921,19 @@ export type Database = {
       jobs: {
         Row: {
           allow_remnants: boolean
+          buylist_generated_at: string | null
           created_at: string
           created_by: string | null
           created_date: string
           customer_id: string | null
+          deposit_received_at: string | null
           due_date: string | null
           id: string
           job_id: string
           job_name: string
           margin_mm: number
           materials_count: number
+          ordering_enabled: boolean
           parts_count: number
           sheet_length_mm: number
           sheet_width_mm: number
@@ -3857,16 +3945,19 @@ export type Database = {
         }
         Insert: {
           allow_remnants?: boolean
+          buylist_generated_at?: string | null
           created_at?: string
           created_by?: string | null
           created_date?: string
           customer_id?: string | null
+          deposit_received_at?: string | null
           due_date?: string | null
           id?: string
           job_id: string
           job_name: string
           margin_mm?: number
           materials_count?: number
+          ordering_enabled?: boolean
           parts_count?: number
           sheet_length_mm?: number
           sheet_width_mm?: number
@@ -3878,16 +3969,19 @@ export type Database = {
         }
         Update: {
           allow_remnants?: boolean
+          buylist_generated_at?: string | null
           created_at?: string
           created_by?: string | null
           created_date?: string
           customer_id?: string | null
+          deposit_received_at?: string | null
           due_date?: string | null
           id?: string
           job_id?: string
           job_name?: string
           margin_mm?: number
           materials_count?: number
+          ordering_enabled?: boolean
           parts_count?: number
           sheet_length_mm?: number
           sheet_width_mm?: number
@@ -5294,6 +5388,57 @@ export type Database = {
           },
         ]
       }
+      purchasing_audit_log: {
+        Row: {
+          action: string
+          actor_staff_id: string | null
+          created_at: string
+          details_json: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          job_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          actor_staff_id?: string | null
+          created_at?: string
+          details_json?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          job_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          actor_staff_id?: string | null
+          created_at?: string
+          details_json?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          job_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchasing_audit_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchasing_audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchasing_settings: {
         Row: {
           approver_role: string | null
@@ -5767,47 +5912,72 @@ export type Database = {
       rfq_line_items: {
         Row: {
           brand: string | null
+          buylist_line_id: string | null
+          category: Database["public"]["Enums"]["buylist_category"] | null
           colour_name: string | null
           created_at: string
           decor_code: string | null
           id: string
+          item_name: string | null
           material_key: string
           notes: string | null
           quantity_sheets: number
           rfq_id: string
           sheet_size_key: string
+          sku_code: string | null
+          spec_json: Json | null
           tenant_id: string
           thickness_mm: number
+          unit: string | null
         }
         Insert: {
           brand?: string | null
+          buylist_line_id?: string | null
+          category?: Database["public"]["Enums"]["buylist_category"] | null
           colour_name?: string | null
           created_at?: string
           decor_code?: string | null
           id?: string
+          item_name?: string | null
           material_key: string
           notes?: string | null
           quantity_sheets?: number
           rfq_id: string
           sheet_size_key: string
+          sku_code?: string | null
+          spec_json?: Json | null
           tenant_id: string
           thickness_mm: number
+          unit?: string | null
         }
         Update: {
           brand?: string | null
+          buylist_line_id?: string | null
+          category?: Database["public"]["Enums"]["buylist_category"] | null
           colour_name?: string | null
           created_at?: string
           decor_code?: string | null
           id?: string
+          item_name?: string | null
           material_key?: string
           notes?: string | null
           quantity_sheets?: number
           rfq_id?: string
           sheet_size_key?: string
+          sku_code?: string | null
+          spec_json?: Json | null
           tenant_id?: string
           thickness_mm?: number
+          unit?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "rfq_line_items_buylist_line_id_fkey"
+            columns: ["buylist_line_id"]
+            isOneToOne: false
+            referencedRelation: "buylist_line_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rfq_line_items_rfq_id_fkey"
             columns: ["rfq_id"]
@@ -5896,6 +6066,9 @@ export type Database = {
       }
       rfq_requests: {
         Row: {
+          buylist_category:
+            | Database["public"]["Enums"]["buylist_category"]
+            | null
           created_at: string
           created_by_staff_id: string | null
           delivery_address_text: string | null
@@ -5905,10 +6078,14 @@ export type Database = {
           required_by_date: string | null
           rfq_number: string
           status: string
+          supplier_group: Database["public"]["Enums"]["supplier_group"] | null
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          buylist_category?:
+            | Database["public"]["Enums"]["buylist_category"]
+            | null
           created_at?: string
           created_by_staff_id?: string | null
           delivery_address_text?: string | null
@@ -5918,10 +6095,14 @@ export type Database = {
           required_by_date?: string | null
           rfq_number: string
           status?: string
+          supplier_group?: Database["public"]["Enums"]["supplier_group"] | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          buylist_category?:
+            | Database["public"]["Enums"]["buylist_category"]
+            | null
           created_at?: string
           created_by_staff_id?: string | null
           delivery_address_text?: string | null
@@ -5931,6 +6112,7 @@ export type Database = {
           required_by_date?: string | null
           rfq_number?: string
           status?: string
+          supplier_group?: Database["public"]["Enums"]["supplier_group"] | null
           tenant_id?: string
           updated_at?: string
         }
@@ -6614,12 +6796,16 @@ export type Database = {
       }
       supplier_capabilities: {
         Row: {
+          category_supported:
+            | Database["public"]["Enums"]["buylist_category"]
+            | null
           created_at: string
           finishes: Json | null
           id: string
           material_brand: string
           material_range: string | null
           sheet_size_key: string | null
+          sku_patterns: string[] | null
           supplier_id: string
           supports_edge_band: boolean
           supports_prefinished: boolean
@@ -6629,12 +6815,16 @@ export type Database = {
           thickness_mm: number | null
         }
         Insert: {
+          category_supported?:
+            | Database["public"]["Enums"]["buylist_category"]
+            | null
           created_at?: string
           finishes?: Json | null
           id?: string
           material_brand?: string
           material_range?: string | null
           sheet_size_key?: string | null
+          sku_patterns?: string[] | null
           supplier_id: string
           supports_edge_band?: boolean
           supports_prefinished?: boolean
@@ -6644,12 +6834,16 @@ export type Database = {
           thickness_mm?: number | null
         }
         Update: {
+          category_supported?:
+            | Database["public"]["Enums"]["buylist_category"]
+            | null
           created_at?: string
           finishes?: Json | null
           id?: string
           material_brand?: string
           material_range?: string | null
           sheet_size_key?: string | null
+          sku_patterns?: string[] | null
           supplier_id?: string
           supports_edge_band?: boolean
           supports_prefinished?: boolean
@@ -6896,6 +7090,7 @@ export type Database = {
           delivery_days: Json | null
           email: string | null
           id: string
+          is_default_spray_shop: boolean
           is_preferred: boolean
           lead_time_days_default: number | null
           min_order_value: number | null
@@ -6903,8 +7098,10 @@ export type Database = {
           notes: string | null
           phone: string | null
           rfq_email: string | null
+          supplier_type: Database["public"]["Enums"]["supplier_group"] | null
           tenant_id: string
           updated_at: string
+          website_url: string | null
         }
         Insert: {
           active?: boolean
@@ -6913,6 +7110,7 @@ export type Database = {
           delivery_days?: Json | null
           email?: string | null
           id?: string
+          is_default_spray_shop?: boolean
           is_preferred?: boolean
           lead_time_days_default?: number | null
           min_order_value?: number | null
@@ -6920,8 +7118,10 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           rfq_email?: string | null
+          supplier_type?: Database["public"]["Enums"]["supplier_group"] | null
           tenant_id?: string
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
           active?: boolean
@@ -6930,6 +7130,7 @@ export type Database = {
           delivery_days?: Json | null
           email?: string | null
           id?: string
+          is_default_spray_shop?: boolean
           is_preferred?: boolean
           lead_time_days_default?: number | null
           min_order_value?: number | null
@@ -6937,8 +7138,10 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           rfq_email?: string | null
+          supplier_type?: Database["public"]["Enums"]["supplier_group"] | null
           tenant_id?: string
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: [
           {
@@ -7335,6 +7538,25 @@ export type Database = {
         | "production"
         | "installer"
         | "finance"
+      buylist_category:
+        | "panels"
+        | "hardware"
+        | "lighting"
+        | "fixings"
+        | "legs"
+        | "handles"
+        | "finishing_oils"
+        | "paint_spray_subcontract"
+        | "edgebanding"
+        | "other"
+      supplier_group:
+        | "panel_suppliers"
+        | "hardware_suppliers"
+        | "lighting_suppliers"
+        | "finishing_suppliers"
+        | "spray_shop"
+        | "edgebanding_suppliers"
+        | "general"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -7473,6 +7695,27 @@ export const Constants = {
         "production",
         "installer",
         "finance",
+      ],
+      buylist_category: [
+        "panels",
+        "hardware",
+        "lighting",
+        "fixings",
+        "legs",
+        "handles",
+        "finishing_oils",
+        "paint_spray_subcontract",
+        "edgebanding",
+        "other",
+      ],
+      supplier_group: [
+        "panel_suppliers",
+        "hardware_suppliers",
+        "lighting_suppliers",
+        "finishing_suppliers",
+        "spray_shop",
+        "edgebanding_suppliers",
+        "general",
       ],
     },
   },
