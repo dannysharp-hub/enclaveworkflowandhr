@@ -453,6 +453,36 @@ export default function GoogleDriveIntegrationSettings() {
         </div>
       )}
 
+      {/* ─── Shared Media Folder ─── */}
+      {isConnected && (
+        <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
+          <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">Shared Media Folder</h4>
+          <p className="text-xs text-muted-foreground">
+            Set a shared photos/media folder. The app will auto-match media files to jobs by job number in the filename.
+          </p>
+          <ToggleRow
+            label="Auto-link shared media to jobs"
+            value={(settings as any)?.auto_link_shared_media ?? true}
+            onChange={v => handleUpdateSetting("auto_link_shared_media", v)}
+          />
+        </div>
+      )}
+
+      {/* ─── BOM Auto-Import ─── */}
+      {isConnected && (
+        <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
+          <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">BOM Auto-Import</h4>
+          <p className="text-xs text-muted-foreground">
+            When a BOM CSV is detected in a job folder (by filename keywords), it will be automatically parsed and buylist generated.
+          </p>
+          <ToggleRow
+            label="Auto-import BOM CSV on detection"
+            value={(settings as any)?.auto_import_bom_on_detect ?? true}
+            onChange={v => handleUpdateSetting("auto_import_bom_on_detect", v)}
+          />
+        </div>
+      )}
+
       {/* ─── Health Panel ─── */}
       {isConnected && (
         <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
