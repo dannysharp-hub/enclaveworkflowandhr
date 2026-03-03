@@ -93,7 +93,15 @@ export default function GoogleDriveIntegrationSettings() {
       toast({ title: "Drive Connected", description: `Linked as ${data.email || "your Google account"}` });
       fetchStatus();
     } catch (err: any) {
-      toast({ title: "Connection Failed", description: err.message, variant: "destructive" });
+      const msg = err?.message || "";
+      const isNotConnected = msg.includes("Google not connected") || msg.includes("not connected");
+      toast({
+        title: isNotConnected ? "Google Not Connected" : "Connection Failed",
+        description: isNotConnected
+          ? "Please connect your Google account via the Calendar integration above first, then return here to enable Drive."
+          : msg,
+        variant: "destructive",
+      });
     } finally {
       setConnecting(false);
     }
