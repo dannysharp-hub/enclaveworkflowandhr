@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { generateBuylistForJob, saveBuylistForJob, getBuylistForJob, getSprayItems } from "@/lib/buylistEngine";
+import BomUploadSection from "@/components/BomUploadSection";
 import { generateRfqsFromBuylist } from "@/lib/rfqEngine";
 import { exportToCsv } from "@/lib/csvExport";
 import { format } from "date-fns";
@@ -499,6 +500,9 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
       {/* BUYLIST SECTION */}
       {activeSection === "buylist" && (
         <div className="space-y-3">
+          {/* BOM Upload from Inventor */}
+          <BomUploadSection jobId={jobId} onBuylistRefresh={loadBuylist} />
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {canManage && (

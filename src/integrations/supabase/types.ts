@@ -285,8 +285,51 @@ export type Database = {
           },
         ]
       }
+      buylist_category_rules: {
+        Row: {
+          active: boolean | null
+          category: string
+          created_at: string | null
+          id: string
+          keyword: string
+          priority: number | null
+          supplier_group: string
+          tenant_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          keyword: string
+          priority?: number | null
+          supplier_group?: string
+          tenant_id: string
+        }
+        Update: {
+          active?: boolean | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          keyword?: string
+          priority?: number | null
+          supplier_group?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buylist_category_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       buylist_line_items: {
         Row: {
+          bom_item_id: string | null
+          bom_revision: number | null
           brand: string | null
           category: Database["public"]["Enums"]["buylist_category"]
           created_at: string
@@ -300,6 +343,8 @@ export type Database = {
           source_part_id: string | null
           source_type: string
           spec_json: Json | null
+          spray_detected: boolean | null
+          spray_reason: string | null
           spray_spec_json: Json | null
           supplier_group: Database["public"]["Enums"]["supplier_group"]
           tenant_id: string
@@ -307,6 +352,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bom_item_id?: string | null
+          bom_revision?: number | null
           brand?: string | null
           category?: Database["public"]["Enums"]["buylist_category"]
           created_at?: string
@@ -320,6 +367,8 @@ export type Database = {
           source_part_id?: string | null
           source_type?: string
           spec_json?: Json | null
+          spray_detected?: boolean | null
+          spray_reason?: string | null
           spray_spec_json?: Json | null
           supplier_group?: Database["public"]["Enums"]["supplier_group"]
           tenant_id: string
@@ -327,6 +376,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bom_item_id?: string | null
+          bom_revision?: number | null
           brand?: string | null
           category?: Database["public"]["Enums"]["buylist_category"]
           created_at?: string
@@ -340,6 +391,8 @@ export type Database = {
           source_part_id?: string | null
           source_type?: string
           spec_json?: Json | null
+          spray_detected?: boolean | null
+          spray_reason?: string | null
           spray_spec_json?: Json | null
           supplier_group?: Database["public"]["Enums"]["supplier_group"]
           tenant_id?: string
@@ -347,6 +400,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "buylist_line_items_bom_item_id_fkey"
+            columns: ["bom_item_id"]
+            isOneToOne: false
+            referencedRelation: "job_bom_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "buylist_line_items_job_id_fkey"
             columns: ["job_id"]
@@ -2452,6 +2512,139 @@ export type Database = {
           },
           {
             foreignKeyName: "invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_bom_items: {
+        Row: {
+          bom_revision: number
+          bom_upload_id: string | null
+          category_hint: string | null
+          created_at: string | null
+          description: string
+          id: string
+          is_virtual: boolean | null
+          job_id: string
+          material_text: string | null
+          metadata_json: Json | null
+          part_number: string | null
+          quantity: number
+          supplier_hint: string | null
+          tenant_id: string
+          unit: string
+        }
+        Insert: {
+          bom_revision?: number
+          bom_upload_id?: string | null
+          category_hint?: string | null
+          created_at?: string | null
+          description: string
+          id?: string
+          is_virtual?: boolean | null
+          job_id: string
+          material_text?: string | null
+          metadata_json?: Json | null
+          part_number?: string | null
+          quantity?: number
+          supplier_hint?: string | null
+          tenant_id: string
+          unit?: string
+        }
+        Update: {
+          bom_revision?: number
+          bom_upload_id?: string | null
+          category_hint?: string | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          is_virtual?: boolean | null
+          job_id?: string
+          material_text?: string | null
+          metadata_json?: Json | null
+          part_number?: string | null
+          quantity?: number
+          supplier_hint?: string | null
+          tenant_id?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_bom_items_bom_upload_id_fkey"
+            columns: ["bom_upload_id"]
+            isOneToOne: false
+            referencedRelation: "job_bom_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_bom_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_bom_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_bom_uploads: {
+        Row: {
+          bom_revision: number
+          created_at: string | null
+          file_name: string
+          id: string
+          job_id: string
+          parse_error: string | null
+          parse_status: string
+          storage_ref: string | null
+          tenant_id: string
+          uploaded_at: string | null
+          uploaded_by_staff_id: string | null
+        }
+        Insert: {
+          bom_revision?: number
+          created_at?: string | null
+          file_name: string
+          id?: string
+          job_id: string
+          parse_error?: string | null
+          parse_status?: string
+          storage_ref?: string | null
+          tenant_id: string
+          uploaded_at?: string | null
+          uploaded_by_staff_id?: string | null
+        }
+        Update: {
+          bom_revision?: number
+          created_at?: string | null
+          file_name?: string
+          id?: string
+          job_id?: string
+          parse_error?: string | null
+          parse_status?: string
+          storage_ref?: string | null
+          tenant_id?: string
+          uploaded_at?: string | null
+          uploaded_by_staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_bom_uploads_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_bom_uploads_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -6307,6 +6500,44 @@ export type Database = {
           },
           {
             foreignKeyName: "smart_quotes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spray_match_rules: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          is_exclusion: boolean | null
+          match_field: string
+          match_term: string
+          tenant_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_exclusion?: boolean | null
+          match_field?: string
+          match_term?: string
+          tenant_id: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_exclusion?: boolean | null
+          match_field?: string
+          match_term?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spray_match_rules_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

@@ -416,14 +416,37 @@ function classifyMaterial(materialCode: string | null, productCode: string | nul
 
 function detectSprayRequired(part: any): { isSpray: boolean; spraySpec: Record<string, any> | null } {
   const code = ((part.material_code || "") + " " + (part.product_code || "")).toLowerCase();
-  const colour = (part.colour_name || "").toLowerCase();
+  const partId = (part.part_id || "").toLowerCase();
+  
+  // Primary rule: MR MDF detection (Inventor source of truth)
+  if (code.includes("mr mdf") || partId.includes("mr mdf")) {
+    return {
+      isSpray: true,
+      spraySpec: {
+        colour_name: part.colour_name || "TBC",
+        finish_type: code.includes("matt") ? "Matt" : code.includes("gloss") ? "Gloss" : "Satin",
+        material_type: "MR MDF",
+        substrate: part.material_code || "MR MDF",
+        length_mm: part.length_mm,
+        width_mm: part.width_mm,
+        thickness_mm: part.thickness_mm,
+        spray_reason: "Matched MR MDF rule",
+      },
+    };
+  }
+  
+  // Secondary: explicit spray/paint keywords
   if (code.includes("spray") || code.includes("paint") || code.includes("lacq") || code.includes("primer")) {
-    return { isSpray: true, spraySpec: { colour_name: part.colour_name || "TBC", finish_type: code.includes("matt") ? "Matt" : code.includes("gloss") ? "Gloss" : "Satin", material_type: part.material_code || "MDF" } };
+    return {
+      isSpray: true,
+      spraySpec: {
+        colour_name: part.colour_name || "TBC",
+        finish_type: code.includes("matt") ? "Matt" : code.includes("gloss") ? "Gloss" : "Satin",
+        material_type: part.material_code || "MDF",
+        spray_reason: "Matched spray/paint keyword",
+      },
+    };
   }
-  if (colour && !["raw", "natural", "unfinished", "melamine", ""].includes(colour)) {
-    if (code.includes("mdf") || code.includes("raw")) {
-      return { isSpray: true, spraySpec: { colour_name: part.colour_name, finish_type: "Satin", material_type: "MDF" } };
-    }
-  }
+  
   return { isSpray: false, spraySpec: null };
 }
