@@ -49,6 +49,91 @@ interface Props {
   jobNumber?: string;
 }
 
+// ─── Purchase Orders Sub-Section ───
+function PurchaseOrdersSection({ jobId, jobNumber, orderingEnabled, canManage }: { jobId: string; jobNumber?: string; orderingEnabled: boolean; canManage: boolean }) {
+  const [pos, setPos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await (supabase.from("purchase_orders") as any)
+        .select("*, suppliers(name)")
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: false });
+      setPos(data ?? []);
+      setLoading(false);
+    })();
+  }, [jobId]);
+
+  const poStatusColors: Record<string, string> = {
+    draft: "bg-muted text-muted-foreground",
+    sent: "bg-primary/15 text-primary",
+    acknowledged: "bg-chart-2/15 text-chart-2",
+    partially_received: "bg-chart-4/15 text-chart-4",
+    received: "bg-chart-1/15 text-chart-1",
+    cancelled: "bg-destructive/15 text-destructive",
+  };
+
+  const handleExportPOs = () => {
+    const headers = ["PO Number", "Supplier", "Status", "Total (ex VAT)", "Expected Delivery", "Created"];
+    const rows = pos.map((po: any) => [
+      po.po_number, po.suppliers?.name || "—", po.status,
+      po.total_ex_vat?.toFixed(2) || "0.00",
+      po.expected_delivery_date || "—",
+      format(new Date(po.created_at), "dd/MM/yyyy"),
+    ]);
+    exportToCsv(`purchase_orders_${jobNumber || jobId}`, headers, rows);
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-8"><div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  if (pos.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Package size={32} className="mx-auto mb-2 opacity-30" />
+        <p className="text-sm">{orderingEnabled ? "No purchase orders yet. Convert RFQ quotes to POs." : "Ordering locked — awaiting deposit."}</p>
+        {!orderingEnabled && <p className="text-[10px] mt-1 flex items-center justify-center gap-1"><Lock size={10} /> Deposit must be received before POs can be created.</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-end">
+        <button onClick={handleExportPOs} className="flex items-center gap-1 px-2 py-1 rounded text-[10px] border border-border text-muted-foreground hover:text-foreground">
+          <Download size={12} /> Export POs CSV
+        </button>
+      </div>
+      <div className="space-y-2">
+        {pos.map((po: any) => (
+          <div key={po.id} className="rounded-lg border border-border bg-card px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Package size={14} className="text-primary" />
+              <span className="font-mono text-sm font-bold text-foreground">{po.po_number}</span>
+              <span className={cn("text-[10px] font-mono px-2 py-0.5 rounded-full", poStatusColors[po.status] || "bg-muted text-muted-foreground")}>
+                {po.status?.replace(/_/g, " ")}
+              </span>
+              <span className="text-xs text-muted-foreground">{po.suppliers?.name}</span>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="font-mono font-bold text-foreground">£{po.total_ex_vat?.toFixed(2) || "0.00"}</span>
+              {po.expected_delivery_date && (
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Truck size={12} /> {format(new Date(po.expected_delivery_date), "dd MMM")}
+                </span>
+              )}
+              <span className="text-[10px] text-muted-foreground">{format(new Date(po.created_at), "dd MMM yyyy")}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
   const { user, userRole } = useAuth();
   const canManage = ["admin", "office", "supervisor"].includes(userRole || "");
@@ -661,11 +746,7 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
 
       {/* ORDERS SECTION */}
       {activeSection === "orders" && (
-        <div className="text-center py-8 text-muted-foreground">
-          <Package size={32} className="mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Purchase Orders created from RFQs will appear here.</p>
-          <p className="text-[10px] mt-1">View and manage POs on the Purchase Orders page.</p>
-        </div>
+        <PurchaseOrdersSection jobId={jobId} jobNumber={jobNumber} orderingEnabled={orderingEnabled} canManage={canManage} />
       )}
 
       {/* Record Quote Dialog */}
