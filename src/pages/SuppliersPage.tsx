@@ -4,13 +4,43 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Plus, X, Check, Pencil, Search, UserPlus, Users, Activity, Star, Package } from "lucide-react";
+import { Plus, X, Check, Pencil, Search, UserPlus, Users, Activity, Star, Package, Zap } from "lucide-react";
 import SupplierInviteDialog from "@/components/SupplierInviteDialog";
 import SupplierCapabilitiesDialog from "@/components/SupplierCapabilitiesDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const inputClass = "w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 const labelClass = "block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase tracking-wider";
+
+const supplierTypeLabels: Record<string, string> = {
+  panel_suppliers: "Panel",
+  hardware_suppliers: "Hardware",
+  lighting_suppliers: "Lighting",
+  finishing_suppliers: "Finishing",
+  spray_shop: "Spray Shop",
+  edgebanding_suppliers: "Edgebanding",
+  general: "General",
+};
+
+const supplierTypeColors: Record<string, string> = {
+  panel_suppliers: "bg-primary/15 text-primary",
+  hardware_suppliers: "bg-chart-2/15 text-chart-2",
+  lighting_suppliers: "bg-chart-4/15 text-chart-4",
+  finishing_suppliers: "bg-chart-3/15 text-chart-3",
+  spray_shop: "bg-chart-5/15 text-chart-5",
+  edgebanding_suppliers: "bg-accent/15 text-accent-foreground",
+  general: "bg-muted text-muted-foreground",
+};
+
+const supplierTypeOptions = [
+  { value: "general", label: "General" },
+  { value: "panel_suppliers", label: "Panel Supplier" },
+  { value: "hardware_suppliers", label: "Hardware Supplier" },
+  { value: "lighting_suppliers", label: "Lighting Supplier" },
+  { value: "finishing_suppliers", label: "Finishing Supplier" },
+  { value: "spray_shop", label: "Spray Shop" },
+  { value: "edgebanding_suppliers", label: "Edgebanding Supplier" },
+];
 
 export default function SuppliersPage() {
   const { userRole } = useAuth();
@@ -20,7 +50,12 @@ export default function SuppliersPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", rfq_email: "", phone: "", address: "", lead_time_days_default: "", min_order_value: "", notes: "", is_preferred: false });
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [form, setForm] = useState({
+    name: "", email: "", rfq_email: "", phone: "", address: "", website_url: "",
+    lead_time_days_default: "", min_order_value: "", notes: "",
+    is_preferred: false, supplier_type: "general", is_default_spray_shop: false,
+  });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [portalUsersOpen, setPortalUsersOpen] = useState(false);
   const [portalUsers, setPortalUsers] = useState<any[]>([]);
@@ -49,11 +84,20 @@ export default function SuppliersPage() {
         rfq_email: form.rfq_email || null,
         phone: form.phone || null,
         address: form.address || null,
+        website_url: form.website_url || null,
         lead_time_days_default: form.lead_time_days_default ? parseInt(form.lead_time_days_default) : null,
         min_order_value: form.min_order_value ? parseFloat(form.min_order_value) : null,
         notes: form.notes || null,
         is_preferred: form.is_preferred,
+        supplier_type: form.supplier_type,
+        is_default_spray_shop: form.is_default_spray_shop,
       };
+
+      // If setting as default spray shop, unset any existing default
+      if (form.is_default_spray_shop) {
+        await supabase.from("suppliers").update({ is_default_spray_shop: false } as any).neq("id", editId || "");
+      }
+
       if (editId) {
         const { error } = await supabase.from("suppliers").update(payload).eq("id", editId);
         if (error) throw error;
@@ -107,14 +151,21 @@ export default function SuppliersPage() {
       rfq_email: s.rfq_email || "",
       phone: s.phone || "",
       address: s.address || "",
+      website_url: (s as any).website_url || "",
       lead_time_days_default: s.lead_time_days_default?.toString() || "",
       min_order_value: s.min_order_value?.toString() || "",
       notes: s.notes || "",
       is_preferred: s.is_preferred || false,
+      supplier_type: (s as any).supplier_type || "general",
+      is_default_spray_shop: (s as any).is_default_spray_shop || false,
     });
   };
 
-  const filtered = suppliers.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = suppliers.filter(s => {
+    if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (typeFilter !== "all" && (s as any).supplier_type !== typeFilter) return false;
+    return true;
+  });
 
   if (loading) return <div className="space-y-6 animate-slide-in"><h2 className="text-2xl font-mono font-bold text-foreground">Suppliers</h2><div className="h-40 flex items-center justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div></div>;
 
@@ -136,13 +187,24 @@ export default function SuppliersPage() {
               </button>
             </>
           )}
-          {!adding && <button onClick={() => { setAdding(true); setEditId(null); setForm({ name: "", email: "", rfq_email: "", phone: "", address: "", lead_time_days_default: "", min_order_value: "", notes: "", is_preferred: false }); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> Add Supplier</button>}
+          {!adding && <button onClick={() => { setAdding(true); setEditId(null); setForm({ name: "", email: "", rfq_email: "", phone: "", address: "", website_url: "", lead_time_days_default: "", min_order_value: "", notes: "", is_preferred: false, supplier_type: "general", is_default_spray_shop: false }); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"><Plus size={14} /> Add Supplier</button>}
         </div>
       </div>
 
-      <div className="relative max-w-xs">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input className={cn(inputClass, "pl-9")} placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input className={cn(inputClass, "pl-9")} placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setTypeFilter("all")} className={cn("px-2.5 py-1 rounded-full text-[10px] font-mono transition-colors", typeFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>All</button>
+          {supplierTypeOptions.map(opt => (
+            <button key={opt.value} onClick={() => setTypeFilter(opt.value)}
+              className={cn("px-2.5 py-1 rounded-full text-[10px] font-mono transition-colors",
+                typeFilter === opt.value ? supplierTypeColors[opt.value] || "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:text-foreground"
+              )}>{opt.label}</button>
+          ))}
+        </div>
       </div>
 
       {adding && (
@@ -154,14 +216,31 @@ export default function SuppliersPage() {
             <div><label className={labelClass}>RFQ Email</label><input className={inputClass} placeholder="For quotes" value={form.rfq_email} onChange={e => setForm(f => ({ ...f, rfq_email: e.target.value }))} /></div>
             <div><label className={labelClass}>Phone</label><input className={inputClass} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
             <div><label className={labelClass}>Address</label><input className={inputClass} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></div>
+            <div><label className={labelClass}>Website</label><input className={inputClass} placeholder="https://..." value={form.website_url} onChange={e => setForm(f => ({ ...f, website_url: e.target.value }))} /></div>
             <div><label className={labelClass}>Lead Time (days)</label><input className={inputClass} type="number" value={form.lead_time_days_default} onChange={e => setForm(f => ({ ...f, lead_time_days_default: e.target.value }))} /></div>
             <div><label className={labelClass}>Min Order (£)</label><input className={inputClass} type="number" step="0.01" value={form.min_order_value} onChange={e => setForm(f => ({ ...f, min_order_value: e.target.value }))} /></div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className={labelClass}>Supplier Type</label>
+              <select className={inputClass} value={form.supplier_type} onChange={e => setForm(f => ({ ...f, supplier_type: e.target.value }))}>
+                {supplierTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
             <div className="flex items-end pb-1">
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                 <input type="checkbox" checked={form.is_preferred} onChange={e => setForm(f => ({ ...f, is_preferred: e.target.checked }))} />
                 <Star size={14} className={form.is_preferred ? "text-chart-4 fill-chart-4" : ""} /> Preferred
               </label>
             </div>
+            {form.supplier_type === "spray_shop" && (
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input type="checkbox" checked={form.is_default_spray_shop} onChange={e => setForm(f => ({ ...f, is_default_spray_shop: e.target.checked }))} />
+                  <Zap size={14} className={form.is_default_spray_shop ? "text-chart-5" : ""} /> Default Spray Shop
+                </label>
+              </div>
+            )}
           </div>
           <div>
             <label className={labelClass}>Notes</label>
@@ -178,8 +257,8 @@ export default function SuppliersPage() {
         <table className="w-full text-sm">
           <thead><tr className="border-b border-border bg-muted/30">
             <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Name</th>
+            <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Type</th>
             <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">RFQ Email</th>
-            <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Phone</th>
             <th className="text-center px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Pref</th>
             <th className="text-left px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Status</th>
             <th className="px-4 py-2" />
@@ -187,9 +266,18 @@ export default function SuppliersPage() {
           <tbody>
             {filtered.map(s => (
               <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/10">
-                <td className="px-4 py-2 font-medium text-foreground">{s.name}</td>
+                <td className="px-4 py-2">
+                  <span className="font-medium text-foreground">{s.name}</span>
+                  {(s as any).is_default_spray_shop && (
+                    <span className="ml-1.5 text-[9px] font-mono text-chart-5 bg-chart-5/10 px-1 py-0.5 rounded">DEFAULT SPRAY</span>
+                  )}
+                </td>
+                <td className="px-4 py-2">
+                  <span className={cn("text-[10px] font-mono px-2 py-0.5 rounded-full", supplierTypeColors[(s as any).supplier_type || "general"] || "bg-muted text-muted-foreground")}>
+                    {supplierTypeLabels[(s as any).supplier_type || "general"] || "General"}
+                  </span>
+                </td>
                 <td className="px-4 py-2 text-muted-foreground">{s.rfq_email || s.email || "—"}</td>
-                <td className="px-4 py-2 text-muted-foreground">{s.phone || "—"}</td>
                 <td className="px-4 py-2 text-center">
                   <button onClick={() => togglePreferred(s)} className="p-1">
                     <Star size={14} className={cn(s.is_preferred ? "text-chart-4 fill-chart-4" : "text-muted-foreground/30")} />
