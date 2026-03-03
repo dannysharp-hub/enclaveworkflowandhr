@@ -7,6 +7,11 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   userRole: string | null;
+  /** The real DB role (unaffected by override) */
+  realRole: string | null;
+  /** Currently active override, or null */
+  roleOverride: string | null;
+  setRoleOverride: (role: string | null) => void;
   profile: any | null;
   tenantId: string | null;
   signOut: () => Promise<void>;
@@ -17,6 +22,9 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   userRole: null,
+  realRole: null,
+  roleOverride: null,
+  setRoleOverride: () => {},
   profile: null,
   tenantId: null,
   signOut: async () => {},
@@ -28,16 +36,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [dbRole, setDbRole] = useState<string | null>(null);
+  const [roleOverride, setRoleOverride] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+
+  // Effective role: override (admin-only) or real DB role
+  const userRole = roleOverride ?? dbRole;
 
   const fetchUserData = async (userId: string) => {
     const [{ data: roleData }, { data: profileData }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId).limit(1).single(),
       supabase.from("profiles").select("*").eq("user_id", userId).single(),
     ]);
-    setUserRole(roleData?.role ?? null);
+    setDbRole(roleData?.role ?? null);
     setProfile(profileData ?? null);
     setTenantId(profileData?.tenant_id ?? null);
   };
@@ -49,7 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         setTimeout(() => fetchUserData(session.user.id), 0);
       } else {
-        setUserRole(null);
+        setDbRole(null);
+        setRoleOverride(null);
         setProfile(null);
         setTenantId(null);
       }
@@ -73,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, profile, tenantId, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, realRole: dbRole, roleOverride, setRoleOverride, profile, tenantId, signOut }}>
       {children}
     </AuthContext.Provider>
   );
