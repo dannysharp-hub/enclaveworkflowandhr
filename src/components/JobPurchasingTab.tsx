@@ -66,6 +66,12 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
   const [rfqs, setRfqs] = useState<any[]>([]);
   const [rfqsLoading, setRfqsLoading] = useState(true);
   const [generatingRfqs, setGeneratingRfqs] = useState(false);
+
+  // Automation state
+  const [automating, setAutomating] = useState(false);
+  const [automationResult, setAutomationResult] = useState<any>(null);
+
+  // Quote/UI state
   const [expandedRfq, setExpandedRfq] = useState<string | null>(null);
   const [rfqLines, setRfqLines] = useState<Record<string, any[]>>({});
   const [rfqRecipients, setRfqRecipients] = useState<Record<string, any[]>>({});
@@ -108,6 +114,31 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
   }, [jobId]);
 
   useEffect(() => { loadJobData(); loadBuylist(); loadRfqs(); }, [loadJobData, loadBuylist, loadRfqs]);
+
+  // ─── Hybrid Trigger: Accept Job → Edge Function does buylist + RFQs + notifications ───
+  const handleAcceptAndAutomate = async () => {
+    setAutomating(true);
+    setAutomationResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("auto-purchasing", {
+        body: { job_id: jobId, action: "accept_job" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAutomationResult(data);
+      toast({
+        title: "Purchasing automation complete",
+        description: `${data.buylist_count || 0} buylist items, ${data.rfqs_created || 0} RFQ(s) to ${data.total_recipients || 0} suppliers${data.unmatched_count > 0 ? ` · ⚠ ${data.unmatched_count} unmatched` : ""}`,
+      });
+      if (data.unmatched_count > 0) {
+        toast({ title: "⚠ Unmatched Items", description: "Some items have no matching suppliers. Check notifications.", variant: "destructive" });
+      }
+      loadJobData(); loadBuylist(); loadRfqs();
+      setActiveSection("rfqs");
+    } catch (err: any) {
+      toast({ title: "Automation failed", description: err.message, variant: "destructive" });
+    } finally { setAutomating(false); }
+  };
 
   // Generate buylist
   const handleGenerateBuylist = async () => {
@@ -313,12 +344,20 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Header + Deposit Status */}
+      {/* Header + Automation + Deposit Status */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
           <Truck size={16} className="text-primary" /> Purchasing
         </h3>
         <div className="flex items-center gap-2">
+          {/* Accept Job automation button — shown if job isn't accepted yet */}
+          {canManage && jobData && !["accepted", "production_in_progress", "complete"].includes(jobData.status) && (
+            <button onClick={handleAcceptAndAutomate} disabled={automating}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-chart-2 text-xs font-medium text-white hover:bg-chart-2/90 disabled:opacity-50">
+              {automating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+              {automating ? "Generating buylist & RFQs…" : "Accept Job & Generate RFQs"}
+            </button>
+          )}
           {!orderingEnabled ? (
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 text-[10px] font-mono text-chart-4 bg-chart-4/10 px-2 py-1 rounded">
@@ -339,6 +378,21 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
           )}
         </div>
       </div>
+
+      {/* Automation result summary */}
+      {automationResult && (
+        <div className="rounded-lg border border-chart-2/30 bg-chart-2/5 px-4 py-3 text-xs space-y-1">
+          <div className="flex items-center gap-2 font-mono font-bold text-chart-2">
+            <CheckCircle2 size={14} /> Automation Complete
+          </div>
+          <div className="text-muted-foreground">
+            {automationResult.buylist_count} buylist items · {automationResult.rfqs_created} RFQ(s) · {automationResult.total_recipients} supplier(s)
+            {automationResult.unmatched_count > 0 && (
+              <span className="text-destructive ml-2">⚠ {automationResult.unmatched_count} unmatched items</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Section Tabs */}
       <div className="flex items-center gap-1 border-b border-border">
