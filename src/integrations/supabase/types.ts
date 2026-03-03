@@ -1115,6 +1115,66 @@ export type Database = {
           },
         ]
       }
+      clock_anomalies: {
+        Row: {
+          anomaly_type: string
+          created_at: string
+          detected_at: string
+          id: string
+          notes: string | null
+          resolution_type: string | null
+          resolved: boolean
+          resolved_at: string | null
+          resolved_clock_out: string | null
+          staff_id: string
+          tenant_id: string
+          time_entry_id: string
+        }
+        Insert: {
+          anomaly_type?: string
+          created_at?: string
+          detected_at?: string
+          id?: string
+          notes?: string | null
+          resolution_type?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_clock_out?: string | null
+          staff_id: string
+          tenant_id: string
+          time_entry_id: string
+        }
+        Update: {
+          anomaly_type?: string
+          created_at?: string
+          detected_at?: string
+          id?: string
+          notes?: string | null
+          resolution_type?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_clock_out?: string | null
+          staff_id?: string
+          tenant_id?: string
+          time_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clock_anomalies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clock_anomalies_time_entry_id_fkey"
+            columns: ["time_entry_id"]
+            isOneToOne: false
+            referencedRelation: "time_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           active: boolean

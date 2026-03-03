@@ -56,17 +56,20 @@ function TimesheetsTab() {
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState(() => format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(() => format(endOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
+  const [anomalyCount, setAnomalyCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [entriesRes, profilesRes] = await Promise.all([
+    const [entriesRes, profilesRes, anomalyRes] = await Promise.all([
       supabase.from("time_entries").select("*").gte("clock_in", `${dateFrom}T00:00:00`).lte("clock_in", `${dateTo}T23:59:59`).order("clock_in", { ascending: false }),
       supabase.from("profiles").select("user_id, full_name"),
+      supabase.from("clock_anomalies").select("id", { count: "exact", head: true }).eq("resolved", false),
     ]);
     setEntries(entriesRes.data ?? []);
     const pMap: Record<string, string> = {};
     (profilesRes.data ?? []).forEach((p: any) => { pMap[p.user_id] = p.full_name; });
     setProfiles(pMap);
+    setAnomalyCount(anomalyRes.count ?? 0);
     setLoading(false);
   }, [dateFrom, dateTo]);
 
@@ -92,6 +95,12 @@ function TimesheetsTab() {
         <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 flex items-center gap-2">
           <AlertTriangle size={16} className="text-warning" />
           <span className="text-sm text-foreground"><strong>{missingClockOuts.length}</strong> missing clock-out{missingClockOuts.length > 1 ? "s" : ""}</span>
+        </div>
+      )}
+      {anomalyCount > 0 && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 flex items-center gap-2">
+          <AlertTriangle size={16} className="text-destructive" />
+          <span className="text-sm text-foreground"><strong>{anomalyCount}</strong> unresolved clock anomal{anomalyCount > 1 ? "ies" : "y"} across all staff</span>
         </div>
       )}
 

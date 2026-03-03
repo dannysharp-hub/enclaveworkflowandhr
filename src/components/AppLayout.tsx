@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { canRoleAccessRoute, FINANCE_ROLES, isAdminLevel } from "@/lib/roleVisibility";
+import ClockAnomalyPrompt from "@/components/ClockAnomalyPrompt";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
@@ -313,6 +314,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-auto p-4 lg:p-6">
           {children}
         </div>
+
+        {/* Clock anomaly prompt */}
+        <ClockAnomalyPrompt />
       </main>
     </div>
   );
