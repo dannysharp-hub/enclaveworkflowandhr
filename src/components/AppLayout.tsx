@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { canRoleAccessRoute, FINANCE_ROLES, isAdminLevel } from "@/lib/roleVisibility";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
@@ -19,7 +20,6 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   featureFlag?: string;
-  adminOnly?: boolean; // Only show for admin/supervisor/office
 }
 
 interface NavGroup {
@@ -37,8 +37,8 @@ const navItems: NavItem[] = [
   { to: "/my-pay", label: "My Pay", icon: Banknote },
   { to: "/workflow", label: "Workflow", icon: Kanban },
   { to: "/jobs", label: "Jobs", icon: Wrench },
-  { to: "/production", label: "Production", icon: Activity, adminOnly: true },
-  { to: "/staff", label: "Staff", icon: Users, adminOnly: true },
+  { to: "/production", label: "Production", icon: Activity },
+  { to: "/staff", label: "Staff", icon: Users },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/holiday-calendar", label: "Holiday Cal", icon: Palmtree },
   { to: "/documents", label: "Documents", icon: FileText },
@@ -51,10 +51,10 @@ const navItems: NavItem[] = [
   { to: "/materials", label: "Materials", icon: Package },
   { to: "/part-library", label: "Part Library", icon: Package },
   { to: "/purchasing", label: "Purchase Orders", icon: Truck },
-  { to: "/drift", label: "Drift Control", icon: TrendingDown, adminOnly: true },
-  { to: "/capacity", label: "Capacity", icon: Factory, adminOnly: true },
-  { to: "/ai-inbox", label: "AI Inbox", icon: Brain, adminOnly: true },
-  { to: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
+  { to: "/drift", label: "Drift Control", icon: TrendingDown },
+  { to: "/capacity", label: "Capacity", icon: Factory },
+  { to: "/ai-inbox", label: "AI Inbox", icon: Brain },
+  { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
 
 const financeGroup: NavGroup = {
@@ -90,15 +90,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const displayName = profile?.full_name || "Loading...";
   const displayRole = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "";
 
-  const ADMIN_ROLES = ["admin", "supervisor", "office"];
-  const isAdminRole = userRole ? ADMIN_ROLES.includes(userRole) : false;
-
-  // Filter nav items based on feature flags and role
+  // Filter nav items: feature flags + role-based visibility
   const visibleNavItems = navItems.filter((item) => {
-    if (item.adminOnly && !isAdminRole) return false;
-    if (!item.featureFlag) return true;
-    return flags[item.featureFlag] === true;
+    // Feature flag check
+    if (item.featureFlag && flags[item.featureFlag] !== true) return false;
+    // Role visibility — items not in MODULE_VISIBILITY are visible to all
+    return canRoleAccessRoute(userRole, item.to);
   });
+
+  // Finance group visible only to finance-capable roles
+  const showFinance =
+    (!financeGroup.featureFlag || flags[financeGroup.featureFlag]) &&
+    FINANCE_ROLES.includes(userRole as any);
+
+  const showSettings = userRole === "admin";
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -184,8 +189,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {/* Finance group */}
-          {(!financeGroup.featureFlag || flags[financeGroup.featureFlag]) && (
+          {/* Finance group — only for finance-capable roles */}
+          {showFinance && (
             <>
               <div className="my-2 border-t border-border" />
               <button
@@ -231,7 +236,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </>
           )}
 
-          {userRole === "admin" && (
+          {showSettings && (
             <>
               <div className="my-2 border-t border-border" />
               {(() => {
