@@ -1175,6 +1175,53 @@ export type Database = {
           },
         ]
       }
+      cnc_time_calibration: {
+        Row: {
+          created_at: string
+          id: string
+          last_updated_at: string
+          machine_id: string
+          material_key: string | null
+          post_processor_name: string | null
+          sample_count: number
+          scale_factor: number
+          tenant_id: string
+          toolpath_template_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_updated_at?: string
+          machine_id?: string
+          material_key?: string | null
+          post_processor_name?: string | null
+          sample_count?: number
+          scale_factor?: number
+          tenant_id: string
+          toolpath_template_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_updated_at?: string
+          machine_id?: string
+          material_key?: string | null
+          post_processor_name?: string | null
+          sample_count?: number
+          scale_factor?: number
+          tenant_id?: string
+          toolpath_template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cnc_time_calibration_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           active: boolean
@@ -3458,6 +3505,9 @@ export type Database = {
       }
       job_sheets: {
         Row: {
+          cnc_actual_minutes: number | null
+          cnc_completed_at: string | null
+          cnc_started_at: string | null
           created_at: string
           cut_at: string | null
           cut_by: string | null
@@ -3467,14 +3517,21 @@ export type Database = {
           nesting_group_id: string | null
           notes: string | null
           qr_payload: string | null
+          sheet_index: number | null
           sheet_length_mm: number
           sheet_number: number
           sheet_width_mm: number
           status: string
           tenant_id: string
           updated_at: string
+          vc_estimate_source: string
+          vc_estimated_minutes_calibrated: number | null
+          vc_estimated_minutes_raw: number | null
         }
         Insert: {
+          cnc_actual_minutes?: number | null
+          cnc_completed_at?: string | null
+          cnc_started_at?: string | null
           created_at?: string
           cut_at?: string | null
           cut_by?: string | null
@@ -3484,14 +3541,21 @@ export type Database = {
           nesting_group_id?: string | null
           notes?: string | null
           qr_payload?: string | null
+          sheet_index?: number | null
           sheet_length_mm?: number
           sheet_number?: number
           sheet_width_mm?: number
           status?: string
           tenant_id: string
           updated_at?: string
+          vc_estimate_source?: string
+          vc_estimated_minutes_calibrated?: number | null
+          vc_estimated_minutes_raw?: number | null
         }
         Update: {
+          cnc_actual_minutes?: number | null
+          cnc_completed_at?: string | null
+          cnc_started_at?: string | null
           created_at?: string
           cut_at?: string | null
           cut_by?: string | null
@@ -3501,12 +3565,16 @@ export type Database = {
           nesting_group_id?: string | null
           notes?: string | null
           qr_payload?: string | null
+          sheet_index?: number | null
           sheet_length_mm?: number
           sheet_number?: number
           sheet_width_mm?: number
           status?: string
           tenant_id?: string
           updated_at?: string
+          vc_estimate_source?: string
+          vc_estimated_minutes_calibrated?: number | null
+          vc_estimated_minutes_raw?: number | null
         }
         Relationships: [
           {
@@ -3640,6 +3708,64 @@ export type Database = {
           },
           {
             foreignKeyName: "job_time_actuals_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_time_estimates_audit: {
+        Row: {
+          calibrated_minutes: number | null
+          created_at: string
+          entered_by_staff_id: string | null
+          id: string
+          job_id: string
+          raw_minutes: number
+          sheet_id: string | null
+          source: string
+          tenant_id: string
+        }
+        Insert: {
+          calibrated_minutes?: number | null
+          created_at?: string
+          entered_by_staff_id?: string | null
+          id?: string
+          job_id: string
+          raw_minutes: number
+          sheet_id?: string | null
+          source?: string
+          tenant_id: string
+        }
+        Update: {
+          calibrated_minutes?: number | null
+          created_at?: string
+          entered_by_staff_id?: string | null
+          id?: string
+          job_id?: string
+          raw_minutes?: number
+          sheet_id?: string | null
+          source?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_time_estimates_audit_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_time_estimates_audit_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "job_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_time_estimates_audit_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -4578,6 +4704,7 @@ export type Database = {
       payroll_settings: {
         Row: {
           created_at: string
+          daily_cnc_capacity_hours: number
           enable_break_tracking: boolean
           enable_productivity_kpis: boolean
           enable_staff_pay_estimate: boolean
@@ -4586,6 +4713,7 @@ export type Database = {
           include_overtime_in_estimate: boolean
           overtime_multiplier: number
           overtime_threshold_hours: number
+          partial_start_threshold_multiplier: number
           pay_currency: string
           pay_frequency: string
           rounding_rule: string
@@ -4594,6 +4722,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          daily_cnc_capacity_hours?: number
           enable_break_tracking?: boolean
           enable_productivity_kpis?: boolean
           enable_staff_pay_estimate?: boolean
@@ -4602,6 +4731,7 @@ export type Database = {
           include_overtime_in_estimate?: boolean
           overtime_multiplier?: number
           overtime_threshold_hours?: number
+          partial_start_threshold_multiplier?: number
           pay_currency?: string
           pay_frequency?: string
           rounding_rule?: string
@@ -4610,6 +4740,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          daily_cnc_capacity_hours?: number
           enable_break_tracking?: boolean
           enable_productivity_kpis?: boolean
           enable_staff_pay_estimate?: boolean
@@ -4618,6 +4749,7 @@ export type Database = {
           include_overtime_in_estimate?: boolean
           overtime_multiplier?: number
           overtime_threshold_hours?: number
+          partial_start_threshold_multiplier?: number
           pay_currency?: string
           pay_frequency?: string
           rounding_rule?: string
