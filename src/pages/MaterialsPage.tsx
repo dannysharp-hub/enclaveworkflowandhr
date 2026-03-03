@@ -135,7 +135,7 @@ export default function MaterialsPage() {
                 <th className="text-left px-4 py-3 font-mono text-xs text-muted-foreground">CODE</th>
                 <th className="text-left px-4 py-3 font-mono text-xs text-muted-foreground">TYPE</th>
                 <th className="text-left px-4 py-3 font-mono text-xs text-muted-foreground">COLOUR</th>
-                <th className="text-left px-4 py-3 font-mono text-xs text-muted-foreground">BRAND</th>
+                
                 <th className="text-right px-4 py-3 font-mono text-xs text-muted-foreground">THK</th>
                 <th className="text-right px-4 py-3 font-mono text-xs text-muted-foreground">SHEET</th>
                 <th className="text-center px-4 py-3 font-mono text-xs text-muted-foreground">GRAIN</th>
@@ -155,7 +155,7 @@ export default function MaterialsPage() {
                   <td className="px-4 py-3 font-mono font-bold text-foreground text-xs">{m.material_code}</td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{m.material_types?.name ?? "—"}</td>
                   <td className="px-4 py-3 text-foreground">{m.colour_name || "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{m.brand || "—"}</td>
+                  
                   <td className="px-4 py-3 text-right font-mono text-muted-foreground">{m.thickness_mm}mm</td>
                   <td className="px-4 py-3 text-right font-mono text-muted-foreground">{m.sheet_length_mm}×{m.sheet_width_mm}</td>
                   <td className="px-4 py-3 text-center">
