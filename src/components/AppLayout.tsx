@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { canRoleAccessRoute, FINANCE_ROLES } from "@/lib/roleVisibility";
 import ClockAnomalyPrompt from "@/components/ClockAnomalyPrompt";
+import RoleSwitcher from "@/components/RoleSwitcher";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { LucideIcon } from "lucide-react";
 
@@ -525,6 +526,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <ClockAnomalyPrompt />
+        <RoleSwitcher />
       </main>
     </div>
   );
