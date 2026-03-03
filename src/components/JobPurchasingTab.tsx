@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   FileText, Send, Upload, CheckCircle2, Plus, ChevronDown, ChevronRight,
-  Package, Truck, Clock, Star, Paperclip, X, Eye,
+  Package, Truck, Clock, Star, Paperclip, X, Eye, Mail, Loader2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -42,6 +42,7 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
   const [quoteForm, setQuoteForm] = useState({ total: "", leadDays: "", notes: "" });
   const [quoteFiles, setQuoteFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadRfqs = useCallback(async () => {
@@ -93,6 +94,31 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
     }
   };
 
+  const handleSendRfqEmails = async (rfqId: string) => {
+    setSending(rfqId);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-rfq-emails", {
+        body: { rfq_id: rfqId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const sent = data?.sent || 0;
+      const failed = data?.failed || 0;
+      if (sent > 0) {
+        toast({ title: `${sent} RFQ email(s) sent`, description: failed > 0 ? `${failed} failed` : undefined });
+      } else {
+        toast({ title: "No emails sent", description: data?.results?.[0]?.error || "Check supplier email addresses", variant: "destructive" });
+      }
+      loadRfqDetails(rfqId);
+      loadRfqs();
+    } catch (err: any) {
+      toast({ title: "Send failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSending(null);
+    }
+  };
+
   const uploadQuoteFiles = async (rfqId: string, supplierId: string): Promise<void> => {
     for (const file of quoteFiles) {
       const path = `${rfqId}/${supplierId}/${Date.now()}_${file.name}`;
@@ -116,7 +142,6 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
     if (!activeRecipient) return;
     setUploading(true);
     try {
-      // Upload attachments first
       if (quoteFiles.length > 0) {
         await uploadQuoteFiles(activeRecipient.rfq_id, activeRecipient.supplier_id);
       }
@@ -129,7 +154,6 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
         })
         .eq("id", activeRecipient.id);
 
-      // Update RFQ status if first quote
       await (supabase.from("rfq_requests") as any)
         .update({ status: "quotes_received" })
         .eq("id", activeRecipient.rfq_id)
@@ -148,16 +172,9 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
 
   const selectSupplier = async (recipient: any, rfqId: string) => {
     try {
-      await (supabase.from("rfq_recipients") as any)
-        .update({ is_selected: false })
-        .eq("rfq_id", rfqId);
-      await (supabase.from("rfq_recipients") as any)
-        .update({ is_selected: true })
-        .eq("id", recipient.id);
-      await (supabase.from("rfq_requests") as any)
-        .update({ status: "supplier_selected" })
-        .eq("id", rfqId);
-
+      await (supabase.from("rfq_recipients") as any).update({ is_selected: false }).eq("rfq_id", rfqId);
+      await (supabase.from("rfq_recipients") as any).update({ is_selected: true }).eq("id", recipient.id);
+      await (supabase.from("rfq_requests") as any).update({ status: "supplier_selected" }).eq("id", rfqId);
       toast({ title: `Selected ${recipient.suppliers?.name}` });
       loadRfqDetails(rfqId);
       loadRfqs();
@@ -173,7 +190,6 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
       const seq = settings?.po_number_next_seq || 1;
       const poNumber = `${prefix}-${String(seq).padStart(4, "0")}`;
 
-      // Create PO
       const { data: newPO, error } = await (supabase.from("purchase_orders") as any).insert({
         supplier_id: recipient.supplier_id,
         job_id: jobId,
@@ -188,33 +204,26 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
 
       if (error) throw error;
 
-      // Copy RFQ line items to PO line items
       const lines = rfqLines[rfqId] ?? [];
       if (lines.length > 0) {
+        const totalQty = lines.reduce((s: number, l: any) => s + l.quantity_sheets, 0);
         const poItems = lines.map((line: any) => ({
           po_id: newPO.id,
           description: `${line.material_key}${line.colour_name ? ` – ${line.colour_name}` : ""} (${line.thickness_mm}mm, ${line.sheet_size_key})`,
           quantity: line.quantity_sheets,
-          unit_cost_ex_vat: recipient.quoted_total ? (recipient.quoted_total / lines.reduce((s: number, l: any) => s + l.quantity_sheets, 0)) : 0,
-          total_ex_vat: recipient.quoted_total ? (recipient.quoted_total * line.quantity_sheets / lines.reduce((s: number, l: any) => s + l.quantity_sheets, 0)) : 0,
+          unit_cost_ex_vat: recipient.quoted_total ? (recipient.quoted_total / totalQty) : 0,
+          total_ex_vat: recipient.quoted_total ? (recipient.quoted_total * line.quantity_sheets / totalQty) : 0,
           vat_rate: 20,
           job_cost_category: "materials",
         }));
         await (supabase.from("purchase_order_items") as any).insert(poItems);
       }
 
-      // Update PO sequence
       if (settings) {
-        await (supabase.from("purchasing_settings") as any)
-          .update({ po_number_next_seq: seq + 1 })
-          .eq("id", settings.id);
+        await (supabase.from("purchasing_settings") as any).update({ po_number_next_seq: seq + 1 }).eq("id", settings.id);
       }
 
-      // Update RFQ status
-      await (supabase.from("rfq_requests") as any)
-        .update({ status: "converted_to_po" })
-        .eq("id", rfqId);
-
+      await (supabase.from("rfq_requests") as any).update({ status: "converted_to_po" }).eq("id", rfqId);
       toast({ title: `Purchase Order ${poNumber} created`, description: `${lines.length} line items copied from RFQ` });
       loadRfqs();
     } catch (err: any) {
@@ -261,6 +270,8 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
             const lines = rfqLines[rfq.id] ?? [];
             const recipients = rfqRecipients[rfq.id] ?? [];
             const attachments = rfqAttachments[rfq.id] ?? [];
+            const hasPendingRecipients = recipients.some((r: any) => r.send_status === "pending");
+            const isSending = sending === rfq.id;
 
             return (
               <div key={rfq.id} className="rounded-lg border border-border bg-card overflow-hidden">
@@ -283,7 +294,26 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
 
                 {isExpanded && (
                   <div className="border-t border-border px-4 py-3 space-y-4">
-                    {/* Line items */}
+                    {canManage && hasPendingRecipients && ["draft", "ready_to_send"].includes(rfq.status) && (
+                      <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <Mail size={14} className="text-primary" />
+                          <span className="text-xs text-foreground">
+                            {recipients.filter((r: any) => r.send_status === "pending").length} supplier(s) ready to receive RFQ emails
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleSendRfqEmails(rfq.id)}
+                          disabled={isSending}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          {isSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                          {isSending ? "Sending…" : "Send RFQ Emails"}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Line items table */}
                     <div>
                       <h4 className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider mb-2">Line Items</h4>
                       {lines.length === 0 ? (
@@ -316,7 +346,7 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
                       )}
                     </div>
 
-                    {/* Recipients / Suppliers */}
+                    {/* Recipients */}
                     <div>
                       <h4 className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider mb-2">Suppliers</h4>
                       {recipients.length === 0 ? (
@@ -338,6 +368,11 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
                                 )}>
                                   {r.send_status}
                                 </span>
+                                {r.sent_at && (
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    sent {format(new Date(r.sent_at), "dd MMM HH:mm")}
+                                  </span>
+                                )}
                                 {r.quote_received_at && (
                                   <span className="text-[10px] text-chart-2 font-mono">
                                     £{r.quoted_total?.toFixed(2)} · {r.quoted_lead_time_days}d lead
@@ -345,6 +380,9 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
                                 )}
                                 {r.is_selected && (
                                   <span className="text-[10px] font-mono text-primary font-bold">✓ SELECTED</span>
+                                )}
+                                {r.send_status === "failed" && r.last_error && (
+                                  <span className="text-[10px] text-destructive font-mono" title={r.last_error}>⚠ {r.last_error.substring(0, 40)}</span>
                                 )}
                               </div>
                               {canManage && (
@@ -426,9 +464,7 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
                 <label className="block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase">Total (£ ex VAT)</label>
                 <input
                   className="w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  type="number"
-                  step="0.01"
-                  value={quoteForm.total}
+                  type="number" step="0.01" value={quoteForm.total}
                   onChange={e => setQuoteForm(f => ({ ...f, total: e.target.value }))}
                   placeholder="0.00"
                 />
@@ -437,8 +473,7 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
                 <label className="block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase">Lead Time (days)</label>
                 <input
                   className="w-full h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  type="number"
-                  value={quoteForm.leadDays}
+                  type="number" value={quoteForm.leadDays}
                   onChange={e => setQuoteForm(f => ({ ...f, leadDays: e.target.value }))}
                   placeholder="e.g. 5"
                 />
@@ -448,33 +483,18 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
               <label className="block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase">Notes</label>
               <textarea
                 className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                rows={2}
-                value={quoteForm.notes}
+                rows={2} value={quoteForm.notes}
                 onChange={e => setQuoteForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Any notes from supplier…"
               />
             </div>
-
-            {/* File upload */}
             <div>
               <label className="block text-[10px] font-mono font-medium text-muted-foreground mb-1 uppercase">Attach Quote Files</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.eml"
-                className="hidden"
-                onChange={e => {
-                  const files = Array.from(e.target.files || []);
-                  setQuoteFiles(prev => [...prev, ...files]);
-                  e.target.value = "";
-                }}
+              <input ref={fileInputRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.eml" className="hidden"
+                onChange={e => { const files = Array.from(e.target.files || []); setQuoteFiles(prev => [...prev, ...files]); e.target.value = ""; }}
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-16 rounded-md border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                className="w-full h-16 rounded-md border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
                 <Paperclip size={16} />
                 <span className="text-[10px] font-mono">Click to attach PDF, image, or email</span>
               </button>
@@ -491,21 +511,12 @@ export default function JobPurchasingTab({ jobId, jobNumber }: Props) {
                 </div>
               )}
             </div>
-
-            <button
-              onClick={recordQuote}
-              disabled={!quoteForm.total || uploading}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
+            <button onClick={recordQuote} disabled={!quoteForm.total || uploading}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
               {uploading ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                  Uploading…
-                </>
+                <><Loader2 size={14} className="animate-spin" /> Uploading…</>
               ) : (
-                <>
-                  <CheckCircle2 size={14} /> Save Quote{quoteFiles.length > 0 && ` (${quoteFiles.length} files)`}
-                </>
+                <><CheckCircle2 size={14} /> Save Quote{quoteFiles.length > 0 && ` (${quoteFiles.length} files)`}</>
               )}
             </button>
           </div>
