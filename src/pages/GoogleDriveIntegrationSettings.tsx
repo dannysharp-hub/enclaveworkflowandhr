@@ -59,6 +59,7 @@ export default function GoogleDriveIntegrationSettings() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   // Folder picker
   const [showFolderPicker, setShowFolderPicker] = useState(false);
@@ -69,12 +70,14 @@ export default function GoogleDriveIntegrationSettings() {
   const fetchStatus = useCallback(async () => {
     if (!session?.access_token) return;
     try {
-      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
-        body: { action: "status" },
-      });
-      if (error) throw error;
-      setSettings(data.settings || null);
-      setQueueCount(data.queue_count || 0);
+      const [driveRes, calRes] = await Promise.all([
+        supabase.functions.invoke("google-drive-auth", { body: { action: "status" } }),
+        supabase.functions.invoke("google-calendar-auth", { body: { action: "status" } }),
+      ]);
+      if (driveRes.error) throw driveRes.error;
+      setSettings(driveRes.data.settings || null);
+      setQueueCount(driveRes.data.queue_count || 0);
+      setGoogleConnected(calRes.data?.settings?.is_connected === true);
     } catch {
       setSettings(null);
     }
@@ -246,7 +249,7 @@ export default function GoogleDriveIntegrationSettings() {
           ) : (
             <button
               onClick={handleConnect}
-              disabled={connecting}
+              disabled={connecting || !googleConnected}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {connecting ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
@@ -255,9 +258,17 @@ export default function GoogleDriveIntegrationSettings() {
           )}
         </div>
 
-        {!isConnected && (
+        {!isConnected && !googleConnected && (
+          <div className="rounded-md bg-warning/10 border border-warning/30 p-3">
+            <p className="text-xs text-warning">
+              ⚠ You must connect your Google account via the <strong>Calendar integration</strong> above first, then return here to enable Drive.
+            </p>
+          </div>
+        )}
+
+        {!isConnected && googleConnected && (
           <p className="text-xs text-muted-foreground">
-            Google must be connected first via Calendar integration. Then enable Drive here to use Drive folders as project file storage.
+            Google is connected. Click "Enable Drive" to start using Drive folders as project file storage.
           </p>
         )}
 
