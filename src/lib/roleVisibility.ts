@@ -40,6 +40,7 @@ export const MODULE_VISIBILITY: Record<string, AppRole[]> = {
 
   // Staff management (admin view of all staff)
   "/staff": HR_ADMIN_ROLES,
+  "/hr-admin": HR_ADMIN_ROLES,
 
   // Production control pages
   "/production": PRODUCTION_MGMT_ROLES,
