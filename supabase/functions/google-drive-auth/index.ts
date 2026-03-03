@@ -470,6 +470,9 @@ Deno.serve(async (req) => {
         "export_subfolder_cnc", "export_subfolder_exports",
         "export_subfolder_labels", "export_subfolder_nesting",
         "include_subfolders", "detect_dxfs", "detect_photos", "detect_cost_sheets",
+        "auto_import_bom_on_detect", "auto_link_shared_media",
+        "shared_media_folder_id", "shared_media_folder_name",
+        "bom_file_match_keywords", "bom_file_match_extensions",
       ];
       const updates: Record<string, unknown> = {};
       for (const f of allowedFields) {
@@ -649,17 +652,36 @@ Deno.serve(async (req) => {
 
       const { data: settings } = await supabaseAdmin
         .from("google_drive_integration_settings")
-        .select("include_subfolders, detect_dxfs, detect_photos, detect_cost_sheets")
+        .select("include_subfolders, detect_dxfs, detect_photos, detect_cost_sheets, auto_import_bom_on_detect, bom_file_match_keywords, bom_file_match_extensions")
         .eq("tenant_id", tenantId)
         .single();
 
       const files = await listDriveFiles(accessToken, folderId, settings?.include_subfolders ?? true);
       let indexed = 0;
       const now = new Date().toISOString();
+      let hasDxf = false;
+      let hasJobpack = false;
+      let bomFile: any = null;
+
+      const bomKeywords = settings?.bom_file_match_keywords || ["bom", "inventor", "partslist", "parts list"];
+      const bomExtensions = settings?.bom_file_match_extensions || [".csv"];
 
       for (const file of files) {
         const detectedType = detectFileType(file.name, file.mimeType);
         const detectedStage = detectStage(file.name);
+        const lowerName = file.name.toLowerCase();
+
+        if (detectedType === "dxf") hasDxf = true;
+        if (lowerName.includes("jobpack") && (lowerName.endsWith(".zip") || lowerName.endsWith(".json"))) hasJobpack = true;
+
+        // BOM detection
+        const isBomExt = bomExtensions.some((ext: string) => lowerName.endsWith(ext));
+        const isBomKeyword = bomKeywords.some((kw: string) => lowerName.includes(kw.toLowerCase()));
+        const isBom = isBomExt && isBomKeyword;
+
+        if (isBom && !bomFile) {
+          bomFile = file; // take the first matching BOM
+        }
 
         await supabaseAdmin.from("drive_file_index").upsert({
           tenant_id: tenantId,
@@ -672,7 +694,7 @@ Deno.serve(async (req) => {
           drive_modified_time: file.modifiedTime || null,
           drive_created_time: file.createdTime || null,
           drive_web_view_link: file.webViewLink || null,
-          detected_type: detectedType,
+          detected_type: isBom ? "bom" : detectedType,
           detected_stage: detectedStage,
           status: "active",
           last_seen_at: now,
@@ -694,6 +716,153 @@ Deno.serve(async (req) => {
         .update({ last_indexed_at: now })
         .eq("id", link.id);
 
+      // Update job readiness flags
+      await supabaseAdmin.from("jobs").update({
+        has_dxf_files: hasDxf,
+        has_jobpack: hasJobpack,
+      }).eq("id", jobId);
+
+      // BOM auto-import
+      let bomImported = false;
+      if (bomFile && settings?.auto_import_bom_on_detect) {
+        // Check if we already processed this version (idempotency by drive_file_id + modifiedTime)
+        const { data: existingUpload } = await supabaseAdmin
+          .from("job_bom_uploads")
+          .select("id")
+          .eq("job_id", jobId)
+          .eq("storage_ref", `drive:${bomFile.id}:${bomFile.modifiedTime || ""}`)
+          .maybeSingle();
+
+        if (!existingUpload) {
+          // Download the BOM CSV from Drive
+          const downloadUrl = `https://www.googleapis.com/drive/v3/files/${bomFile.id}?alt=media`;
+          const dlRes = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (dlRes.ok) {
+            const csvText = await dlRes.text();
+
+            // Determine next revision
+            const { data: prevUploads } = await supabaseAdmin
+              .from("job_bom_uploads")
+              .select("bom_revision")
+              .eq("job_id", jobId)
+              .order("bom_revision", { ascending: false })
+              .limit(1);
+            const nextRevision = ((prevUploads?.[0] as any)?.bom_revision || 0) + 1;
+
+            // Create upload record
+            const { data: upload } = await supabaseAdmin
+              .from("job_bom_uploads")
+              .insert({
+                tenant_id: tenantId,
+                job_id: jobId,
+                file_name: bomFile.name,
+                storage_ref: `drive:${bomFile.id}:${bomFile.modifiedTime || ""}`,
+                uploaded_by_staff_id: "system",
+                parse_status: "pending",
+                bom_revision: nextRevision,
+              })
+              .select("id")
+              .single();
+
+            if (upload) {
+              // Inline BOM parsing (simplified — matches parse-bom-csv logic)
+              const lines = csvText.trim().split("\n");
+              if (lines.length >= 2) {
+                const headers = parseCSVRowInline(lines[0]).map(h => h.trim().toLowerCase().replace(/[^a-z0-9_ ]/g, ""));
+                const colMap = mapColumnsInline(headers);
+
+                // Load spray rules
+                const { data: sprayRules } = await supabaseAdmin
+                  .from("spray_match_rules").select("*").eq("tenant_id", tenantId).eq("active", true);
+                const inclusionTerms: { field: string; term: string }[] = [];
+                if (sprayRules && sprayRules.length > 0) {
+                  for (const rule of sprayRules) {
+                    if (!rule.is_exclusion) inclusionTerms.push({ field: rule.match_field, term: rule.match_term.toLowerCase() });
+                  }
+                } else {
+                  inclusionTerms.push({ field: "material_text", term: "mr mdf" });
+                  inclusionTerms.push({ field: "description", term: "mr mdf" });
+                }
+
+                const bomItems: any[] = [];
+                for (let i = 1; i < lines.length; i++) {
+                  const row = parseCSVRowInline(lines[i]);
+                  if (row.every(c => !c.trim())) continue;
+                  const desc = colMap.description >= 0 ? row[colMap.description]?.trim() || "" : "";
+                  const pn = colMap.part_number >= 0 ? row[colMap.part_number]?.trim() || "" : "";
+                  if (!desc && !pn) continue;
+                  const qtyRaw = colMap.quantity >= 0 ? row[colMap.quantity]?.trim() : "1";
+                  let qty = parseFloat(qtyRaw || "1");
+                  if (isNaN(qty) || qty <= 0) qty = 1;
+                  const mat = colMap.material >= 0 ? row[colMap.material]?.trim() || null : null;
+
+                  bomItems.push({
+                    tenant_id: tenantId, job_id: jobId, bom_upload_id: upload.id,
+                    bom_revision: nextRevision, part_number: pn || null,
+                    description: desc || pn, quantity: qty, unit: "pcs",
+                    material_text: mat,
+                  });
+                }
+
+                if (bomItems.length > 0) {
+                  await supabaseAdmin.from("job_bom_items").insert(bomItems);
+
+                  // Generate buylist
+                  const buylistLines: any[] = [];
+                  const deduped = new Map<string, { totalQty: number; rep: any }>();
+                  for (const item of bomItems) {
+                    const key = item.part_number ? `pn:${item.part_number}` : `desc:${(item.description || "").toLowerCase()}`;
+                    const ex = deduped.get(key);
+                    if (ex) { ex.totalQty += item.quantity; } else { deduped.set(key, { totalQty: item.quantity, rep: item }); }
+                  }
+
+                  for (const [, group] of deduped) {
+                    const rep = group.rep;
+                    const d = (rep.description || "").toLowerCase();
+                    const m = (rep.material_text || "").toLowerCase();
+                    let isSpray = false;
+                    let sprayReason = "";
+                    for (const rule of inclusionTerms) {
+                      const txt = rule.field === "material_text" ? m : d;
+                      if (txt.includes(rule.term)) { isSpray = true; sprayReason = `Matched "${rule.term}"`; break; }
+                    }
+                    const cat = isSpray ? "paint_spray_subcontract" : "other";
+                    const sg = isSpray ? "spray_shop" : "other";
+
+                    buylistLines.push({
+                      job_id: jobId, tenant_id: tenantId, category: cat, supplier_group: sg,
+                      item_name: rep.part_number || rep.description, quantity: group.totalQty, unit: "pcs",
+                      is_spray_required: isSpray, spray_detected: isSpray, spray_reason: sprayReason || null,
+                      source_type: "bom", bom_revision: nextRevision,
+                      notes: rep.material_text ? `Material: ${rep.material_text}` : null,
+                    });
+                  }
+
+                  await supabaseAdmin.from("buylist_line_items").delete().eq("job_id", jobId).eq("source_type", "bom");
+                  if (buylistLines.length > 0) await supabaseAdmin.from("buylist_line_items").insert(buylistLines);
+                }
+
+                await supabaseAdmin.from("job_bom_uploads").update({ parse_status: "parsed" }).eq("id", upload.id);
+                await supabaseAdmin.from("jobs").update({ has_bom_imported: true, drive_bom_last_imported_at: now }).eq("id", jobId);
+                bomImported = true;
+
+                // Notify office
+                const { data: notifyUsers } = await supabaseAdmin
+                  .from("user_roles").select("user_id").eq("tenant_id", tenantId).in("role", ["admin", "office"]);
+                for (const u of (notifyUsers || [])) {
+                  await supabaseAdmin.from("notifications").insert({
+                    user_id: u.user_id, tenant_id: tenantId,
+                    title: "BOM imported from Drive",
+                    message: `${bomFile.name} imported for Job (rev ${nextRevision}), ${bomItems.length} items`,
+                    type: "info", link: `/jobs/${jobId}`,
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Audit
       await supabaseAdmin.from("drive_sync_audit").insert({
         tenant_id: tenantId,
@@ -701,10 +870,10 @@ Deno.serve(async (req) => {
         action: "index_job_files",
         job_id: jobId,
         drive_folder_id: folderId,
-        payload_after_json: { indexed, total_files: files.length },
+        payload_after_json: { indexed, total_files: files.length, has_dxf: hasDxf, has_jobpack: hasJobpack, bom_imported: bomImported },
       });
 
-      return new Response(JSON.stringify({ indexed, total_files: files.length }), {
+      return new Response(JSON.stringify({ indexed, total_files: files.length, has_dxf: hasDxf, has_jobpack: hasJobpack, bom_imported: bomImported }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -1036,6 +1205,216 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── SCAN SHARED MEDIA ───
+    if (action === "scan_shared_media") {
+      const { data: settings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("shared_media_folder_id, auto_link_shared_media")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!settings?.shared_media_folder_id) {
+        return new Response(JSON.stringify({ error: "No shared media folder configured" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const mediaFiles = await listDriveFiles(accessToken, settings.shared_media_folder_id, true);
+
+      // Get all job numbers for matching
+      const { data: jobs } = await supabaseAdmin
+        .from("jobs").select("id, job_id").eq("tenant_id", tenantId);
+      const jobMap = new Map((jobs || []).map((j: any) => [j.job_id, j.id]));
+
+      // Get existing assignments to skip
+      const { data: existing } = await supabaseAdmin
+        .from("shared_media_assignments").select("drive_file_id").eq("tenant_id", tenantId);
+      const existingIds = new Set((existing || []).map((e: any) => e.drive_file_id));
+
+      let autoMatched = 0;
+      let unassigned = 0;
+
+      for (const file of mediaFiles) {
+        if (existingIds.has(file.id)) continue;
+        if (!file.mimeType?.startsWith("image/") && !file.mimeType?.startsWith("video/")) continue;
+
+        // Try to match by job number in filename
+        let matchedJobId: string | null = null;
+        let matchReason: string | null = null;
+
+        for (const [jobNum, jobUuid] of jobMap) {
+          if (jobNum && file.name.includes(jobNum)) {
+            matchedJobId = jobUuid as string;
+            matchReason = `Filename contains job number "${jobNum}"`;
+            break;
+          }
+        }
+
+        const status = matchedJobId ? "assigned" : "unassigned";
+        if (matchedJobId) autoMatched++;
+        else unassigned++;
+
+        await supabaseAdmin.from("shared_media_assignments").insert({
+          tenant_id: tenantId,
+          drive_file_id: file.id,
+          file_name: file.name,
+          mime_type: file.mimeType,
+          drive_web_view_link: file.webViewLink || null,
+          job_id: matchedJobId,
+          auto_matched: !!matchedJobId,
+          match_reason: matchReason,
+          status,
+          assigned_at: matchedJobId ? new Date().toISOString() : null,
+        });
+
+        // If matched, also add to drive_file_index for the job
+        if (matchedJobId) {
+          await supabaseAdmin.from("drive_file_index").upsert({
+            tenant_id: tenantId,
+            job_id: matchedJobId,
+            drive_file_id: file.id,
+            file_name: file.name,
+            mime_type: file.mimeType,
+            drive_web_view_link: file.webViewLink || null,
+            detected_type: "photo",
+            detected_stage: "unknown",
+            status: "active",
+            last_seen_at: new Date().toISOString(),
+          }, { onConflict: "tenant_id,drive_file_id" });
+        }
+      }
+
+      return new Response(JSON.stringify({ total: mediaFiles.length, auto_matched: autoMatched, unassigned }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── SET SHARED MEDIA FOLDER ───
+    if (action === "set_shared_media_folder") {
+      const folderId = body.folder_id as string;
+      const folderName = body.folder_name as string;
+
+      await supabaseAdmin.from("google_drive_integration_settings").update({
+        shared_media_folder_id: folderId || null,
+        shared_media_folder_name: folderName || null,
+      }).eq("tenant_id", tenantId);
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── ASSIGN MEDIA TO JOB ───
+    if (action === "assign_media") {
+      const mediaId = body.media_id as string;
+      const targetJobId = body.job_id as string;
+
+      if (!mediaId || !targetJobId) {
+        return new Response(JSON.stringify({ error: "media_id and job_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: media } = await supabaseAdmin
+        .from("shared_media_assignments")
+        .select("*")
+        .eq("id", mediaId)
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!media) {
+        return new Response(JSON.stringify({ error: "Media not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await supabaseAdmin.from("shared_media_assignments").update({
+        job_id: targetJobId,
+        assigned_by_staff_id: user.id,
+        assigned_at: new Date().toISOString(),
+        status: "assigned",
+        match_reason: "Manual assignment",
+      }).eq("id", mediaId);
+
+      // Add to drive_file_index
+      await supabaseAdmin.from("drive_file_index").upsert({
+        tenant_id: tenantId,
+        job_id: targetJobId,
+        drive_file_id: media.drive_file_id,
+        file_name: media.file_name,
+        mime_type: media.mime_type,
+        drive_web_view_link: media.drive_web_view_link,
+        detected_type: "photo",
+        detected_stage: "unknown",
+        status: "active",
+        last_seen_at: new Date().toISOString(),
+      }, { onConflict: "tenant_id,drive_file_id" });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── GET UNASSIGNED MEDIA ───
+    if (action === "get_unassigned_media") {
+      const { data: media } = await supabaseAdmin
+        .from("shared_media_assignments")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("status", "unassigned")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      return new Response(JSON.stringify({ media: media || [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── RECORD FILE OPEN (Read Receipt) ───
+    if (action === "record_file_open") {
+      const driveFileId = body.drive_file_id as string;
+      const fileJobId = body.job_id as string;
+      const fileName = body.file_name as string;
+      const context = body.context as string || "job_documents";
+
+      if (!driveFileId) {
+        return new Response(JSON.stringify({ error: "drive_file_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await supabaseAdmin.from("file_open_events").insert({
+        tenant_id: tenantId,
+        job_id: fileJobId || null,
+        drive_file_id: driveFileId,
+        file_name: fileName || null,
+        opened_by_staff_id: user.id,
+        context,
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── GET FILE OPEN EVENTS (Seen By) ───
+    if (action === "get_file_opens") {
+      const driveFileId = body.drive_file_id as string;
+      const fileJobId = body.job_id as string;
+
+      let query = supabaseAdmin.from("file_open_events").select("*").eq("tenant_id", tenantId);
+      if (driveFileId) query = query.eq("drive_file_id", driveFileId);
+      if (fileJobId) query = query.eq("job_id", fileJobId);
+      query = query.order("opened_at", { ascending: false }).limit(200);
+
+      const { data: opens } = await query;
+
+      return new Response(JSON.stringify({ opens: opens || [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -1070,6 +1449,8 @@ function detectFileType(fileName: string, mimeType: string): string {
   if (ext === "pdf" && /drawing|plan|elevation/i.test(lower)) return "cad";
   if (ext === "pdf") return "pdf";
 
+  if (/bom|inventor|partslist|parts.?list/i.test(lower) && ext === "csv") return "bom";
+
   return "other";
 }
 
@@ -1081,4 +1462,41 @@ function detectStage(fileName: string): string {
   if (/install|site|delivery|signoff/i.test(lower)) return "install";
   if (/invoice|cost|budget|payment|finance/i.test(lower)) return "finance";
   return "unknown";
+}
+
+// Inline CSV helpers for BOM auto-import (can't import from src)
+function parseCSVRowInline(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ",") { result.push(current); current = ""; }
+      else { current += ch; }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function mapColumnsInline(headers: string[]): Record<string, number> {
+  const map: Record<string, number> = { description: -1, part_number: -1, quantity: -1, material: -1 };
+  const descKeys = ["description", "desc", "part description", "item", "item name", "name", "component"];
+  const pnKeys = ["part number", "part_number", "partnumber", "partno", "part_no", "part no", "part id", "part_id", "sku", "item code"];
+  const qtyKeys = ["quantity", "qty", "q", "count"];
+  const matKeys = ["material", "material_text", "mat", "material code", "material_code", "product_code", "product code"];
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i].replace(/_/g, " ").trim();
+    if (map.description < 0 && descKeys.includes(h)) map.description = i;
+    if (map.part_number < 0 && pnKeys.includes(h)) map.part_number = i;
+    if (map.quantity < 0 && qtyKeys.includes(h)) map.quantity = i;
+    if (map.material < 0 && matKeys.includes(h)) map.material = i;
+  }
+  return map;
 }

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   HardDrive, ExternalLink, RefreshCw, Loader2, FileText, Image, FileCode,
-  FileSpreadsheet, File, Film, Search, Filter, Upload,
+  FileSpreadsheet, File, Film, Search, Filter, Upload, Eye, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,8 @@ const typeIcons: Record<string, React.ReactNode> = {
   proposal: <FileText size={14} className="text-green-400" />,
   cost_sheet: <FileSpreadsheet size={14} className="text-amber-400" />,
   photo: <Image size={14} className="text-purple-400" />,
+  video: <Film size={14} className="text-pink-400" />,
+  bom: <FileSpreadsheet size={14} className="text-green-500" />,
   pdf: <FileText size={14} className="text-red-400" />,
   cnc_output: <FileCode size={14} className="text-orange-400" />,
   other: <File size={14} className="text-muted-foreground" />,
@@ -44,6 +47,8 @@ const typeLabels: Record<string, string> = {
   proposal: "Proposal",
   cost_sheet: "Cost Sheet",
   photo: "Photo/Media",
+  video: "Video",
+  bom: "BOM",
   pdf: "PDF",
   cnc_output: "CNC Output",
   other: "Other",
@@ -66,8 +71,10 @@ function formatBytes(bytes: number | null): string {
 }
 
 export default function JobDrivePanel({ jobId }: { jobId: string }) {
+  const { user } = useAuth();
   const [link, setLink] = useState<DriveLink | null>(null);
   const [files, setFiles] = useState<DriveFile[]>([]);
+  const [fileOpens, setFileOpens] = useState<Record<string, { count: number; staffIds: string[] }>>({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
@@ -82,6 +89,24 @@ export default function JobDrivePanel({ jobId }: { jobId: string }) {
       if (error) throw error;
       setLink(data.link);
       setFiles(data.files || []);
+
+      // Load read receipts for these files
+      if (data.files?.length > 0) {
+        const { data: opensData } = await supabase.functions.invoke("google-drive-auth", {
+          body: { action: "get_file_opens", job_id: jobId },
+        });
+        if (opensData?.opens) {
+          const grouped: Record<string, { count: number; staffIds: string[] }> = {};
+          for (const o of opensData.opens) {
+            if (!grouped[o.drive_file_id]) grouped[o.drive_file_id] = { count: 0, staffIds: [] };
+            grouped[o.drive_file_id].count++;
+            if (!grouped[o.drive_file_id].staffIds.includes(o.opened_by_staff_id)) {
+              grouped[o.drive_file_id].staffIds.push(o.opened_by_staff_id);
+            }
+          }
+          setFileOpens(grouped);
+        }
+      }
     } catch {
       // No link — that's fine
     }
@@ -260,12 +285,28 @@ export default function JobDrivePanel({ jobId }: { jobId: string }) {
                       ? new Date(file.drive_modified_time).toLocaleDateString()
                       : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right flex items-center justify-end gap-2">
+                    {fileOpens[file.id] && (
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5" title={`Opened by ${fileOpens[file.id].staffIds.length} person(s), ${fileOpens[file.id].count} total opens`}>
+                        <Users size={10} /> {fileOpens[file.id].staffIds.length}
+                      </span>
+                    )}
                     {file.drive_web_view_link && (
                       <a
                         href={file.drive_web_view_link}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => {
+                          // Record read receipt
+                          supabase.functions.invoke("google-drive-auth", {
+                            body: {
+                              action: "record_file_open",
+                              drive_file_id: file.id,
+                              job_id: jobId,
+                              file_name: file.file_name,
+                            },
+                          }).catch(() => {});
+                        }}
                         className="text-primary hover:underline text-[10px]"
                       >
                         Open

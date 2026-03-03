@@ -1940,6 +1940,54 @@ export type Database = {
           },
         ]
       }
+      file_open_events: {
+        Row: {
+          context: string | null
+          drive_file_id: string
+          file_name: string | null
+          id: string
+          job_id: string | null
+          opened_at: string | null
+          opened_by_staff_id: string
+          tenant_id: string
+        }
+        Insert: {
+          context?: string | null
+          drive_file_id: string
+          file_name?: string | null
+          id?: string
+          job_id?: string | null
+          opened_at?: string | null
+          opened_by_staff_id: string
+          tenant_id: string
+        }
+        Update: {
+          context?: string | null
+          drive_file_id?: string
+          file_name?: string | null
+          id?: string
+          job_id?: string | null
+          opened_at?: string | null
+          opened_by_staff_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_open_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_open_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       file_read_receipts: {
         Row: {
           acknowledged: boolean
@@ -2080,8 +2128,12 @@ export type Database = {
         Row: {
           auto_attach_dxfs: boolean
           auto_create_jobs_from_folders: boolean
+          auto_import_bom_on_detect: boolean | null
           auto_index_files: boolean
+          auto_link_shared_media: boolean | null
           auto_upload_exports: boolean
+          bom_file_match_extensions: string[] | null
+          bom_file_match_keywords: string[] | null
           created_at: string
           detect_cost_sheets: boolean
           detect_dxfs: boolean
@@ -2102,6 +2154,8 @@ export type Database = {
           polling_interval_minutes: number
           projects_root_folder_id: string | null
           projects_root_folder_name: string | null
+          shared_media_folder_id: string | null
+          shared_media_folder_name: string | null
           status: string
           sync_mode: string
           tenant_id: string
@@ -2110,8 +2164,12 @@ export type Database = {
         Insert: {
           auto_attach_dxfs?: boolean
           auto_create_jobs_from_folders?: boolean
+          auto_import_bom_on_detect?: boolean | null
           auto_index_files?: boolean
+          auto_link_shared_media?: boolean | null
           auto_upload_exports?: boolean
+          bom_file_match_extensions?: string[] | null
+          bom_file_match_keywords?: string[] | null
           created_at?: string
           detect_cost_sheets?: boolean
           detect_dxfs?: boolean
@@ -2132,6 +2190,8 @@ export type Database = {
           polling_interval_minutes?: number
           projects_root_folder_id?: string | null
           projects_root_folder_name?: string | null
+          shared_media_folder_id?: string | null
+          shared_media_folder_name?: string | null
           status?: string
           sync_mode?: string
           tenant_id: string
@@ -2140,8 +2200,12 @@ export type Database = {
         Update: {
           auto_attach_dxfs?: boolean
           auto_create_jobs_from_folders?: boolean
+          auto_import_bom_on_detect?: boolean | null
           auto_index_files?: boolean
+          auto_link_shared_media?: boolean | null
           auto_upload_exports?: boolean
+          bom_file_match_extensions?: string[] | null
+          bom_file_match_keywords?: string[] | null
           created_at?: string
           detect_cost_sheets?: boolean
           detect_dxfs?: boolean
@@ -2162,6 +2226,8 @@ export type Database = {
           polling_interval_minutes?: number
           projects_root_folder_id?: string | null
           projects_root_folder_name?: string | null
+          shared_media_folder_id?: string | null
+          shared_media_folder_name?: string | null
           status?: string
           sync_mode?: string
           tenant_id?: string
@@ -4120,7 +4186,11 @@ export type Database = {
           created_date: string
           customer_id: string | null
           deposit_received_at: string | null
+          drive_bom_last_imported_at: string | null
           due_date: string | null
+          has_bom_imported: boolean | null
+          has_dxf_files: boolean | null
+          has_jobpack: boolean | null
           id: string
           job_id: string
           job_name: string
@@ -4144,7 +4214,11 @@ export type Database = {
           created_date?: string
           customer_id?: string | null
           deposit_received_at?: string | null
+          drive_bom_last_imported_at?: string | null
           due_date?: string | null
+          has_bom_imported?: boolean | null
+          has_dxf_files?: boolean | null
+          has_jobpack?: boolean | null
           id?: string
           job_id: string
           job_name: string
@@ -4168,7 +4242,11 @@ export type Database = {
           created_date?: string
           customer_id?: string | null
           deposit_received_at?: string | null
+          drive_bom_last_imported_at?: string | null
           due_date?: string | null
+          has_bom_imported?: boolean | null
+          has_dxf_files?: boolean | null
+          has_jobpack?: boolean | null
           id?: string
           job_id?: string
           job_name?: string
@@ -6319,6 +6397,69 @@ export type Database = {
           },
           {
             foreignKeyName: "rfq_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shared_media_assignments: {
+        Row: {
+          assigned_at: string | null
+          assigned_by_staff_id: string | null
+          auto_matched: boolean | null
+          created_at: string | null
+          drive_file_id: string
+          drive_web_view_link: string | null
+          file_name: string
+          id: string
+          job_id: string | null
+          match_reason: string | null
+          mime_type: string | null
+          status: string | null
+          tenant_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by_staff_id?: string | null
+          auto_matched?: boolean | null
+          created_at?: string | null
+          drive_file_id: string
+          drive_web_view_link?: string | null
+          file_name: string
+          id?: string
+          job_id?: string | null
+          match_reason?: string | null
+          mime_type?: string | null
+          status?: string | null
+          tenant_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by_staff_id?: string | null
+          auto_matched?: boolean | null
+          created_at?: string | null
+          drive_file_id?: string
+          drive_web_view_link?: string | null
+          file_name?: string
+          id?: string
+          job_id?: string | null
+          match_reason?: string | null
+          mime_type?: string | null
+          status?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_media_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_media_assignments_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
