@@ -44,13 +44,16 @@ interface JobPackOptions {
   jobName: string;
   tenantId?: string | null;
   groups: NestingGroup[];
+  machineName?: string;
+  postProcessorName?: string;
+  toolpathTemplateName?: string;
 }
 
 // Generate the Lua Gadget script for VCarve Pro
 function generateLuaGadget(): string {
   return `-- ============================================================
 -- Enclave - Import Job Pack (VCarve Pro Gadget)
--- Version: 1.0
+-- Version: 1.1
 -- Compatible with: VCarve Pro 11+
 -- ============================================================
 -- USAGE:
@@ -58,6 +61,7 @@ function generateLuaGadget(): string {
 --   2. Select "Enclave - Import Job Pack"
 --   3. Browse to the exported JobPack.json file
 --   4. The gadget will auto-import DXFs and configure nesting
+--   5. After calculating toolpaths, enter estimated cut times
 -- ============================================================
 
 function main(script)
@@ -89,6 +93,7 @@ function main(script)
   -- Simple JSON parser for our known structure
   local job_name = content:match('"job_name"%s*:%s*"([^"]*)"')
   local job_id = content:match('"job_id"%s*:%s*"([^"]*)"')
+  local machine_name = content:match('"machine_name"%s*:%s*"([^"]*)"') or "Unknown"
   
   if not job_name then
     DisplayMessageBox("Invalid JobPack.json format")
@@ -99,6 +104,7 @@ function main(script)
   local confirm = Dialog("Confirm Import")
   confirm:AddLabelField("job", "Job: " .. (job_name or "Unknown"))
   confirm:AddLabelField("id", "ID: " .. (job_id or "Unknown"))
+  confirm:AddLabelField("machine", "Machine: " .. machine_name)
   confirm:AddLabelField("note", "This will create a new VCarve job and import all DXFs.")
   
   if not confirm:ShowDialog() then return false end
@@ -114,10 +120,10 @@ function main(script)
   
   -- Read Parts.csv and import DXFs
   local parts_file = io.open(base_dir .. "manifest/Parts.csv", "r")
+  local part_count = 0
   if parts_file then
     local header = parts_file:read("*line") -- skip header
     local line = parts_file:read("*line")
-    local part_count = 0
     
     while line do
       -- Parse CSV: part_id, product_code, material, length, width, qty, grain_req, grain_axis, rotation, dxf_path
@@ -143,16 +149,119 @@ function main(script)
       line = parts_file:read("*line")
     end
     parts_file:close()
-    
-    DisplayMessageBox("Import complete!\\n\\n" ..
-      "Parts imported: " .. part_count .. "\\n\\n" ..
-      "NEXT STEPS:\\n" ..
-      "1. Click 'Nest Parts' to run nesting\\n" ..
-      "2. Click 'Calculate Toolpaths'\\n" ..
-      "3. Save and run")
   else
     DisplayMessageBox("Parts.csv not found in manifest folder")
+    return false
   end
+
+  -- ════════════════════════════════════════════════════════
+  -- STEP: Enter Estimated Cut Times Per Sheet
+  -- ════════════════════════════════════════════════════════
+  -- Read TimeEstimates.json to get sheet list
+  local te_file = io.open(base_dir .. "manifest/TimeEstimates.json", "r")
+  local te_content = ""
+  if te_file then
+    te_content = te_file:read("*all")
+    te_file:close()
+  end
+  
+  -- Count sheets from the template
+  local sheet_count = 0
+  local sheet_ids = {}
+  local sheet_groups = {}
+  for idx, sid in te_content:gmatch('"sheet_index"%s*:%s*(%d+).-"sheet_id"%s*:%s*"([^"]*)"') do
+    sheet_count = sheet_count + 1
+    table.insert(sheet_ids, sid)
+  end
+  for gl in te_content:gmatch('"group_label"%s*:%s*"([^"]*)"') do
+    table.insert(sheet_groups, gl)
+  end
+  
+  if sheet_count == 0 then
+    sheet_count = 1 -- fallback
+  end
+  
+  -- Time entry dialog
+  local time_dialog = Dialog("Enter Estimated Cut Times")
+  time_dialog:AddLabelField("instr1", "INSTRUCTIONS:")
+  time_dialog:AddLabelField("instr2", "1. In VCarve, go to Toolpath Summary")
+  time_dialog:AddLabelField("instr3", "2. Run 'Estimate Machining Times'")
+  time_dialog:AddLabelField("instr4", "3. Enter the estimated minutes for each sheet below")
+  time_dialog:AddLabelField("sep", "─────────────────────────────────")
+  
+  -- Option: enter per-sheet or enter total
+  time_dialog:AddRadioGroup("entry_mode", "Entry Mode:", "Per Sheet,Total (divide evenly)", 0)
+  time_dialog:AddDoubleField("total_minutes", "Total Minutes (if using total):", 0)
+  
+  for i = 1, math.min(sheet_count, 20) do
+    local label = "Sheet " .. i
+    if sheet_groups[i] then label = label .. " (" .. sheet_groups[i] .. ")" end
+    time_dialog:AddDoubleField("sheet_" .. i, label .. " minutes:", 0)
+  end
+  
+  if not time_dialog:ShowDialog() then
+    DisplayMessageBox("Import complete (without time estimates).\\n\\n" ..
+      "Parts imported: " .. part_count)
+    return true
+  end
+  
+  -- Collect time values
+  local entry_mode = time_dialog:GetIntField("entry_mode")
+  local sheet_times = {}
+  local notes = "Estimates taken from VCarve Toolpath Summary."
+  
+  if entry_mode == 1 then
+    -- Total mode: divide evenly
+    local total = time_dialog:GetDoubleField("total_minutes")
+    if total > 0 then
+      local per_sheet = total / sheet_count
+      for i = 1, sheet_count do
+        table.insert(sheet_times, per_sheet)
+      end
+      notes = "Total " .. total .. " min divided evenly across " .. sheet_count .. " sheets."
+    end
+  else
+    -- Per-sheet mode
+    for i = 1, sheet_count do
+      local val = time_dialog:GetDoubleField("sheet_" .. i)
+      if val and val > 0 then
+        table.insert(sheet_times, val)
+      else
+        table.insert(sheet_times, 0)
+      end
+    end
+  end
+  
+  -- Write TimeEstimates.json with actual values
+  local te_out = '{\\n'
+  te_out = te_out .. '  "job_id": "' .. (job_id or "") .. '",\\n'
+  te_out = te_out .. '  "machine": "' .. machine_name .. '",\\n'
+  te_out = te_out .. '  "generated_at": "' .. os.date("!%Y-%m-%dT%H:%M:%SZ") .. '",\\n'
+  te_out = te_out .. '  "sheets": [\\n'
+  for i = 1, #sheet_times do
+    local sid = sheet_ids[i] or ("sheet-" .. i)
+    te_out = te_out .. '    { "sheet_index": ' .. i .. ', "sheet_id": "' .. sid .. '", "estimated_minutes": ' .. string.format("%.1f", sheet_times[i]) .. ' }'
+    if i < #sheet_times then te_out = te_out .. ',' end
+    te_out = te_out .. '\\n'
+  end
+  te_out = te_out .. '  ],\\n'
+  te_out = te_out .. '  "notes": "' .. notes .. '"\\n'
+  te_out = te_out .. '}\\n'
+  
+  local te_write = io.open(base_dir .. "manifest/TimeEstimates.json", "w")
+  if te_write then
+    te_write:write(te_out)
+    te_write:close()
+  end
+  
+  DisplayMessageBox("Import complete!\\n\\n" ..
+    "Parts imported: " .. part_count .. "\\n" ..
+    "Sheet time estimates: " .. #sheet_times .. " sheets\\n\\n" ..
+    "NEXT STEPS:\\n" ..
+    "1. Click 'Nest Parts' to run nesting\\n" ..
+    "2. Click 'Calculate Toolpaths'\\n" ..
+    "3. Verify estimates match Toolpath Summary\\n" ..
+    "4. Save and run")
   
   return true
 end
@@ -195,7 +304,13 @@ STEP 5: CALCULATE TOOLPATHS
   - Calculate all toolpaths
   - Preview and verify
 
-STEP 6: SAVE & CUT
+STEP 6: ENTER ESTIMATED CUT TIMES
+  - Go to: Toolpath Summary → Estimate Machining Times
+  - The gadget will prompt you to enter estimated minutes per sheet
+  - You can enter per-sheet times OR a total to divide evenly
+  - These estimates feed into production queue planning
+
+STEP 7: SAVE & CUT
   - Save the VCarve project
   - Output toolpaths to the machine
   - Scan sheet QR codes before cutting
@@ -214,18 +329,21 @@ IMPORTANT NOTES:
 }
 
 export async function generateVCarveJobPack(options: JobPackOptions & { uploadToDrive?: boolean }): Promise<void> {
-  const { jobId, jobCode, jobName, tenantId, groups, uploadToDrive: shouldUpload } = options;
+  const { jobId, jobCode, jobName, tenantId, groups, uploadToDrive: shouldUpload, machineName, postProcessorName, toolpathTemplateName } = options;
   const zip = new JSZip();
   const packName = `${jobCode}_VCarve_Pack`;
 
   // --- manifest/JobPack.json ---
   const manifest = {
-    version: "1.0",
+    version: "1.1",
     format: "enclave_vcarve_pack",
     tenant_id: tenantId || undefined,
     job_id: jobId,
     job_code: jobCode,
     job_name: jobName,
+    machine_name: machineName || "Fabertec M1",
+    post_processor_name: postProcessorName || null,
+    toolpath_template_name: toolpathTemplateName || null,
     created_at: new Date().toISOString(),
     total_unique_parts: groups.reduce((s, g) => s + g.parts.length, 0),
     total_quantity: groups.reduce((s, g) => s + g.parts.reduce((s2, p) => s2 + p.quantity, 0), 0),
@@ -302,6 +420,24 @@ export async function generateVCarveJobPack(options: JobPackOptions & { uploadTo
     prioritise_grain_parts: g.prioritise_grain_parts,
   }));
   zip.file("manifest/NestingSettings.json", JSON.stringify(nestingSettings, null, 2));
+
+  // --- manifest/TimeEstimates.json (placeholder for gadget to populate) ---
+  const timeEstimates = {
+    job_id: jobCode,
+    machine: machineName || "Fabertec M1",
+    generated_at: new Date().toISOString(),
+    sheets: groups.flatMap(g =>
+      g.planned_sheets.map((s, idx) => ({
+        sheet_index: idx + 1,
+        sheet_id: s.sheet_id,
+        group_label: g.group_label,
+        material_code: g.material_code,
+        estimated_minutes: null as number | null, // To be filled by operator via gadget
+      }))
+    ),
+    notes: "Estimates to be entered by operator from VCarve Toolpath Summary.",
+  };
+  zip.file("manifest/TimeEstimates.json", JSON.stringify(timeEstimates, null, 2));
 
   // --- DXF files ---
   for (const g of groups) {

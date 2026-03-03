@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { updateAllJobReadiness, type ReadinessResult } from "@/lib/readinessEngine";
 import ReadinessBadge from "@/components/ReadinessBadge";
 import JobStatusBadge from "@/components/JobStatusBadge";
+import CncQueuePressureWidget from "@/components/CncQueuePressureWidget";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import {
@@ -224,6 +225,9 @@ export default function ProductionControlPage() {
 
         {/* ═══ Overview Tab ═══ */}
         <TabsContent value="overview" className="space-y-6">
+          {/* CNC Queue Pressure */}
+          <CncQueuePressureWidget />
+
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Stage Bottleneck Analysis */}
             <div className="glass-panel rounded-lg">

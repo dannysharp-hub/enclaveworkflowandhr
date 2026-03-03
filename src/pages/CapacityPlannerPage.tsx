@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import CncQueuePressureWidget from "@/components/CncQueuePressureWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -151,6 +152,9 @@ export default function CapacityPlannerPage() {
           </Button>
         </div>
       </div>
+
+      {/* CNC Queue Pressure */}
+      <CncQueuePressureWidget />
 
       {/* Stage utilisation cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
