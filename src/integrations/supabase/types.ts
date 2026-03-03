@@ -4578,11 +4578,14 @@ export type Database = {
       payroll_settings: {
         Row: {
           created_at: string
+          enable_break_tracking: boolean
           enable_productivity_kpis: boolean
           enable_staff_pay_estimate: boolean
+          holiday_model: string
           id: string
           include_overtime_in_estimate: boolean
           overtime_multiplier: number
+          overtime_threshold_hours: number
           pay_currency: string
           pay_frequency: string
           rounding_rule: string
@@ -4591,11 +4594,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          enable_break_tracking?: boolean
           enable_productivity_kpis?: boolean
           enable_staff_pay_estimate?: boolean
+          holiday_model?: string
           id?: string
           include_overtime_in_estimate?: boolean
           overtime_multiplier?: number
+          overtime_threshold_hours?: number
           pay_currency?: string
           pay_frequency?: string
           rounding_rule?: string
@@ -4604,11 +4610,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          enable_break_tracking?: boolean
           enable_productivity_kpis?: boolean
           enable_staff_pay_estimate?: boolean
+          holiday_model?: string
           id?: string
           include_overtime_in_estimate?: boolean
           overtime_multiplier?: number
+          overtime_threshold_hours?: number
           pay_currency?: string
           pay_frequency?: string
           rounding_rule?: string

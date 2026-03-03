@@ -13,8 +13,11 @@ interface Settings {
   pay_frequency: string;
   include_overtime_in_estimate: boolean;
   overtime_multiplier: number;
+  overtime_threshold_hours: number;
   rounding_rule: string;
   enable_productivity_kpis: boolean;
+  holiday_model: string;
+  enable_break_tracking: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -23,8 +26,11 @@ const DEFAULTS: Settings = {
   pay_frequency: "monthly",
   include_overtime_in_estimate: false,
   overtime_multiplier: 1.5,
+  overtime_threshold_hours: 8,
   rounding_rule: "none",
   enable_productivity_kpis: true,
+  holiday_model: "accrual",
+  enable_break_tracking: false,
 };
 
 export default function PayrollSettingsTab() {
@@ -44,8 +50,11 @@ export default function PayrollSettingsTab() {
           pay_frequency: data.pay_frequency,
           include_overtime_in_estimate: data.include_overtime_in_estimate,
           overtime_multiplier: Number(data.overtime_multiplier),
+          overtime_threshold_hours: Number((data as any).overtime_threshold_hours ?? 8),
           rounding_rule: data.rounding_rule,
           enable_productivity_kpis: data.enable_productivity_kpis,
+          holiday_model: (data as any).holiday_model ?? "accrual",
+          enable_break_tracking: (data as any).enable_break_tracking ?? false,
         });
       }
       setLoaded(true);
@@ -133,12 +142,29 @@ export default function PayrollSettingsTab() {
             <input type="number" step="0.1" min="1" max="3" className={inputClass} value={form.overtime_multiplier} onChange={e => setForm(f => ({ ...f, overtime_multiplier: parseFloat(e.target.value) || 1.5 }))} />
           </div>
           <div>
+            <label className={labelClass}>Overtime Threshold (hrs/day)</label>
+            <input type="number" step="0.5" min="1" max="24" className={inputClass} value={form.overtime_threshold_hours} onChange={e => setForm(f => ({ ...f, overtime_threshold_hours: parseFloat(e.target.value) || 8 }))} />
+            <p className="text-[10px] text-muted-foreground mt-1">Hours after which overtime rate applies</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
             <label className={labelClass}>Rounding Rule</label>
             <select className={selectClass} value={form.rounding_rule} onChange={e => setForm(f => ({ ...f, rounding_rule: e.target.value }))}>
               <option value="none">None</option>
               <option value="nearest_5_minutes">Nearest 5 min</option>
               <option value="nearest_15_minutes">Nearest 15 min</option>
             </select>
+          </div>
+          <div>
+            <label className={labelClass}>Holiday Model</label>
+            <select className={selectClass} value={form.holiday_model} onChange={e => setForm(f => ({ ...f, holiday_model: e.target.value }))}>
+              <option value="accrual">Accrual (earned over time)</option>
+              <option value="annual_allowance">Annual Allowance (fixed)</option>
+              <option value="unlimited">Unlimited</option>
+            </select>
+            <p className="text-[10px] text-muted-foreground mt-1">How holiday entitlement is calculated</p>
           </div>
         </div>
 
@@ -153,6 +179,20 @@ export default function PayrollSettingsTab() {
             className={`w-10 h-5 rounded-full transition-colors ${form.include_overtime_in_estimate ? "bg-primary" : "bg-muted"}`}
           >
             <div className={`w-4 h-4 rounded-full bg-background shadow transition-transform ${form.include_overtime_in_estimate ? "translate-x-5" : "translate-x-0.5"}`} />
+          </button>
+        </div>
+
+        {/* Break Tracking Toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">Enable Break Tracking</p>
+            <p className="text-[10px] text-muted-foreground">Allow staff to log break start/end times</p>
+          </div>
+          <button
+            onClick={() => setForm(f => ({ ...f, enable_break_tracking: !f.enable_break_tracking }))}
+            className={`w-10 h-5 rounded-full transition-colors ${form.enable_break_tracking ? "bg-primary" : "bg-muted"}`}
+          >
+            <div className={`w-4 h-4 rounded-full bg-background shadow transition-transform ${form.enable_break_tracking ? "translate-x-5" : "translate-x-0.5"}`} />
           </button>
         </div>
 
