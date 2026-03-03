@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import JobStatusBadge from "@/components/JobStatusBadge";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
@@ -15,14 +15,40 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format, differenceInDays } from "date-fns";
 import type { JobStatus } from "@/types";
 
+/**
+ * Role-based landing router:
+ * - production/installer → stays on "/" (My Day view)
+ * - supervisor → /workflow
+ * - office → /production
+ * - admin → stays on "/" (Business Overview)
+ * - viewer/finance → stays on "/"
+ */
+function useLandingRedirect(): string | null {
+  const { userRole, loading } = useAuth();
+  if (loading) return null;
+  switch (userRole) {
+    case "supervisor": return "/workflow";
+    case "office": return "/production";
+    default: return null; // stay on /
+  }
+}
+
 function daysUntilExpiry(d: string | null): number | null {
   if (!d) return null;
   return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
 }
 
-export default function Dashboard() {
+function DashboardRouter() {
+  const redirect = useLandingRedirect();
+  if (redirect) return <Navigate to={redirect} replace />;
+  return <DashboardContent />;
+}
+
+export default DashboardRouter;
+
+function DashboardContent() {
   const { flags } = useFeatureFlags();
-  const { profile } = useAuth();
+  const { profile, userRole } = useAuth();
   const [stats, setStats] = useState({ activeJobs: 0, inProgressStages: 0, pendingHolidays: 0, availableRemnants: 0 });
   const [jobs, setJobs] = useState<any[]>([]);
   const [allStages, setAllStages] = useState<any[]>([]);
@@ -190,10 +216,19 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <QuickLink to="/my-work" icon={ClipboardCheck} label="My Work" />
-          <QuickLink to="/workflow" icon={Kanban} label="Workflow" />
-          <QuickLink to="/production" icon={Activity} label="Production" />
-          <QuickLink to="/reports" icon={BarChart3} label="Reports" />
+          {(userRole === "production" || userRole === "installer") ? (
+            <>
+              <QuickLink to="/my-work" icon={ClipboardCheck} label="My Work" />
+              <QuickLink to="/my-hours" icon={Clock} label="My Hours" />
+              <QuickLink to="/jobs" icon={Wrench} label="Jobs" />
+            </>
+          ) : (
+            <>
+              <QuickLink to="/workflow" icon={Kanban} label="Workflow" />
+              <QuickLink to="/production" icon={Activity} label="Production" />
+              <QuickLink to="/reports" icon={BarChart3} label="Reports" />
+            </>
+          )}
         </div>
       </div>
 
