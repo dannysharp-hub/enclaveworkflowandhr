@@ -46,6 +46,7 @@ import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import SupplierPerformancePage from "./pages/SupplierPerformancePage";
 import ProductionDriftPage from "./pages/ProductionDriftPage";
 import CapacityPlannerPage from "./pages/CapacityPlannerPage";
+import AiInboxPage from "./pages/AiInboxPage";
 import MyHoursPage from "./pages/MyHoursPage";
 import MyPayPage from "./pages/MyPayPage";
 import ClientPortalLoginPage from "./pages/portal/ClientPortalLoginPage";
@@ -128,6 +129,7 @@ const AppRoutes = () => (
               <Route path="/purchasing/performance" element={<SupplierPerformancePage />} />
               <Route path="/drift" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionDriftPage /></RoleGate>} />
               <Route path="/capacity" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><CapacityPlannerPage /></RoleGate>} />
+              <Route path="/ai-inbox" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><AiInboxPage /></RoleGate>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>

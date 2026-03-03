@@ -14,6 +14,170 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_proposal_actions: {
+        Row: {
+          acted_by_staff_id: string | null
+          action_type: string
+          created_at: string
+          edited_payload_json: Json | null
+          id: string
+          proposal_id: string
+          tenant_id: string
+        }
+        Insert: {
+          acted_by_staff_id?: string | null
+          action_type: string
+          created_at?: string
+          edited_payload_json?: Json | null
+          id?: string
+          proposal_id: string
+          tenant_id: string
+        }
+        Update: {
+          acted_by_staff_id?: string | null
+          action_type?: string
+          created_at?: string
+          edited_payload_json?: Json | null
+          id?: string
+          proposal_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_proposal_actions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "ai_proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_proposal_actions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_proposal_metrics: {
+        Row: {
+          avg_confidence: number
+          id: string
+          last_updated_at: string
+          proposal_type: string
+          tenant_id: string
+          total_applied_success: number
+          total_approved: number
+          total_proposed: number
+          total_rejected: number
+        }
+        Insert: {
+          avg_confidence?: number
+          id?: string
+          last_updated_at?: string
+          proposal_type: string
+          tenant_id: string
+          total_applied_success?: number
+          total_approved?: number
+          total_proposed?: number
+          total_rejected?: number
+        }
+        Update: {
+          avg_confidence?: number
+          id?: string
+          last_updated_at?: string
+          proposal_type?: string
+          tenant_id?: string
+          total_applied_success?: number
+          total_approved?: number
+          total_proposed?: number
+          total_rejected?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_proposal_metrics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_proposals: {
+        Row: {
+          auto_apply_allowed: boolean
+          confidence_score: number
+          created_at: string
+          created_by: string
+          description: string
+          expires_at: string | null
+          id: string
+          impact_summary_json: Json
+          job_id: string | null
+          proposal_type: string
+          reasoning_json: Json
+          requires_role: string
+          risk_level: string
+          scope_type: string
+          status: string
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          auto_apply_allowed?: boolean
+          confidence_score?: number
+          created_at?: string
+          created_by?: string
+          description?: string
+          expires_at?: string | null
+          id?: string
+          impact_summary_json?: Json
+          job_id?: string | null
+          proposal_type?: string
+          reasoning_json?: Json
+          requires_role?: string
+          risk_level?: string
+          scope_type?: string
+          status?: string
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          auto_apply_allowed?: boolean
+          confidence_score?: number
+          created_at?: string
+          created_by?: string
+          description?: string
+          expires_at?: string | null
+          id?: string
+          impact_summary_json?: Json
+          job_id?: string | null
+          proposal_type?: string
+          reasoning_json?: Json
+          requires_role?: string
+          risk_level?: string
+          scope_type?: string
+          status?: string
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_proposals_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_proposals_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bills: {
         Row: {
           amount_ex_vat: number
