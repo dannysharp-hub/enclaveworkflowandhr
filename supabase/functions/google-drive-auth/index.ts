@@ -747,6 +747,84 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── CREATE JOB FOLDER ───
+    if (action === "create_job_folder") {
+      const jobId = body.job_id as string;
+      if (!jobId) {
+        return new Response(JSON.stringify({ error: "job_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Check if link already exists
+      const { data: existingLink } = await supabaseAdmin
+        .from("job_drive_links")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("job_id", jobId)
+        .maybeSingle();
+
+      if (existingLink) {
+        return new Response(JSON.stringify({ success: true, already_linked: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: settings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("is_connected, projects_root_folder_id")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!settings?.is_connected || !settings.projects_root_folder_id) {
+        return new Response(JSON.stringify({ success: false, reason: "no_root_folder" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get job details for folder name
+      const { data: jobRow } = await supabaseAdmin
+        .from("jobs")
+        .select("job_id, job_name")
+        .eq("id", jobId)
+        .single();
+
+      if (!jobRow) {
+        return new Response(JSON.stringify({ error: "Job not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const folderName = `${jobRow.job_id} - ${jobRow.job_name || "Untitled"}`;
+      const accessToken = await getAccessToken();
+      const folderId = await createDriveFolder(accessToken, settings.projects_root_folder_id, folderName);
+      const folderUrl = `https://drive.google.com/drive/folders/${folderId}`;
+
+      // Create link record
+      await supabaseAdmin.from("job_drive_links").insert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        drive_folder_id: folderId,
+        drive_folder_name: folderName,
+        drive_folder_url: folderUrl,
+      });
+
+      // Audit
+      await supabaseAdmin.from("drive_sync_audit").insert({
+        tenant_id: tenantId,
+        actor_staff_id: user.id,
+        action: "auto_create_job_folder",
+        job_id: jobId,
+        drive_folder_id: folderId,
+        payload_after_json: { folder_name: folderName },
+      });
+
+      return new Response(JSON.stringify({ success: true, folder_id: folderId, folder_url: folderUrl }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+
     // ─── INDEX JOB FILES ───
     if (action === "index_job_files") {
       const jobId = body.job_id as string;

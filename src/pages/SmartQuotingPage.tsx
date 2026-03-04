@@ -116,6 +116,11 @@ export default function SmartQuotingPage() {
 
       await (supabase.from("smart_quotes") as any).update({ status: "converted", converted_job_id: newJob.id }).eq("id", quote.id);
       toast({ title: "Job created", description: `${jobId} from quote` });
+
+      // Auto-create Drive folder (fire & forget)
+      supabase.functions.invoke("google-drive-auth", {
+        body: { action: "create_job_folder", job_id: newJob.id },
+      }).catch(() => {});
       load();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
