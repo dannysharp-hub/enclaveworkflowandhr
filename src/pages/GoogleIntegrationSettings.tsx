@@ -64,6 +64,7 @@ export default function GoogleIntegrationSettings() {
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [callbackStatus, setCallbackStatus] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
     if (!session?.access_token) return;
@@ -98,31 +99,64 @@ export default function GoogleIntegrationSettings() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
-    if (!code || !state) return;
-    // Wait until Supabase session is restored before calling edge function
-    if (!session?.access_token) {
-      console.log("[GoogleAuth] Waiting for session before exchanging code...");
+    const errorParam = params.get("error");
+    
+    // Google returned an error instead of a code
+    if (errorParam) {
+      const errorDesc = params.get("error_description") || errorParam;
+      setCallbackStatus(`Google error: ${errorDesc}`);
+      toast({ title: "Google Connection Failed", description: errorDesc, variant: "destructive" });
+      window.history.replaceState({}, "", "/settings");
       return;
     }
-    console.log("[GoogleAuth] Session ready, exchanging code for tokens...");
+    
+    if (!code || !state) return;
+    
+    // Wait until Supabase session is restored before calling edge function
+    if (!session?.access_token) {
+      setCallbackStatus("Waiting for authentication session...");
+      return;
+    }
+    
+    setCallbackStatus("Exchanging authorization code...");
     let cancelled = false;
     (async () => {
       setConnecting(true);
       try {
         const redirectUri = `${window.location.origin}/settings`;
+        setCallbackStatus(`Calling backend with redirect_uri: ${redirectUri}`);
+        
         const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
           body: { action: "callback", code, redirect_uri: redirectUri },
         });
+        
         if (cancelled) return;
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error + (data.detail ? `: ${data.detail}` : ''));
+        
+        if (error) {
+          // Try to extract body from FunctionsHttpError
+          let detail = error.message;
+          try {
+            if ('context' in error && error.context?.body) {
+              const body = await error.context.body.json?.() || error.context.body;
+              detail = JSON.stringify(body);
+            }
+          } catch {}
+          throw new Error(detail);
+        }
+        
+        if (data?.error) {
+          throw new Error(data.error + (data.detail ? `: ${data.detail}` : ''));
+        }
+        
+        setCallbackStatus(null);
         toast({ title: "Google Connected", description: `Connected as ${data.email}` });
         window.history.replaceState({}, "", "/settings");
         fetchStatus();
       } catch (err: any) {
         if (cancelled) return;
-        console.error("[GoogleAuth] Callback error:", err);
-        toast({ title: "Connection Failed", description: err.message, variant: "destructive" });
+        const msg = err.message || "Unknown error during token exchange";
+        setCallbackStatus(`Error: ${msg}`);
+        toast({ title: "Connection Failed", description: msg, variant: "destructive" });
       } finally {
         if (!cancelled) setConnecting(false);
       }
@@ -254,6 +288,18 @@ export default function GoogleIntegrationSettings() {
        <Calendar size={16} className="text-primary" />
         Google Account
       </h3>
+
+      {/* ─── Callback Status Banner ─── */}
+      {callbackStatus && (
+        <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 max-w-2xl">
+          <p className="text-sm font-medium text-warning flex items-center gap-2">
+            {callbackStatus.startsWith("Error") || callbackStatus.startsWith("Google error") 
+              ? <AlertTriangle size={16} /> 
+              : <Loader2 size={16} className="animate-spin" />}
+            {callbackStatus}
+          </p>
+        </div>
+      )}
 
       {/* ─── Connection Card ─── */}
       <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
