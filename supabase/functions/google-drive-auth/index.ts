@@ -572,17 +572,15 @@ Deno.serve(async (req) => {
         } catch {}
 
         if (isSharedDriveRoot) {
-          // For Shared Drive roots: list ALL folders in the drive, filter to direct children
-          // Google Drive API requires corpora=drive for shared drives
-          const query = `mimeType='application/vnd.google-apps.folder' and trashed=false`;
+          // For Shared Drive roots: use 'parentId' in parents WITH corpora=drive and driveId
+          const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
           const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,parents)&orderBy=name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=drive&driveId=${parentId}`;
+          console.log("Shared Drive folder query URL:", url);
           const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
           const data = await res.json();
+          console.log("Shared Drive folder response:", JSON.stringify(data).substring(0, 500));
           if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
-          // Filter to only direct children of the shared drive root
-          allFolders = (data.files || []).filter((f: any) => 
-            f.parents && f.parents.includes(parentId)
-          );
+          allFolders = data.files || [];
         } else {
           const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
           const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
