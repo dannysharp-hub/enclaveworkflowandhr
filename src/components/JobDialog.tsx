@@ -36,15 +36,22 @@ export default function JobDialog({ open, onOpenChange, onSuccess, job }: Props)
         if (error) throw error;
         toast({ title: "Job updated" });
       } else {
-        const { error } = await supabase.from("jobs").insert({
+        const { data: newJob, error } = await supabase.from("jobs").insert({
           job_id: form.job_id,
           job_name: form.job_name,
           status: form.status,
           sheets_estimated: form.sheets_estimated,
           created_by: user?.id,
-        });
+        }).select("id").single();
         if (error) throw error;
         toast({ title: "Job created", description: `${form.job_id} — ${form.job_name}` });
+
+        // Auto-create Drive folder (fire & forget)
+        if (newJob?.id) {
+          supabase.functions.invoke("google-drive-auth", {
+            body: { action: "create_job_folder", job_id: newJob.id },
+          }).catch(() => {}); // silent — Drive may not be configured
+        }
       }
       onOpenChange(false);
       onSuccess();
