@@ -93,40 +93,42 @@ export default function GoogleIntegrationSettings() {
     fetchMappings();
   }, [fetchStatus, fetchMappings]);
 
-  // Handle OAuth callback
+  // Handle OAuth callback - wait for session to be ready
   useEffect(() => {
-    const fullUrl = window.location.href;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
-    console.log("[GoogleAuth] Callback check - URL:", fullUrl, "code:", !!code, "state:", !!state);
-    if (code && state) {
-      console.log("[GoogleAuth] Exchanging code for tokens...");
-      // Exchange code
-      (async () => {
-        setConnecting(true);
-        try {
-          const redirectUri = `${window.location.origin}/settings`;
-          console.log("[GoogleAuth] Using redirect_uri:", redirectUri);
-          const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
-            body: { action: "callback", code, redirect_uri: redirectUri },
-          });
-          console.log("[GoogleAuth] Callback response:", data, "error:", error);
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error + (data.detail ? `: ${data.detail}` : ''));
-          toast({ title: "Google Connected", description: `Connected as ${data.email}` });
-          // Clean URL
-          window.history.replaceState({}, "", "/settings");
-          fetchStatus();
-        } catch (err: any) {
-          console.error("[GoogleAuth] Callback error:", err);
-          toast({ title: "Connection Failed", description: err.message, variant: "destructive" });
-        } finally {
-          setConnecting(false);
-        }
-      })();
+    if (!code || !state) return;
+    // Wait until Supabase session is restored before calling edge function
+    if (!session?.access_token) {
+      console.log("[GoogleAuth] Waiting for session before exchanging code...");
+      return;
     }
-  }, []);
+    console.log("[GoogleAuth] Session ready, exchanging code for tokens...");
+    let cancelled = false;
+    (async () => {
+      setConnecting(true);
+      try {
+        const redirectUri = `${window.location.origin}/settings`;
+        const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
+          body: { action: "callback", code, redirect_uri: redirectUri },
+        });
+        if (cancelled) return;
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error + (data.detail ? `: ${data.detail}` : ''));
+        toast({ title: "Google Connected", description: `Connected as ${data.email}` });
+        window.history.replaceState({}, "", "/settings");
+        fetchStatus();
+      } catch (err: any) {
+        if (cancelled) return;
+        console.error("[GoogleAuth] Callback error:", err);
+        toast({ title: "Connection Failed", description: err.message, variant: "destructive" });
+      } finally {
+        if (!cancelled) setConnecting(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session?.access_token]);
 
   const handleConnect = async () => {
     setConnecting(true);
