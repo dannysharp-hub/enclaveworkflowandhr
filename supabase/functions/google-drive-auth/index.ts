@@ -88,7 +88,7 @@ async function processQueueForTenant(supabaseAdmin: any, tenantId: string): Prom
           const allFiles: any[] = [];
           const listFiles = async (folderId: string, recurse: boolean) => {
             const query = `'${folderId}' in parents and trashed=false`;
-            const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents)&pageSize=500`;
+            const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
             const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
             const data = await res.json();
             if (!res.ok) return;
@@ -278,7 +278,7 @@ Deno.serve(async (req) => {
 
       do {
         const query = `'${folderId}' in parents and trashed=false`;
-        let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents)&pageSize=500`;
+        let url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
         if (pageToken) url += `&pageToken=${pageToken}`;
 
         const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
 
     // Helper: create a folder in Drive
     async function createDriveFolder(accessToken: string, parentId: string, folderName: string): Promise<string> {
-      const res = await fetch("https://www.googleapis.com/drive/v3/files", {
+      const res = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -324,7 +324,7 @@ Deno.serve(async (req) => {
     // Helper: find or create subfolder
     async function findOrCreateSubfolder(accessToken: string, parentId: string, folderName: string): Promise<string> {
       const query = `'${parentId}' in parents and name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&pageSize=1`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await res.json();
       if (data.files?.length > 0) return data.files[0].id;
@@ -542,7 +542,46 @@ Deno.serve(async (req) => {
       const accessToken = await getAccessToken();
 
       const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100`;
+      // Include shared drives with supportsAllDrives + includeItemsFromAllDrives
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+
+      // If listing root, also include Shared Drives themselves
+      let allFolders = data.files || [];
+      if (parentId === "root") {
+        const drivesUrl = `https://www.googleapis.com/drive/v3/drives?pageSize=50`;
+        const drivesRes = await fetch(drivesUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const drivesData = await drivesRes.json();
+        if (drivesRes.ok && drivesData.drives) {
+          for (const d of drivesData.drives) {
+            // Add shared drives as navigable folders (avoid duplicates)
+            if (!allFolders.some((f: any) => f.id === d.id)) {
+              allFolders.push({ id: d.id, name: `📁 ${d.name} (Shared Drive)`, mimeType: "application/vnd.google-apps.folder" });
+            }
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ folders: allFolders }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── AUTO LOCATE FOLDER ───
+    if (action === "auto_locate") {
+      const searchName = (body.search_name as string) || "Jobs";
+      const accessToken = await getAccessToken();
+
+      // Search across all drives for the folder by name
+      const query = `name='${searchName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,parents,driveId)&pageSize=20&supportsAllDrives=true&includeItemsFromAllDrives=true`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -630,7 +669,7 @@ Deno.serve(async (req) => {
 
       // List immediate subfolders
       const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&orderBy=name&pageSize=500`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&orderBy=name&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(`Drive API error: ${data.error?.message}`);
