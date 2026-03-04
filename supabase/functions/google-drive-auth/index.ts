@@ -365,12 +365,44 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Check if we need to request Drive scope (incremental consent)
       const { data: calSettings } = await supabaseAdmin
         .from("google_integration_settings")
         .select("google_user_email, google_user_id, granted_scopes")
         .eq("tenant_id", tenantId)
         .single();
 
+      const grantedScopes: string[] = Array.isArray(calSettings?.granted_scopes) ? calSettings.granted_scopes : [];
+      const hasDriveScope = grantedScopes.some((s: string) => s.includes("drive"));
+
+      if (!hasDriveScope) {
+        // Need incremental consent — return an auth URL with drive.readonly scope
+        const redirectUri = body.redirect_uri as string;
+        if (!redirectUri) {
+          return new Response(JSON.stringify({ error: "redirect_uri required for Drive consent" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+        const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+        const state = btoa(JSON.stringify({ tenant_id: tenantId, flow: "drive_setup" }));
+        const params = new URLSearchParams({
+          client_id: GOOGLE_CLIENT_ID,
+          redirect_uri: redirectUri,
+          response_type: "code",
+          scope: DRIVE_SCOPE,
+          access_type: "offline",
+          prompt: "consent",
+          include_granted_scopes: "true",
+          state,
+        });
+        const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+        return new Response(JSON.stringify({ needs_consent: true, url }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Already has Drive scope — just enable the integration
       await supabaseAdmin.from("google_drive_integration_settings").upsert({
         tenant_id: tenantId,
         is_connected: true,
@@ -385,6 +417,96 @@ Deno.serve(async (req) => {
         actor_staff_id: user.id,
         action: "drive_connected",
         payload_after_json: { email: calSettings?.google_user_email },
+      });
+
+      return new Response(JSON.stringify({ success: true, email: calSettings?.google_user_email }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── DRIVE CALLBACK: exchange incremental consent code ───
+    if (action === "drive_callback") {
+      const code = body.code as string;
+      const redirectUri = body.redirect_uri as string;
+      if (!code || !redirectUri) {
+        return new Response(JSON.stringify({ error: "code and redirect_uri required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+      const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code",
+        }),
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) {
+        return new Response(JSON.stringify({ error: "Token exchange failed", detail: tokenData.error_description || tokenData.error }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { access_token, refresh_token, expires_in, scope: grantedScope } = tokenData;
+      const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
+
+      // Update tokens
+      const encAccessToken = btoa(access_token);
+      const encRefreshToken = refresh_token ? btoa(refresh_token) : null;
+
+      const { data: existingToken } = await supabaseAdmin
+        .from("google_oauth_tokens")
+        .select("id, token_version, refresh_token_encrypted")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (existingToken) {
+        const updateData: Record<string, unknown> = {
+          access_token_encrypted: encAccessToken,
+          expires_at: expiresAt,
+          token_version: existingToken.token_version + 1,
+        };
+        if (encRefreshToken) updateData.refresh_token_encrypted = encRefreshToken;
+        await supabaseAdmin.from("google_oauth_tokens").update(updateData).eq("id", existingToken.id);
+      }
+
+      // Merge granted scopes
+      const newScopes = (grantedScope || "").split(" ").filter(Boolean);
+      const { data: calSettings } = await supabaseAdmin
+        .from("google_integration_settings")
+        .select("granted_scopes, google_user_email, google_user_id")
+        .eq("tenant_id", tenantId)
+        .single();
+      const existingScopes: string[] = Array.isArray(calSettings?.granted_scopes) ? calSettings.granted_scopes : [];
+      const mergedScopes = [...new Set([...existingScopes, ...newScopes])];
+
+      await supabaseAdmin.from("google_integration_settings").update({
+        granted_scopes: mergedScopes,
+      }).eq("tenant_id", tenantId);
+
+      // Enable Drive integration
+      await supabaseAdmin.from("google_drive_integration_settings").upsert({
+        tenant_id: tenantId,
+        is_connected: true,
+        google_user_email: calSettings?.google_user_email || null,
+        google_user_id: calSettings?.google_user_id || null,
+        granted_scopes: mergedScopes,
+        status: "healthy",
+      }, { onConflict: "tenant_id" });
+
+      await supabaseAdmin.from("drive_sync_audit").insert({
+        tenant_id: tenantId,
+        actor_staff_id: user.id,
+        action: "drive_connected",
+        payload_after_json: { scopes: mergedScopes },
       });
 
       return new Response(JSON.stringify({ success: true, email: calSettings?.google_user_email }), {
