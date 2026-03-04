@@ -1316,6 +1316,122 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── SCAN SINGLE JOB (scan files + import BOM for one job) ───
+    if (action === "scan_single_job") {
+      const jobId = body.job_id as string;
+      if (!jobId) {
+        return new Response(JSON.stringify({ error: "job_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: link } = await supabaseAdmin
+        .from("job_drive_links")
+        .select("job_id, drive_folder_id")
+        .eq("tenant_id", tenantId)
+        .eq("job_id", jobId)
+        .single();
+
+      if (!link) {
+        return new Response(JSON.stringify({ error: "No Drive folder linked to this job" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const { data: singleSettings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("include_subfolders, auto_import_bom_on_detect, bom_file_match_keywords, bom_file_match_extensions")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      const bomKw = singleSettings?.bom_file_match_keywords || ["bom", "inventor", "partslist", "parts list"];
+      const bomExt = singleSettings?.bom_file_match_extensions || [".csv"];
+      const files = await listDriveFiles(accessToken, link.drive_folder_id, singleSettings?.include_subfolders ?? true);
+      const now = new Date().toISOString();
+      let hasDxf = false;
+      let bomFile: any = null;
+      let bomImported = false;
+
+      for (const file of files) {
+        const detectedType = detectFileType(file.name, file.mimeType);
+        const detectedStage = detectStage(file.name);
+        const lowerName = file.name.toLowerCase();
+        if (detectedType === "dxf") hasDxf = true;
+        const isBomExt = bomExt.some((ext: string) => lowerName.endsWith(ext));
+        const isBomKw = bomKw.some((kw: string) => lowerName.includes(kw.toLowerCase()));
+        if (isBomExt && isBomKw && !bomFile) bomFile = file;
+
+        await supabaseAdmin.from("drive_file_index").upsert({
+          tenant_id: tenantId, job_id: jobId, drive_file_id: file.id,
+          drive_parent_folder_id: file.parents?.[0] || link.drive_folder_id,
+          file_name: file.name, mime_type: file.mimeType,
+          file_size_bytes: file.size ? parseInt(file.size) : null,
+          drive_modified_time: file.modifiedTime || null,
+          drive_created_time: file.createdTime || null,
+          drive_web_view_link: file.webViewLink || null,
+          detected_type: (isBomExt && isBomKw) ? "bom" : detectedType,
+          detected_stage: detectedStage, status: "active", last_seen_at: now,
+        }, { onConflict: "tenant_id,drive_file_id" });
+      }
+
+      await supabaseAdmin.from("jobs").update({ has_dxf_files: hasDxf }).eq("id", jobId);
+      await supabaseAdmin.from("job_drive_links").update({ last_indexed_at: now }).eq("tenant_id", tenantId).eq("job_id", jobId);
+
+      // BOM auto-import
+      if (bomFile && (singleSettings?.auto_import_bom_on_detect !== false)) {
+        const { data: existingUpload } = await supabaseAdmin
+          .from("job_bom_uploads").select("id")
+          .eq("job_id", jobId)
+          .eq("storage_ref", `drive:${bomFile.id}:${bomFile.modifiedTime || ""}`)
+          .maybeSingle();
+
+        if (!existingUpload) {
+          const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${bomFile.id}?alt=media`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (dlRes.ok) {
+            const csvText = await dlRes.text();
+            if (csvText.trim().split("\n").length >= 2) {
+              const { data: prevUploads } = await supabaseAdmin
+                .from("job_bom_uploads").select("bom_revision")
+                .eq("job_id", jobId).order("bom_revision", { ascending: false }).limit(1);
+              const nextRevision = ((prevUploads?.[0] as any)?.bom_revision || 0) + 1;
+
+              const { data: upload } = await supabaseAdmin.from("job_bom_uploads").insert({
+                tenant_id: tenantId, job_id: jobId, file_name: bomFile.name,
+                uploaded_by_staff_id: user.id, parse_status: "parsed",
+                bom_revision: nextRevision,
+                storage_ref: `drive:${bomFile.id}:${bomFile.modifiedTime || ""}`,
+              }).select("id").single();
+
+              if (upload) {
+                const parseRes = await fetch(
+                  `${Deno.env.get("SUPABASE_URL")}/functions/v1/parse-bom-csv`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": req.headers.get("Authorization") || "" },
+                    body: JSON.stringify({ job_id: jobId, csv_text: csvText, file_name: bomFile.name }),
+                  }
+                );
+                if (parseRes.ok) {
+                  bomImported = true;
+                  await supabaseAdmin.from("jobs").update({
+                    has_bom_imported: true, drive_bom_last_imported_at: now,
+                  }).eq("id", jobId);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true, files_found: files.length, has_dxf: hasDxf,
+        bom_found: !!bomFile, bom_imported: bomImported, bom_file_name: bomFile?.name || null,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // ─── BULK INDEX ALL JOBS (inline, scans + imports BOMs) ───
     if (action === "bulk_index_job_files") {
       const { data: links } = await supabaseAdmin

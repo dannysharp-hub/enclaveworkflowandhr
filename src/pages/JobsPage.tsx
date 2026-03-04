@@ -128,17 +128,32 @@ export default function JobsPage() {
   const scanAllBoms = useCallback(async () => {
     setScanningBoms(true);
     try {
-      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
-        body: { action: "bulk_index_job_files" },
-      });
-      if (error) throw error;
+      // Get all jobs with drive links and scan them one by one
+      const { data: jobList } = await supabase.from("job_drive_links").select("job_id");
+      if (!jobList || jobList.length === 0) {
+        toast({ title: "No linked jobs", description: "No jobs are linked to Drive folders yet." });
+        setScanningBoms(false);
+        return;
+      }
+      let scanned = 0;
+      let bomImported = 0;
+      const errors: string[] = [];
+      for (const link of jobList) {
+        try {
+          const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+            body: { action: "scan_single_job", job_id: link.job_id },
+          });
+          if (error) throw error;
+          scanned++;
+          if (data?.bom_imported) bomImported++;
+        } catch (err: any) {
+          errors.push(link.job_id);
+        }
+      }
       toast({
         title: "BOM Scan Complete",
-        description: `${data.scanned} jobs scanned, ${data.bom_imported} BOMs imported${data.errors?.length ? `, ${data.errors.length} errors` : ""}`,
+        description: `${scanned} jobs scanned, ${bomImported} BOMs imported${errors.length ? `, ${errors.length} errors` : ""}`,
       });
-      if (data.errors?.length > 0) {
-        console.log("Scan errors:", data.errors);
-      }
       fetchJobs();
     } catch (err: any) {
       toast({ title: "Scan failed", description: err.message, variant: "destructive" });
