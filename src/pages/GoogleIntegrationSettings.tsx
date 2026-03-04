@@ -96,9 +96,10 @@ export default function GoogleIntegrationSettings() {
 
   // Handle OAuth callback - wait for session to be ready
   useEffect(() => {
+    // Read from URL first, then fallback to sessionStorage (persisted by SettingsPage)
     const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    const state = params.get("state");
+    let code = params.get("code");
+    let state = params.get("state");
     const errorParam = params.get("error");
     
     // Google returned an error instead of a code
@@ -110,6 +111,20 @@ export default function GoogleIntegrationSettings() {
       return;
     }
     
+    // Fallback: read from sessionStorage if not in URL
+    if (!code || !state) {
+      code = sessionStorage.getItem("google_oauth_code");
+      state = sessionStorage.getItem("google_oauth_state");
+    }
+    
+    console.log("[GoogleAuth] useEffect fired", { 
+      codeFromUrl: params.get("code")?.substring(0, 10), 
+      codeFromStorage: sessionStorage.getItem("google_oauth_code")?.substring(0, 10),
+      hasCode: !!code, 
+      hasState: !!state, 
+      hasSession: !!session?.access_token 
+    });
+    
     if (!code || !state) return;
     
     // Wait until Supabase session is restored before calling edge function
@@ -118,13 +133,17 @@ export default function GoogleIntegrationSettings() {
       return;
     }
     
+    // Clear sessionStorage to prevent re-processing
+    sessionStorage.removeItem("google_oauth_code");
+    sessionStorage.removeItem("google_oauth_state");
+    
     setCallbackStatus("Exchanging authorization code...");
     let cancelled = false;
     (async () => {
       setConnecting(true);
       try {
         const redirectUri = `${window.location.origin}/settings`;
-        setCallbackStatus(`Calling backend with redirect_uri: ${redirectUri}`);
+        console.log("[GoogleAuth] Calling callback with redirect_uri:", redirectUri);
         
         const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
           body: { action: "callback", code, redirect_uri: redirectUri },
@@ -133,11 +152,10 @@ export default function GoogleIntegrationSettings() {
         if (cancelled) return;
         
         if (error) {
-          // Try to extract body from FunctionsHttpError
           let detail = error.message;
           try {
-            if ('context' in error && error.context?.body) {
-              const body = await error.context.body.json?.() || error.context.body;
+            if ('context' in error && (error as any).context?.body) {
+              const body = await (error as any).context.body.json?.() || (error as any).context.body;
               detail = JSON.stringify(body);
             }
           } catch {}
@@ -155,6 +173,7 @@ export default function GoogleIntegrationSettings() {
       } catch (err: any) {
         if (cancelled) return;
         const msg = err.message || "Unknown error during token exchange";
+        console.error("[GoogleAuth] Callback error:", msg);
         setCallbackStatus(`Error: ${msg}`);
         toast({ title: "Connection Failed", description: msg, variant: "destructive" });
       } finally {

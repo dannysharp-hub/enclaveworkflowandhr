@@ -75,7 +75,15 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabKey>(() => {
     // Auto-switch to integrations tab when returning from Google OAuth callback
     const params = new URLSearchParams(window.location.search);
-    if (params.get("code") && params.get("state")) return "integrations";
+    const code = params.get("code");
+    const state = params.get("state");
+    if (code && state) {
+      // Persist OAuth params to sessionStorage so they survive loading/re-renders
+      console.log("[SettingsPage] OAuth callback detected, saving to sessionStorage", { code: code.substring(0, 10) + "...", state: state.substring(0, 10) + "..." });
+      sessionStorage.setItem("google_oauth_code", code);
+      sessionStorage.setItem("google_oauth_state", state);
+      return "integrations";
+    }
     return "branding";
   });
   const [departments, setDepartments] = useState<DepartmentConfig[]>([]);
