@@ -11,9 +11,10 @@ interface Props {
  * Gates content to specific roles. Staff/viewers without the required role are redirected.
  */
 export default function RoleGate({ children, allowedRoles, redirectTo = "/" }: Props) {
-  const { userRole, loading } = useAuth();
+  const { userRole, loading, user } = useAuth();
 
-  if (loading) {
+  // Still loading auth OR user exists but role hasn't loaded yet — show spinner
+  if (loading || (user && !userRole)) {
     return (
       <div className="h-40 flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
