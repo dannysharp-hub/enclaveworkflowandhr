@@ -72,7 +72,12 @@ const labelClass = "block text-[10px] font-mono font-medium text-muted-foregroun
 
 export default function SettingsPage() {
   const { userRole, tenantId } = useAuth();
-  const [tab, setTab] = useState<TabKey>("branding");
+  const [tab, setTab] = useState<TabKey>(() => {
+    // Auto-switch to integrations tab when returning from Google OAuth callback
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("code") && params.get("state")) return "integrations";
+    return "branding";
+  });
   const [departments, setDepartments] = useState<DepartmentConfig[]>([]);
   const [stages, setStages] = useState<StageConfig[]>([]);
   const [machines, setMachines] = useState<MachineConfig[]>([]);
