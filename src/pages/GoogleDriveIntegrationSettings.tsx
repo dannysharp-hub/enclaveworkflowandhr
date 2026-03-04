@@ -92,31 +92,58 @@ export default function GoogleDriveIntegrationSettings() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const stateRaw = params.get("state");
-    if (code && stateRaw) {
+    if (!code || !stateRaw) return;
+    
+    let stateObj: any;
+    try {
+      stateObj = JSON.parse(atob(stateRaw));
+    } catch { return; }
+    if (stateObj.flow !== "drive_setup") return;
+    
+    // Clear URL immediately to prevent re-processing on re-renders
+    window.history.replaceState({}, "", "/settings");
+    
+    // Wait for auth session
+    if (!session?.access_token) return;
+    
+    let cancelled = false;
+    (async () => {
+      setConnecting(true);
       try {
-        const stateObj = JSON.parse(atob(stateRaw));
-        if (stateObj.flow === "drive_setup") {
-          (async () => {
-            setConnecting(true);
-            try {
-      const redirectUri = "https://enclaveworkflowandhr.lovable.app/settings";
-              const { data, error } = await supabase.functions.invoke("google-drive-auth", {
-                body: { action: "drive_callback", code, redirect_uri: redirectUri },
-              });
-              if (error) throw error;
-              toast({ title: "Drive Connected", description: `Linked as ${data.email || "your Google account"}` });
-              window.history.replaceState({}, "", "/settings");
-              fetchStatus();
-            } catch (err: any) {
-              toast({ title: "Drive Connection Failed", description: err.message, variant: "destructive" });
-            } finally {
-              setConnecting(false);
+        const redirectUri = "https://enclaveworkflowandhr.lovable.app/settings";
+        const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+          body: { action: "drive_callback", code, redirect_uri: redirectUri },
+        });
+        if (cancelled) return;
+        
+        if (error) {
+          let detail = error.message || "Unknown error";
+          try {
+            if ('context' in error && (error as any).context?.body) {
+              const body = await (error as any).context.body.json?.();
+              if (body?.error) detail = body.error + (body.detail ? `: ${body.detail}` : '');
             }
-          })();
+          } catch {}
+          throw new Error(detail);
         }
-      } catch { /* not a drive callback */ }
-    }
-  }, []);
+        
+        if (data?.error) {
+          throw new Error(data.error + (data.detail ? `: ${data.detail}` : ''));
+        }
+        
+        toast({ title: "Drive Connected", description: `Linked as ${data.email || "your Google account"}` });
+        fetchStatus();
+      } catch (err: any) {
+        if (cancelled) return;
+        const msg = err?.message || JSON.stringify(err) || "Unknown error";
+        console.error("[DriveAuth] Callback error:", msg);
+        toast({ title: "Drive Connection Failed", description: msg, variant: "destructive" });
+      } finally {
+        if (!cancelled) setConnecting(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session?.access_token]);
 
   const handleConnect = async () => {
     setConnecting(true);
