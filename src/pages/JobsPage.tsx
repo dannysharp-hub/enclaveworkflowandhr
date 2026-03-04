@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import ReadinessBadge from "@/components/ReadinessBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search, Hammer, AlertTriangle, RefreshCw, Trash2, FolderDown } from "lucide-react";
+import { Plus, Search, Hammer, AlertTriangle, RefreshCw, Trash2, FolderDown, FileSearch } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -37,6 +37,7 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshingReadiness, setRefreshingReadiness] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [scanningBoms, setScanningBoms] = useState(false);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editJob, setEditJob] = useState<DbJob | null>(null);
@@ -124,6 +125,26 @@ export default function JobsPage() {
     } finally { setImporting(false); }
   }, [fetchJobs]);
 
+  const scanAllBoms = useCallback(async () => {
+    setScanningBoms(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+        body: { action: "bulk_index_job_files" },
+      });
+      if (error) throw error;
+      toast({
+        title: "BOM Scan Complete",
+        description: `${data.scanned} jobs scanned, ${data.bom_imported} BOMs imported${data.errors?.length ? `, ${data.errors.length} errors` : ""}`,
+      });
+      if (data.errors?.length > 0) {
+        console.log("Scan errors:", data.errors);
+      }
+      fetchJobs();
+    } catch (err: any) {
+      toast({ title: "Scan failed", description: err.message, variant: "destructive" });
+    } finally { setScanningBoms(false); }
+  }, [fetchJobs]);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return jobs;
     const q = search.toLowerCase();
@@ -149,6 +170,12 @@ export default function JobsPage() {
             <button onClick={importFromDrive} disabled={importing} className="flex items-center gap-2 rounded-md border border-border px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50">
               <FolderDown size={14} className={importing ? "animate-pulse" : ""} />
               {importing ? "Importing…" : "Import from Drive"}
+            </button>
+          )}
+          {canManage && (
+            <button onClick={scanAllBoms} disabled={scanningBoms} className="flex items-center gap-2 rounded-md border border-border px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50">
+              <FileSearch size={14} className={scanningBoms ? "animate-pulse" : ""} />
+              {scanningBoms ? "Scanning…" : "Scan BOMs"}
             </button>
           )}
           <button onClick={refreshReadiness} disabled={refreshingReadiness} className="flex items-center gap-2 rounded-md border border-border px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50">
