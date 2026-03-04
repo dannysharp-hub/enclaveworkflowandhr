@@ -95,24 +95,31 @@ export default function GoogleIntegrationSettings() {
 
   // Handle OAuth callback
   useEffect(() => {
+    const fullUrl = window.location.href;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
+    console.log("[GoogleAuth] Callback check - URL:", fullUrl, "code:", !!code, "state:", !!state);
     if (code && state) {
+      console.log("[GoogleAuth] Exchanging code for tokens...");
       // Exchange code
       (async () => {
         setConnecting(true);
         try {
           const redirectUri = `${window.location.origin}/settings`;
+          console.log("[GoogleAuth] Using redirect_uri:", redirectUri);
           const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
             body: { action: "callback", code, redirect_uri: redirectUri },
           });
+          console.log("[GoogleAuth] Callback response:", data, "error:", error);
           if (error) throw error;
+          if (data?.error) throw new Error(data.error + (data.detail ? `: ${data.detail}` : ''));
           toast({ title: "Google Connected", description: `Connected as ${data.email}` });
           // Clean URL
           window.history.replaceState({}, "", "/settings");
           fetchStatus();
         } catch (err: any) {
+          console.error("[GoogleAuth] Callback error:", err);
           toast({ title: "Connection Failed", description: err.message, variant: "destructive" });
         } finally {
           setConnecting(false);
