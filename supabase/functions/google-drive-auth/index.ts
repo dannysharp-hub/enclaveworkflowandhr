@@ -648,7 +648,7 @@ Deno.serve(async (req) => {
       }
 
       const rootId = settings.projects_root_folder_id;
-      const parseRegex = new RegExp(settings.job_number_parse_regex || "^([0-9]{3,6})\\s*-\\s*(.+)$");
+      const parseRegex = new RegExp(settings.job_number_parse_regex || "^(\\d{3})_(.+)$");
 
       // List all subfolders in root
       const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
@@ -692,7 +692,7 @@ Deno.serve(async (req) => {
         }
 
         const jobNumber = match[1].trim();
-        const jobName = match[2].trim();
+        const jobName = match[2].trim().replace(/[_-]/g, " ");
 
         // Skip if job_id already exists
         if (existingJobIds.has(jobNumber)) {
@@ -857,8 +857,8 @@ Deno.serve(async (req) => {
       if (!res.ok) throw new Error(`Drive API error: ${data.error?.message}`);
 
       const folders = data.files || [];
-      const pattern = new RegExp(settings.folder_name_pattern || "^[0-9]{3,6}\\s*-\\s*.+$");
-      const parseRegex = new RegExp(settings.job_number_parse_regex || "^([0-9]{3,6})\\s*-\\s*(.+)$");
+      const pattern = new RegExp(settings.folder_name_pattern || "^\\d{3}_.+$");
+      const parseRegex = new RegExp(settings.job_number_parse_regex || "^(\\d{3})_(.+)$");
 
       let created = 0;
       let linked = 0;

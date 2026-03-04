@@ -669,7 +669,7 @@ export default function GoogleDriveIntegrationSettings() {
                   onChange={e => handleUpdateSetting("job_number_parse_regex", e.target.value)}
                 />
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Group 1 = job number, Group 2 = job name. Default: ^([0-9]&#123;3,6&#125;)\s*-\s*(.+)$
+                  Group 1 = job number, Group 2 = job name. Default: ^(\d&#123;3&#125;)_(.+)$ — e.g. "053_Chris-Mitchell_Wardrobes"
                 </p>
               </div>
 
