@@ -541,32 +541,52 @@ Deno.serve(async (req) => {
       const parentId = (body.parent_id as string) || "root";
       const accessToken = await getAccessToken();
 
-      const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      // Include shared drives with supportsAllDrives + includeItemsFromAllDrives
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      let allFolders: any[] = [];
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
-
-      // If listing root, also include Shared Drives themselves
-      let allFolders = data.files || [];
       if (parentId === "root") {
+        // List My Drive root folders
+        const query = `'root' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+        const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const data = await res.json();
+        if (res.ok) allFolders = data.files || [];
+
+        // Also list Shared Drives themselves
         const drivesUrl = `https://www.googleapis.com/drive/v3/drives?pageSize=50`;
-        const drivesRes = await fetch(drivesUrl, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const drivesRes = await fetch(drivesUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         const drivesData = await drivesRes.json();
         if (drivesRes.ok && drivesData.drives) {
           for (const d of drivesData.drives) {
-            // Add shared drives as navigable folders (avoid duplicates)
             if (!allFolders.some((f: any) => f.id === d.id)) {
-              allFolders.push({ id: d.id, name: `📁 ${d.name} (Shared Drive)`, mimeType: "application/vnd.google-apps.folder" });
+              allFolders.push({ id: d.id, name: `📁 ${d.name} (Shared Drive)`, mimeType: "application/vnd.google-apps.folder", _isSharedDrive: true });
             }
           }
         }
+      } else {
+        // Check if this parentId is actually a Shared Drive root by trying to get it as a drive
+        let isSharedDriveRoot = false;
+        try {
+          const driveCheckUrl = `https://www.googleapis.com/drive/v3/drives/${parentId}`;
+          const driveCheckRes = await fetch(driveCheckUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+          if (driveCheckRes.ok) isSharedDriveRoot = true;
+        } catch {}
+
+        let query: string;
+        let url: string;
+
+        if (isSharedDriveRoot) {
+          // For Shared Drive roots, use corpora=drive with driveId
+          query = `mimeType='application/vnd.google-apps.folder' and trashed=false and '${parentId}' in parents`;
+          url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=drive&driveId=${parentId}`;
+        } else {
+          query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+          url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        }
+
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+        allFolders = data.files || [];
       }
 
       return new Response(JSON.stringify({ folders: allFolders }), {
