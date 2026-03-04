@@ -1310,7 +1310,175 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── INDEX ALL JOBS ───
+    // ─── BULK INDEX ALL JOBS (inline, scans + imports BOMs) ───
+    if (action === "bulk_index_job_files") {
+      const { data: links } = await supabaseAdmin
+        .from("job_drive_links")
+        .select("job_id, drive_folder_id")
+        .eq("tenant_id", tenantId);
+
+      if (!links || links.length === 0) {
+        return new Response(JSON.stringify({ message: "No linked jobs to scan", total: 0, scanned: 0, bom_imported: 0 }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const { data: settings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("include_subfolders, detect_dxfs, detect_photos, detect_cost_sheets, auto_import_bom_on_detect, bom_file_match_keywords, bom_file_match_extensions")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      const bomKeywords = settings?.bom_file_match_keywords || ["bom", "inventor", "partslist", "parts list"];
+      const bomExtensions = settings?.bom_file_match_extensions || [".csv"];
+      let totalScanned = 0;
+      let totalBomImported = 0;
+      const errors: string[] = [];
+
+      for (const link of links) {
+        try {
+          const files = await listDriveFiles(accessToken, link.drive_folder_id, settings?.include_subfolders ?? true);
+          const now = new Date().toISOString();
+          let hasDxf = false;
+          let hasJobpack = false;
+          let bomFile: any = null;
+
+          for (const file of files) {
+            const detectedType = detectFileType(file.name, file.mimeType);
+            const detectedStage = detectStage(file.name);
+            const lowerName = file.name.toLowerCase();
+
+            if (detectedType === "dxf") hasDxf = true;
+            if (lowerName.includes("jobpack") && (lowerName.endsWith(".zip") || lowerName.endsWith(".json"))) hasJobpack = true;
+
+            const isBomExt = bomExtensions.some((ext: string) => lowerName.endsWith(ext));
+            const isBomKeyword = bomKeywords.some((kw: string) => lowerName.includes(kw.toLowerCase()));
+            const isBom = isBomExt && isBomKeyword;
+            if (isBom && !bomFile) bomFile = file;
+
+            await supabaseAdmin.from("drive_file_index").upsert({
+              tenant_id: tenantId,
+              job_id: link.job_id,
+              drive_file_id: file.id,
+              drive_parent_folder_id: file.parents?.[0] || link.drive_folder_id,
+              file_name: file.name,
+              mime_type: file.mimeType,
+              file_size_bytes: file.size ? parseInt(file.size) : null,
+              drive_modified_time: file.modifiedTime || null,
+              drive_created_time: file.createdTime || null,
+              drive_web_view_link: file.webViewLink || null,
+              detected_type: isBom ? "bom" : detectedType,
+              detected_stage: detectedStage,
+              status: "active",
+              last_seen_at: now,
+            }, { onConflict: "tenant_id,drive_file_id" });
+          }
+
+          // Update job readiness flags
+          await supabaseAdmin.from("jobs").update({
+            has_dxf_files: hasDxf,
+            has_jobpack: hasJobpack,
+          }).eq("id", link.job_id);
+
+          await supabaseAdmin.from("job_drive_links")
+            .update({ last_indexed_at: now })
+            .eq("tenant_id", tenantId)
+            .eq("job_id", link.job_id);
+
+          // BOM auto-import
+          if (bomFile && (settings?.auto_import_bom_on_detect !== false)) {
+            const { data: existingUpload } = await supabaseAdmin
+              .from("job_bom_uploads")
+              .select("id")
+              .eq("job_id", link.job_id)
+              .eq("storage_ref", `drive:${bomFile.id}:${bomFile.modifiedTime || ""}`)
+              .maybeSingle();
+
+            if (!existingUpload) {
+              const downloadUrl = `https://www.googleapis.com/drive/v3/files/${bomFile.id}?alt=media`;
+              const dlRes = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+              if (dlRes.ok) {
+                const csvText = await dlRes.text();
+                if (csvText.trim().split("\n").length >= 2) {
+                  // Get next revision
+                  const { data: prevUploads } = await supabaseAdmin
+                    .from("job_bom_uploads")
+                    .select("bom_revision")
+                    .eq("job_id", link.job_id)
+                    .order("bom_revision", { ascending: false })
+                    .limit(1);
+                  const nextRevision = ((prevUploads?.[0] as any)?.bom_revision || 0) + 1;
+
+                  // Create upload record
+                  const { data: upload } = await supabaseAdmin
+                    .from("job_bom_uploads")
+                    .insert({
+                      tenant_id: tenantId,
+                      job_id: link.job_id,
+                      file_name: bomFile.name,
+                      uploaded_by_staff_id: user.id,
+                      parse_status: "parsed",
+                      bom_revision: nextRevision,
+                      storage_ref: `drive:${bomFile.id}:${bomFile.modifiedTime || ""}`,
+                    })
+                    .select("id")
+                    .single();
+
+                  if (upload) {
+                    // Parse & import BOM using the parse-bom-csv function's format
+                    // We invoke it internally
+                    const parseRes = await fetch(
+                      `${Deno.env.get("SUPABASE_URL")}/functions/v1/parse-bom-csv`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          "Authorization": `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                          job_id: link.job_id,
+                          csv_text: csvText,
+                          file_name: bomFile.name,
+                        }),
+                      }
+                    );
+                    if (parseRes.ok) {
+                      totalBomImported++;
+                      await supabaseAdmin.from("jobs").update({
+                        has_bom_imported: true,
+                        drive_bom_last_imported_at: now,
+                      }).eq("id", link.job_id);
+                      console.log(`BOM imported for job ${link.job_id}: ${bomFile.name}`);
+                    } else {
+                      const errBody = await parseRes.text();
+                      console.error(`BOM parse failed for job ${link.job_id}: ${errBody}`);
+                      errors.push(`Job ${link.job_id}: BOM parse failed`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          totalScanned++;
+        } catch (err: any) {
+          console.error(`Error scanning job ${link.job_id}:`, err.message);
+          errors.push(`Job ${link.job_id}: ${err.message}`);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        total: links.length,
+        scanned: totalScanned,
+        bom_imported: totalBomImported,
+        errors,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── INDEX ALL JOBS (queue-based) ───
     if (action === "index_all_jobs") {
       const { data: links } = await supabaseAdmin
         .from("job_drive_links")
