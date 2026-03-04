@@ -630,6 +630,132 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── IMPORT JOBS FROM DRIVE ───
+    if (action === "import_jobs_from_drive") {
+      const accessToken = await getAccessToken();
+
+      // Get settings
+      const { data: settings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("projects_root_folder_id, job_number_parse_regex, folder_name_pattern")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!settings?.projects_root_folder_id) {
+        return new Response(JSON.stringify({ error: "No root folder configured" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const rootId = settings.projects_root_folder_id;
+      const parseRegex = new RegExp(settings.job_number_parse_regex || "^([0-9]{3,6})\\s*-\\s*(.+)$");
+
+      // List all subfolders in root
+      const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,webViewLink)&orderBy=name&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+
+      const folders = data.files || [];
+      console.log(`Found ${folders.length} folders in root`);
+
+      // Get existing job_drive_links to avoid duplicates
+      const { data: existingLinks } = await supabaseAdmin
+        .from("job_drive_links")
+        .select("drive_folder_id")
+        .eq("tenant_id", tenantId);
+      const linkedFolderIds = new Set((existingLinks || []).map((l: any) => l.drive_folder_id));
+
+      // Get existing jobs by job_id to avoid duplicates
+      const { data: existingJobs } = await supabaseAdmin
+        .from("jobs")
+        .select("id, job_id")
+        .eq("tenant_id", tenantId);
+      const existingJobIds = new Set((existingJobs || []).map((j: any) => j.job_id));
+
+      let created = 0;
+      let skipped = 0;
+      let unmatched: string[] = [];
+
+      for (const folder of folders) {
+        // Skip if already linked
+        if (linkedFolderIds.has(folder.id)) {
+          skipped++;
+          continue;
+        }
+
+        const match = folder.name.match(parseRegex);
+        if (!match) {
+          unmatched.push(folder.name);
+          continue;
+        }
+
+        const jobNumber = match[1].trim();
+        const jobName = match[2].trim();
+
+        // Skip if job_id already exists
+        if (existingJobIds.has(jobNumber)) {
+          // Just create the drive link for the existing job
+          const existingJob = existingJobs!.find((j: any) => j.job_id === jobNumber);
+          if (existingJob) {
+            await supabaseAdmin.from("job_drive_links").insert({
+              tenant_id: tenantId,
+              job_id: existingJob.id,
+              drive_folder_id: folder.id,
+              drive_folder_name: folder.name,
+              drive_folder_url: folder.webViewLink || null,
+            });
+            linkedFolderIds.add(folder.id);
+          }
+          skipped++;
+          continue;
+        }
+
+        // Create the job
+        const { data: newJob, error: jobErr } = await supabaseAdmin
+          .from("jobs")
+          .insert({
+            tenant_id: tenantId,
+            job_id: jobNumber,
+            job_name: jobName,
+            status: "draft",
+            created_by: user.id,
+          })
+          .select("id")
+          .single();
+
+        if (jobErr) {
+          console.error(`Failed to create job ${jobNumber}: ${jobErr.message}`);
+          continue;
+        }
+
+        // Create drive link
+        await supabaseAdmin.from("job_drive_links").insert({
+          tenant_id: tenantId,
+          job_id: newJob.id,
+          drive_folder_id: folder.id,
+          drive_folder_name: folder.name,
+          drive_folder_url: folder.webViewLink || null,
+        });
+
+        created++;
+        existingJobIds.add(jobNumber);
+        linkedFolderIds.add(folder.id);
+      }
+
+      console.log(`Import complete: ${created} created, ${skipped} skipped, ${unmatched.length} unmatched`);
+
+      return new Response(JSON.stringify({ 
+        created, 
+        skipped, 
+        unmatched,
+        total_folders: folders.length,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ─── AUTO LOCATE FOLDER ───
     if (action === "auto_locate") {
       const searchName = (body.search_name as string) || "Jobs";
