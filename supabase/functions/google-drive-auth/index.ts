@@ -647,10 +647,20 @@ Deno.serve(async (req) => {
         });
       }
 
-      const rootId = settings.projects_root_folder_id;
+      let rootId = settings.projects_root_folder_id;
       const parseRegex = new RegExp(settings.job_number_parse_regex || "^(\\d{3})_(.+)$");
 
-      // List all subfolders in root
+      // Look for a _Jobs subfolder inside the root
+      const jobsFolderQuery = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and name='_Jobs' and trashed=false`;
+      const jobsFolderUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(jobsFolderQuery)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const jobsFolderRes = await fetch(jobsFolderUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const jobsFolderData = await jobsFolderRes.json();
+      if (jobsFolderData.files?.length > 0) {
+        rootId = jobsFolderData.files[0].id;
+        console.log(`Found _Jobs subfolder, using it as import root: ${rootId}`);
+      }
+
+      // List all subfolders in root (or _Jobs)
       const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
       const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,webViewLink)&orderBy=name&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
