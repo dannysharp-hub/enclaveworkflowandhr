@@ -60,6 +60,7 @@ export default function GoogleDriveIntegrationSettings() {
   const [syncing, setSyncing] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [autoLocating, setAutoLocating] = useState(false);
 
   // Folder picker
   const [showFolderPicker, setShowFolderPicker] = useState(false);
@@ -336,17 +337,53 @@ export default function GoogleDriveIntegrationSettings() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={openFolderPicker}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <FolderSearch size={14} />
-              Choose Projects Root Folder
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openFolderPicker}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                <FolderSearch size={14} />
+                Browse Folders
+              </button>
+              <button
+                onClick={async () => {
+                  setAutoLocating(true);
+                  try {
+                    const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+                      body: { action: "auto_locate", search_name: "Jobs" },
+                    });
+                    if (error) throw error;
+                    const found = data.folders || [];
+                    if (found.length === 0) {
+                      toast({ title: "Not found", description: "Could not find a 'Jobs' folder. Try browsing manually.", variant: "destructive" });
+                    } else if (found.length === 1) {
+                      // Auto-select it
+                      await selectFolder({ id: found[0].id, name: found[0].name });
+                    } else {
+                      // Show results for user to pick
+                      setFolders(found);
+                      setShowFolderPicker(true);
+                      setFolderStack([]);
+                      toast({ title: `Found ${found.length} 'Jobs' folders`, description: "Select the correct one below." });
+                    }
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  } finally {
+                    setAutoLocating(false);
+                  }
+                }}
+                disabled={autoLocating}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                {autoLocating ? <Loader2 size={14} className="animate-spin" /> : <FolderSearch size={14} />}
+                Auto-locate "Jobs" Folder
+              </button>
+            </div>
           )}
 
           <p className="text-xs text-muted-foreground">
             Subfolders under this folder will be scanned for project folders (e.g. "1042 - Smith Kitchen").
+            Use "Auto-locate" to search Shared Drives for your Jobs folder.
           </p>
 
           {/* Folder Picker */}
