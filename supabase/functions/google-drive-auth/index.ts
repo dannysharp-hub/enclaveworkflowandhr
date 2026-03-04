@@ -572,25 +572,34 @@ Deno.serve(async (req) => {
         } catch {}
 
         if (isSharedDriveRoot) {
-          // For Shared Drive roots: try corpora=drive first, then fallback to allDrives
+          // Debug: check token info
+          const tokenInfoRes = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`);
+          const tokenInfo = await tokenInfoRes.json();
+          console.log("Token scopes:", tokenInfo.scope);
+          
+          // Debug: try listing ANY files in the shared drive (not just folders)
+          const debugQuery = `trashed=false`;
+          const debugUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(debugQuery)}&fields=files(id,name,mimeType)&pageSize=10&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=drive&driveId=${parentId}`;
+          const debugRes = await fetch(debugUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+          const debugData = await debugRes.json();
+          console.log("Debug - ANY files in shared drive:", JSON.stringify(debugData).substring(0, 1000));
+
+          // Now try the actual folder query
           const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
           
           // Approach 1: corpora=drive
           const url1 = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=drive&driveId=${parentId}`;
-          console.log("Shared Drive query (corpora=drive):", url1);
           const res1 = await fetch(url1, { headers: { Authorization: `Bearer ${accessToken}` } });
           const data1 = await res1.json();
-          console.log("Shared Drive response (corpora=drive):", JSON.stringify(data1).substring(0, 500));
+          console.log("Folder query response:", JSON.stringify(data1).substring(0, 500));
           
           if (res1.ok && data1.files && data1.files.length > 0) {
             allFolders = data1.files;
           } else {
-            // Approach 2: corpora=allDrives (broader search)
+            // Approach 2: corpora=allDrives
             const url2 = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`;
-            console.log("Shared Drive query (corpora=allDrives):", url2);
             const res2 = await fetch(url2, { headers: { Authorization: `Bearer ${accessToken}` } });
             const data2 = await res2.json();
-            console.log("Shared Drive response (corpora=allDrives):", JSON.stringify(data2).substring(0, 500));
             if (res2.ok) allFolders = data2.files || [];
           }
         } else {
