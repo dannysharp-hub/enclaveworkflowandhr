@@ -687,6 +687,7 @@ Deno.serve(async (req) => {
 
         const match = folder.name.match(parseRegex);
         if (!match) {
+          console.log(`Unmatched folder: "${folder.name}" against regex: ${parseRegex}`);
           unmatched.push(folder.name);
           continue;
         }
