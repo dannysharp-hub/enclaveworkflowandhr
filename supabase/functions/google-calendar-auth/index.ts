@@ -10,11 +10,18 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
 // Identity-only scopes for initial Google Account connection.
-// Additional scopes (Drive, Calendar) are requested incrementally when those features are enabled.
+// Additional scopes (Drive, Calendar, Gmail) are requested incrementally when those features are enabled.
 const SCOPES = [
   "openid",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/userinfo.profile",
+].join(" ");
+
+const GMAIL_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+  "https://www.googleapis.com/auth/gmail.readonly",
 ].join(" ");
 
 Deno.serve(async (req) => {
@@ -121,6 +128,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── INITIATE GMAIL: OAuth with gmail.readonly scope ───
+    if (action === "initiate_gmail") {
+      const redirectUri = body.redirect_uri as string;
+      if (!redirectUri) {
+        return new Response(JSON.stringify({ error: "redirect_uri required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const state = btoa(JSON.stringify({ tenant_id: tenantId, include_gmail: true }));
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: GMAIL_SCOPES,
+        access_type: "offline",
+        prompt: "consent",
+        state,
+        include_granted_scopes: "true",
+      });
+      const url = `${GOOGLE_AUTH_URL}?${params.toString()}`;
+
+      return new Response(JSON.stringify({ url }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ─── CALLBACK: exchange code for tokens ───
     if (action === "callback") {
       const code = body.code as string;
@@ -154,7 +189,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      const { access_token, refresh_token, expires_in } = tokenData;
+      const { access_token, refresh_token, expires_in, scope: grantedScope } = tokenData;
+      const actualScopes = grantedScope ? grantedScope.split(" ") : SCOPES.split(" ");
       const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
 
       // Get Google user info
@@ -201,7 +237,8 @@ Deno.serve(async (req) => {
           is_connected: true,
           google_user_email: googleUser.email || null,
           google_user_id: googleUser.sub || null,
-          granted_scopes: SCOPES.split(" "),
+          granted_scopes: actualScopes,
+          gmail_scan_enabled: actualScopes.some((s: string) => s.includes("gmail.readonly")),
           status: "healthy",
           last_health_check_at: new Date().toISOString(),
         },

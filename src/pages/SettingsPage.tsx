@@ -9,6 +9,7 @@ import JobCardTemplateManager from "@/components/JobCardTemplateManager";
 import PayrollSettingsTab from "@/pages/PayrollSettingsTab";
 import GoogleIntegrationSettings from "@/pages/GoogleIntegrationSettings";
 import GoogleDriveIntegrationSettings from "@/pages/GoogleDriveIntegrationSettings";
+import GmailScanSettings from "@/pages/GmailScanSettings";
 
 // ─── Types ────────────────────────────────────────────
 interface DepartmentConfig {
@@ -157,6 +158,7 @@ export default function SettingsPage() {
             <div className="space-y-10">
               <GoogleIntegrationSettings />
               <GoogleDriveIntegrationSettings />
+              <GmailScanSettings />
             </div>
           )}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
