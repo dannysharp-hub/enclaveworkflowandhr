@@ -129,7 +129,12 @@ export default function GoogleIntegrationSettings() {
         body: { action: "initiate", redirect_uri: redirectUri },
       });
       if (error) throw error;
-      window.location.href = data.url;
+      // Open in new tab – preview iframes block top-level navigation
+      const w = window.open(data.url, "_blank");
+      if (!w) {
+        // Popup blocked – fall back to same-window redirect
+        window.location.href = data.url;
+      }
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setConnecting(false);
