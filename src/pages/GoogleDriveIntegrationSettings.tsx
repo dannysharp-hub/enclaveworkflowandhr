@@ -85,6 +85,8 @@ export default function GoogleDriveIntegrationSettings() {
     setLoading(false);
   }, [session]);
 
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
   // Handle Drive OAuth callback (incremental consent)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
