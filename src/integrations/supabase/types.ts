@@ -2086,6 +2086,200 @@ export type Database = {
           },
         ]
       }
+      gmail_extracted_documents: {
+        Row: {
+          ai_confidence: number | null
+          ai_extracted_data: Json | null
+          ai_match_reason: string | null
+          ai_matched_job_id: string | null
+          created_at: string
+          document_type: string
+          drive_file_id: string | null
+          file_name: string
+          file_size_bytes: number | null
+          filed_to_drive: boolean | null
+          id: string
+          mime_type: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scanned_email_id: string
+          status: string
+          storage_path: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_extracted_data?: Json | null
+          ai_match_reason?: string | null
+          ai_matched_job_id?: string | null
+          created_at?: string
+          document_type?: string
+          drive_file_id?: string | null
+          file_name: string
+          file_size_bytes?: number | null
+          filed_to_drive?: boolean | null
+          id?: string
+          mime_type?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scanned_email_id: string
+          status?: string
+          storage_path?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_extracted_data?: Json | null
+          ai_match_reason?: string | null
+          ai_matched_job_id?: string | null
+          created_at?: string
+          document_type?: string
+          drive_file_id?: string | null
+          file_name?: string
+          file_size_bytes?: number | null
+          filed_to_drive?: boolean | null
+          id?: string
+          mime_type?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scanned_email_id?: string
+          status?: string
+          storage_path?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_extracted_documents_ai_matched_job_id_fkey"
+            columns: ["ai_matched_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gmail_extracted_documents_scanned_email_id_fkey"
+            columns: ["scanned_email_id"]
+            isOneToOne: false
+            referencedRelation: "gmail_scanned_emails"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gmail_extracted_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_scan_settings: {
+        Row: {
+          auto_file_threshold: number
+          created_at: string
+          document_types: string[]
+          enabled: boolean
+          last_history_id: string | null
+          last_scan_at: string | null
+          require_review: boolean
+          scan_frequency_minutes: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_file_threshold?: number
+          created_at?: string
+          document_types?: string[]
+          enabled?: boolean
+          last_history_id?: string | null
+          last_scan_at?: string | null
+          require_review?: boolean
+          scan_frequency_minutes?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_file_threshold?: number
+          created_at?: string
+          document_types?: string[]
+          enabled?: boolean
+          last_history_id?: string | null
+          last_scan_at?: string | null
+          require_review?: boolean
+          scan_frequency_minutes?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_scan_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gmail_scanned_emails: {
+        Row: {
+          attachment_count: number | null
+          created_at: string
+          error_message: string | null
+          gmail_message_id: string
+          gmail_thread_id: string | null
+          has_attachments: boolean | null
+          id: string
+          processing_status: string
+          received_at: string | null
+          scanned_at: string
+          sender_email: string | null
+          sender_name: string | null
+          subject: string | null
+          tenant_id: string
+        }
+        Insert: {
+          attachment_count?: number | null
+          created_at?: string
+          error_message?: string | null
+          gmail_message_id: string
+          gmail_thread_id?: string | null
+          has_attachments?: boolean | null
+          id?: string
+          processing_status?: string
+          received_at?: string | null
+          scanned_at?: string
+          sender_email?: string | null
+          sender_name?: string | null
+          subject?: string | null
+          tenant_id: string
+        }
+        Update: {
+          attachment_count?: number | null
+          created_at?: string
+          error_message?: string | null
+          gmail_message_id?: string
+          gmail_thread_id?: string | null
+          has_attachments?: boolean | null
+          id?: string
+          processing_status?: string
+          received_at?: string | null
+          scanned_at?: string
+          sender_email?: string | null
+          sender_name?: string | null
+          subject?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_scanned_emails_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_calendar_mappings: {
         Row: {
           created_at: string
@@ -2248,6 +2442,7 @@ export type Database = {
           conflict_policy: string
           created_at: string
           default_timezone: string
+          gmail_scan_enabled: boolean
           google_user_email: string | null
           google_user_id: string | null
           granted_scopes: Json | null
@@ -2263,6 +2458,7 @@ export type Database = {
           conflict_policy?: string
           created_at?: string
           default_timezone?: string
+          gmail_scan_enabled?: boolean
           google_user_email?: string | null
           google_user_id?: string | null
           granted_scopes?: Json | null
@@ -2278,6 +2474,7 @@ export type Database = {
           conflict_policy?: string
           created_at?: string
           default_timezone?: string
+          gmail_scan_enabled?: boolean
           google_user_email?: string | null
           google_user_id?: string | null
           granted_scopes?: Json | null

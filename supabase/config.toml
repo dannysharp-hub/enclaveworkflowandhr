@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.review-digest]
 verify_jwt = false
+
+[functions.scan-gmail]
+verify_jwt = false
