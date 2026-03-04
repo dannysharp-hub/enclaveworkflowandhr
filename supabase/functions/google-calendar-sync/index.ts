@@ -276,14 +276,19 @@ Deno.serve(async (req) => {
   let callerTenantId: string | null = null;
 
   if (authHeader?.startsWith("Bearer ")) {
-    const { data: { user } } = await supabaseAdmin.auth.getUser(
-      authHeader.replace("Bearer ", "")
+    const token = authHeader.replace("Bearer ", "");
+    const supabaseWithAuth = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
     );
-    if (user) {
+    const { data: claimsData } = await supabaseWithAuth.auth.getClaims(token);
+    if (claimsData?.claims?.sub) {
+      const userId = claimsData.claims.sub as string;
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("tenant_id")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
       callerTenantId = profile?.tenant_id || null;
     }

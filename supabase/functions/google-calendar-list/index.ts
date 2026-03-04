@@ -88,15 +88,20 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(
-    authHeader.replace("Bearer ", "")
+  const token = authHeader.replace("Bearer ", "");
+  const supabaseWithAuth = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } }
   );
-  if (authErr || !user) {
+  const { data: claimsData, error: authErr } = await supabaseWithAuth.auth.getClaims(token);
+  if (authErr || !claimsData?.claims) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+  const user = { id: claimsData.claims.sub as string };
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
