@@ -551,6 +551,19 @@ Deno.serve(async (req) => {
         const data = await res.json();
         if (res.ok) allFolders = data.files || [];
 
+        // Also list "Shared with me" folders
+        const sharedQuery = `mimeType='application/vnd.google-apps.folder' and trashed=false and sharedWithMe=true`;
+        const sharedUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(sharedQuery)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        const sharedRes = await fetch(sharedUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const sharedData = await sharedRes.json();
+        if (sharedRes.ok && sharedData.files) {
+          for (const f of sharedData.files) {
+            if (!allFolders.some((existing: any) => existing.id === f.id)) {
+              allFolders.push({ ...f, name: `🔗 ${f.name} (Shared with me)` });
+            }
+          }
+        }
+
         // Also list Shared Drives themselves
         const drivesUrl = `https://www.googleapis.com/drive/v3/drives?pageSize=50`;
         const drivesRes = await fetch(drivesUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
