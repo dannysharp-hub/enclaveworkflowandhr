@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package, ClipboardCheck, Library, FileBox } from "lucide-react";
+import { ArrowLeft, Upload, Download, Save, Plus, FileSpreadsheet, AlertTriangle, CheckCircle2, Package, ClipboardCheck, Library, FileBox, FolderSearch } from "lucide-react";
 import BulkDxfUploadDialog from "@/components/BulkDxfUploadDialog";
 import CsvImportDialog from "@/components/CsvImportDialog";
 import PartRow from "@/components/PartRow";
@@ -58,6 +58,7 @@ export default function JobBuilderPage() {
   const [uploadToDrive, setUploadToDrive] = useState(true);
   const [fullMaterials, setFullMaterials] = useState<any[]>([]);
   const [bulkDxfOpen, setBulkDxfOpen] = useState(false);
+  const [scanningBom, setScanningBom] = useState(false);
 
   const fetchJob = useCallback(async () => {
     if (!jobId) return;
@@ -78,6 +79,27 @@ export default function JobBuilderPage() {
   }, [jobId]);
 
   useEffect(() => { fetchJob(); }, [fetchJob]);
+
+  const scanBomFromDrive = useCallback(async () => {
+    if (!jobId) return;
+    setScanningBom(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+        body: { action: "scan_single_job", job_id: jobId },
+      });
+      if (error) throw error;
+      if (data?.bom_imported) {
+        toast({ title: "BOM Imported", description: `Found and imported ${data.bom_file_name}` });
+        fetchJob();
+      } else if (data?.bom_found) {
+        toast({ title: "BOM already imported", description: `${data.bom_file_name} was already imported` });
+      } else {
+        toast({ title: "No BOM found", description: `Scanned ${data?.files_found || 0} files — no matching BOM CSV detected`, variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Scan failed", description: err.message, variant: "destructive" });
+    } finally { setScanningBom(false); }
+  }, [jobId, fetchJob]);
 
   // Apply product mappings to resolve material and grain defaults
   // Also validates material_code against the materials table to avoid FK violations
@@ -358,6 +380,9 @@ export default function JobBuilderPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {canEdit && (
             <>
+              <button onClick={scanBomFromDrive} disabled={scanningBom} className="flex items-center gap-2 h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-muted/20 transition-colors disabled:opacity-50">
+                <FolderSearch size={14} className={scanningBom ? "animate-pulse" : ""} /> {scanningBom ? "Scanning…" : "Scan BOM"}
+              </button>
               <button onClick={() => setLibraryPickerOpen(true)} className="flex items-center gap-2 h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-muted/20 transition-colors">
                 <Library size={14} /> From Library
               </button>
