@@ -84,15 +84,52 @@ export default function GoogleDriveIntegrationSettings() {
     setLoading(false);
   }, [session]);
 
-  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+  // Handle Drive OAuth callback (incremental consent)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const stateRaw = params.get("state");
+    if (code && stateRaw) {
+      try {
+        const stateObj = JSON.parse(atob(stateRaw));
+        if (stateObj.flow === "drive_setup") {
+          (async () => {
+            setConnecting(true);
+            try {
+              const redirectUri = `${window.location.origin}/settings`;
+              const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+                body: { action: "drive_callback", code, redirect_uri: redirectUri },
+              });
+              if (error) throw error;
+              toast({ title: "Drive Connected", description: `Linked as ${data.email || "your Google account"}` });
+              window.history.replaceState({}, "", "/settings");
+              fetchStatus();
+            } catch (err: any) {
+              toast({ title: "Drive Connection Failed", description: err.message, variant: "destructive" });
+            } finally {
+              setConnecting(false);
+            }
+          })();
+        }
+      } catch { /* not a drive callback */ }
+    }
+  }, []);
 
   const handleConnect = async () => {
     setConnecting(true);
     try {
+      const redirectUri = `${window.location.origin}/settings`;
       const { data, error } = await supabase.functions.invoke("google-drive-auth", {
-        body: { action: "setup" },
+        body: { action: "setup", redirect_uri: redirectUri },
       });
       if (error) throw error;
+
+      // If incremental consent is needed, redirect
+      if (data.needs_consent && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
       toast({ title: "Drive Connected", description: `Linked as ${data.email || "your Google account"}` });
       fetchStatus();
     } catch (err: any) {
@@ -101,7 +138,7 @@ export default function GoogleDriveIntegrationSettings() {
       toast({
         title: isNotConnected ? "Google Not Connected" : "Connection Failed",
         description: isNotConnected
-          ? "Please connect your Google account via the Calendar integration above first, then return here to enable Drive."
+          ? "Please connect your Google Account above first, then return here to enable Drive."
           : msg,
         variant: "destructive",
       });
@@ -261,7 +298,7 @@ export default function GoogleDriveIntegrationSettings() {
         {!isConnected && !googleConnected && (
           <div className="rounded-md bg-warning/10 border border-warning/30 p-3">
             <p className="text-xs text-warning">
-              ⚠ You must connect your Google account via the <strong>Calendar integration</strong> above first, then return here to enable Drive.
+              ⚠ You must connect your <strong>Google Account</strong> above first, then return here to enable Drive.
             </p>
           </div>
         )}

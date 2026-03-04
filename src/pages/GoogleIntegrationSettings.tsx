@@ -137,7 +137,7 @@ export default function GoogleIntegrationSettings() {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm("Disconnect Google Calendar? All mappings and sync links will be removed.")) return;
+    if (!confirm("Disconnect Google Account? All calendar mappings, Drive links and sync links will be removed.")) return;
     setDisconnecting(true);
     try {
       const { error } = await supabase.functions.invoke("google-calendar-auth", {
@@ -241,8 +241,8 @@ export default function GoogleIntegrationSettings() {
   return (
     <div className="space-y-6">
       <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
-        <Calendar size={16} className="text-primary" />
-        Google Calendar Integration
+       <Calendar size={16} className="text-primary" />
+        Google Account
       </h3>
 
       {/* ─── Connection Card ─── */}
@@ -276,7 +276,7 @@ export default function GoogleIntegrationSettings() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {connecting ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
-              Connect Google
+              Connect Google Account
             </button>
           )}
         </div>
