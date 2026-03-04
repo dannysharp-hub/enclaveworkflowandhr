@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import ReadinessBadge from "@/components/ReadinessBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search, Hammer, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, Search, Hammer, AlertTriangle, RefreshCw, Trash2, FolderDown } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -36,6 +36,7 @@ export default function JobsPage() {
   const [readiness, setReadiness] = useState<Map<string, ReadinessResult>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshingReadiness, setRefreshingReadiness] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editJob, setEditJob] = useState<DbJob | null>(null);
@@ -103,6 +104,26 @@ export default function JobsPage() {
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
+  const importFromDrive = useCallback(async () => {
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+        body: { action: "import_jobs_from_drive" },
+      });
+      if (error) throw error;
+      toast({
+        title: "Drive Import Complete",
+        description: `${data.created} jobs created, ${data.skipped} skipped, ${data.unmatched?.length || 0} folders didn't match pattern`,
+      });
+      if (data.unmatched?.length > 0) {
+        console.log("Unmatched folders:", data.unmatched);
+      }
+      fetchJobs();
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    } finally { setImporting(false); }
+  }, [fetchJobs]);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return jobs;
     const q = search.toLowerCase();
@@ -122,6 +143,12 @@ export default function JobsPage() {
           {canManage && (
             <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
               <Plus size={16} /> New Job
+            </button>
+          )}
+          {canManage && (
+            <button onClick={importFromDrive} disabled={importing} className="flex items-center gap-2 rounded-md border border-border px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50">
+              <FolderDown size={14} className={importing ? "animate-pulse" : ""} />
+              {importing ? "Importing…" : "Import from Drive"}
             </button>
           )}
           <button onClick={refreshReadiness} disabled={refreshingReadiness} className="flex items-center gap-2 rounded-md border border-border px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50">
