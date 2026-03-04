@@ -571,22 +571,26 @@ Deno.serve(async (req) => {
           if (driveCheckRes.ok) isSharedDriveRoot = true;
         } catch {}
 
-        let query: string;
-        let url: string;
-
         if (isSharedDriveRoot) {
-          // For Shared Drive roots, use corpora=drive with driveId
-          query = `mimeType='application/vnd.google-apps.folder' and trashed=false and '${parentId}' in parents`;
-          url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=drive&driveId=${parentId}`;
+          // For Shared Drive roots: list ALL folders in the drive, filter to direct children
+          // Google Drive API requires corpora=drive for shared drives
+          const query = `mimeType='application/vnd.google-apps.folder' and trashed=false`;
+          const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,parents)&orderBy=name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=drive&driveId=${parentId}`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+          const data = await res.json();
+          if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+          // Filter to only direct children of the shared drive root
+          allFolders = (data.files || []).filter((f: any) => 
+            f.parents && f.parents.includes(parentId)
+          );
         } else {
-          query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-          url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+          const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+          const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+          const data = await res.json();
+          if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+          allFolders = data.files || [];
         }
-
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-        const data = await res.json();
-        if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
-        allFolders = data.files || [];
       }
 
       return new Response(JSON.stringify({ folders: allFolders }), {
