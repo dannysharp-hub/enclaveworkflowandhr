@@ -99,7 +99,7 @@ export default function GoogleDriveIntegrationSettings() {
           (async () => {
             setConnecting(true);
             try {
-              const redirectUri = `${window.location.origin}/settings`;
+      const redirectUri = "https://enclaveworkflowandhr.lovable.app/settings";
               const { data, error } = await supabase.functions.invoke("google-drive-auth", {
                 body: { action: "drive_callback", code, redirect_uri: redirectUri },
               });
@@ -121,7 +121,7 @@ export default function GoogleDriveIntegrationSettings() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const redirectUri = `${window.location.origin}/settings`;
+      const redirectUri = "https://enclaveworkflowandhr.lovable.app/settings";
       const { data, error } = await supabase.functions.invoke("google-drive-auth", {
         body: { action: "setup", redirect_uri: redirectUri },
       });
