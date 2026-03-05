@@ -10,7 +10,7 @@ import {
   ClipboardCheck, Palmtree, Settings, ChevronDown, Activity, BarChart3,
   BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet,
   Download, TrendingUp, TrendingDown, Factory, Timer, Banknote, Brain, UserCog,
-  Home, MoreHorizontal, Landmark, Briefcase, Contact, FileBox, Link2,
+  Home, MoreHorizontal, Landmark, Briefcase, Contact, FileBox, Link2, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -141,6 +141,7 @@ function buildNavGroups(flags: Record<string, boolean>, userRole: string | null)
     roles: ["admin"],
     items: [
       { to: "/admin/leads", label: "Leads & Jobs", icon: Contact },
+      { to: "/admin/profit-watch", label: "Profit Watch", icon: AlertTriangle },
       { to: "/admin/production", label: "Production Board", icon: Factory },
       { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
       { to: "/admin/team", label: "Team & Invites", icon: Users },
