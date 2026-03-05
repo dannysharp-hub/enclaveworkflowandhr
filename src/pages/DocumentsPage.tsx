@@ -3,10 +3,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DocumentDialog from "@/components/DocumentDialog";
-import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign, Eye, Trash2 } from "lucide-react";
+import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign, Eye, Trash2, FolderOpen, ChevronDown, Monitor, Car, Zap, Building2, Briefcase, HardHat, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface DbFile {
   id: string;
@@ -20,16 +21,37 @@ interface DbFile {
   file_reference: string | null;
 }
 
-const categoryIcons: Record<string, React.ReactNode> = {
-  Safety: <Shield size={16} />,
-  SOP: <BookOpen size={16} />,
-  Machine: <FileText size={16} />,
-  HR: <FileText size={16} />,
-  Finance: <DollarSign size={16} />,
-  Purchasing: <ShoppingCart size={16} />,
-  Sales: <Receipt size={16} />,
-  Other: <FileText size={16} />,
-};
+const filingCategories = [
+  { group: "Operations", items: [
+    { value: "Safety", label: "Safety", icon: <Shield size={14} /> },
+    { value: "SOP", label: "SOP", icon: <BookOpen size={14} /> },
+    { value: "Machine", label: "Machine", icon: <Wrench size={14} /> },
+    { value: "HR", label: "HR", icon: <Briefcase size={14} /> },
+  ]},
+  { group: "Finance", items: [
+    { value: "Finance", label: "General Finance", icon: <DollarSign size={14} /> },
+    { value: "Software", label: "Software", icon: <Monitor size={14} /> },
+    { value: "Insurance", label: "Insurance", icon: <Shield size={14} /> },
+    { value: "Utilities", label: "Utilities", icon: <Zap size={14} /> },
+    { value: "Vehicle", label: "Vehicle", icon: <Car size={14} /> },
+    { value: "Rent", label: "Rent / Premises", icon: <Building2 size={14} /> },
+    { value: "Subscriptions", label: "Subscriptions", icon: <Receipt size={14} /> },
+    { value: "Equipment", label: "Equipment", icon: <HardHat size={14} /> },
+  ]},
+  { group: "Commercial", items: [
+    { value: "Purchasing", label: "Purchasing", icon: <ShoppingCart size={14} /> },
+    { value: "Sales", label: "Sales", icon: <Receipt size={14} /> },
+  ]},
+  { group: "Other", items: [
+    { value: "Other", label: "Other", icon: <FileText size={14} /> },
+  ]},
+];
+
+const allCategoryItems = filingCategories.flatMap(g => g.items);
+
+const categoryIcons: Record<string, React.ReactNode> = Object.fromEntries(
+  allCategoryItems.map(c => [c.value, c.icon])
+);
 
 export default function DocumentsPage() {
   const { userRole, session } = useAuth();
@@ -66,6 +88,16 @@ export default function DocumentsPage() {
       fetchFiles();
     }
     setBulkDeleteOpen(false);
+  };
+
+  const handleRefile = async (fileId: string, newCategory: string) => {
+    const { error } = await supabase.from("file_assets").update({ category: newCategory }).eq("id", fileId);
+    if (error) {
+      toast({ title: "Error", description: "Failed to update category", variant: "destructive" });
+    } else {
+      toast({ title: "Filed", description: `Document moved to ${newCategory}` });
+      fetchFiles();
+    }
   };
 
   const toggleSelect = (id: string) => {
@@ -234,6 +266,36 @@ export default function DocumentsPage() {
                         <Eye size={14} />
                         View
                       </button>
+                    )}
+                    {canManage && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                            <FolderOpen size={14} />
+                            File As
+                            <ChevronDown size={12} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52 max-h-72 overflow-y-auto">
+                          {filingCategories.map((group, gi) => (
+                            <div key={group.group}>
+                              {gi > 0 && <DropdownMenuSeparator />}
+                              <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">{group.group}</DropdownMenuLabel>
+                              {group.items.map(item => (
+                                <DropdownMenuItem
+                                  key={item.value}
+                                  onClick={() => handleRefile(file.id, item.value)}
+                                  className={cn("flex items-center gap-2 text-xs", file.category === item.value && "bg-primary/10 font-semibold")}
+                                >
+                                  {item.icon}
+                                  {item.label}
+                                  {file.category === item.value && <span className="ml-auto text-[10px] text-primary">current</span>}
+                                </DropdownMenuItem>
+                              ))}
+                            </div>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                     {canManage && (
                       <button
