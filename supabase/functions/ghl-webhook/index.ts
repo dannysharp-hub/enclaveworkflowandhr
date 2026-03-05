@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     // Extract fields from various GHL payload shapes
     const email = payload.email || payload.contact?.email || payload.calendarData?.email;
     const phone = payload.phone || payload.contact?.phone || payload.calendarData?.phone;
-    const jobRef = payload.customData?.job_ref || payload.job_ref;
+    const jobRef = payload.customData?.job_ref || payload.job_ref || payload.queryParams?.job_ref || payload.calendarData?.job_ref;
     const appointmentStart = payload.startTime || payload.calendarData?.startTime || payload.appointment?.startTime;
     const appointmentEnd = payload.endTime || payload.calendarData?.endTime || payload.appointment?.endTime;
     const ghlAppointmentId = payload.id || payload.appointmentId;
