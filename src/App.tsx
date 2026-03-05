@@ -68,7 +68,8 @@ import GhlSettingsPage from "./pages/cab/GhlSettingsPage";
 import WebhookLogsPage from "./pages/cab/WebhookLogsPage";
 import TeamPage from "./pages/cab/TeamPage";
 import CabSuppliersPage from "./pages/cab/SuppliersPage";
-
+import ProductionBoardPage from "./pages/cab/ProductionBoardPage";
+import InstallerJobsPage from "./pages/cab/InstallerJobsPage";
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
 const queryClient = new QueryClient();
@@ -123,7 +124,9 @@ const AppRoutes = () => (
               <Route path="/admin/webhooks" element={<WebhookLogsPage />} />
               <Route path="/admin/team" element={<TeamPage />} />
               <Route path="/admin/suppliers" element={<CabSuppliersPage />} />
-
+              <Route path="/admin/production" element={<ProductionBoardPage />} />
+              {/* Installer routes */}
+              <Route path="/installer/jobs" element={<InstallerJobsPage />} />
               {/* Open to all authenticated */}
               <Route path="/" element={<Index />} />
               <Route path="/my-work" element={<MyWorkPage />} />

@@ -200,6 +200,7 @@ export const PORTAL_MILESTONES = [
   { key: "ready_for_installation", label: "Ready for Installation" },
   { key: "install_booked", label: "Installation Booked" },
   { key: "installation_complete", label: "Installation Complete" },
+  { key: "signed_off", label: "Signed Off" },
   { key: "practical_completed", label: "Practical Completion" },
   { key: "closed_paid", label: "Project Complete" },
 ] as const;
@@ -207,6 +208,7 @@ export const PORTAL_MILESTONES = [
 /** Map current_stage_key to milestone index */
 export function getMilestoneIndex(stageKey: string | null): number {
   if (!stageKey) return -1;
+  // Map customer_signoff_at presence to signed_off milestone
   const idx = PORTAL_MILESTONES.findIndex(m => m.key === stageKey);
   if (idx >= 0) return idx;
   // Pre-confirmation stages
