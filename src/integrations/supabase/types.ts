@@ -178,6 +178,218 @@ export type Database = {
           },
         ]
       }
+      bank_accounts: {
+        Row: {
+          account_name: string
+          account_number_last4: string | null
+          account_type: string
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          provider_name: string | null
+          sort_code: string | null
+          tenant_id: string
+          truelayer_account_id: string
+          updated_at: string
+        }
+        Insert: {
+          account_name: string
+          account_number_last4?: string | null
+          account_type?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          provider_name?: string | null
+          sort_code?: string | null
+          tenant_id: string
+          truelayer_account_id: string
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string
+          account_number_last4?: string | null
+          account_type?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          provider_name?: string | null
+          sort_code?: string | null
+          tenant_id?: string
+          truelayer_account_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_document_matches: {
+        Row: {
+          bank_transaction_id: string
+          bill_id: string | null
+          confidence_score: number | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          file_asset_id: string | null
+          id: string
+          invoice_id: string | null
+          match_reason: string | null
+          match_type: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          bank_transaction_id: string
+          bill_id?: string | null
+          confidence_score?: number | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          file_asset_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          match_reason?: string | null
+          match_type?: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          bank_transaction_id?: string
+          bill_id?: string | null
+          confidence_score?: number | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          file_asset_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          match_reason?: string | null
+          match_type?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_document_matches_bank_transaction_id_fkey"
+            columns: ["bank_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "bank_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_document_matches_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_document_matches_file_asset_id_fkey"
+            columns: ["file_asset_id"]
+            isOneToOne: false
+            referencedRelation: "file_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_document_matches_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_document_matches_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_transactions: {
+        Row: {
+          amount: number
+          bank_account_id: string
+          counterparty_name: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          running_balance: number | null
+          status: string
+          tenant_id: string
+          transaction_category: string | null
+          transaction_date: string
+          transaction_type: string | null
+          truelayer_transaction_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id: string
+          counterparty_name?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          running_balance?: number | null
+          status?: string
+          tenant_id: string
+          transaction_category?: string | null
+          transaction_date: string
+          transaction_type?: string | null
+          truelayer_transaction_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string
+          counterparty_name?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          running_balance?: number | null
+          status?: string
+          tenant_id?: string
+          transaction_category?: string | null
+          transaction_date?: string
+          transaction_type?: string | null
+          truelayer_transaction_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bills: {
         Row: {
           amount_ex_vat: number
@@ -7955,6 +8167,50 @@ export type Database = {
             foreignKeyName: "training_records_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      truelayer_connections: {
+        Row: {
+          access_token: string
+          consent_id: string | null
+          created_at: string
+          id: string
+          refresh_token: string
+          status: string
+          tenant_id: string
+          token_expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          consent_id?: string | null
+          created_at?: string
+          id?: string
+          refresh_token: string
+          status?: string
+          tenant_id: string
+          token_expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          consent_id?: string | null
+          created_at?: string
+          id?: string
+          refresh_token?: string
+          status?: string
+          tenant_id?: string
+          token_expires_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "truelayer_connections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },

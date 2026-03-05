@@ -38,6 +38,7 @@ import SuppliersPage from "./pages/SuppliersPage";
 import PandlePage from "./pages/PandlePage";
 import PandleExportPage from "./pages/PandleExportPage";
 import CashflowForecastPage from "./pages/CashflowForecastPage";
+import BankReconciliationPage from "./pages/BankReconciliationPage";
 import ProductionControlPage from "./pages/ProductionControlPage";
 import InstallSignOffPage from "./pages/InstallSignOffPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -137,6 +138,7 @@ const AppRoutes = () => (
               <Route path="/finance/pandle" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><PandlePage /></RoleGate></FeatureGate>} />
               <Route path="/finance/pandle/export" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><PandleExportPage /></RoleGate></FeatureGate>} />
               <Route path="/finance/forecast" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><CashflowForecastPage /></RoleGate></FeatureGate>} />
+              <Route path="/finance/bank" element={<FeatureGate flag="enable_finance" featureName="Finance"><RoleGate allowedRoles={FINANCE_ROLES}><BankReconciliationPage /></RoleGate></FeatureGate>} />
 
               {/* Purchasing — admin/office/finance */}
               <Route path="/purchasing" element={<RoleGate allowedRoles={[...ADMIN_ROLES, "finance"]}><PurchaseOrdersPage /></RoleGate>} />

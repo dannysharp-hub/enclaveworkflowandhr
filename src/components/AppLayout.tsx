@@ -10,7 +10,7 @@ import {
   ClipboardCheck, Palmtree, Settings, ChevronDown, Activity, BarChart3,
   BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet,
   Download, TrendingUp, TrendingDown, Factory, Timer, Banknote, Brain, UserCog,
-  Home, MoreHorizontal,
+  Home, MoreHorizontal, Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -128,6 +128,7 @@ function buildNavGroups(flags: Record<string, boolean>, userRole: string | null)
         { to: "/finance/pandle", label: "Pandle", icon: FileSpreadsheet },
         { to: "/finance/pandle/export", label: "Pandle Export", icon: Download },
         { to: "/finance/forecast", label: "Forecast", icon: TrendingUp },
+        { to: "/finance/bank", label: "Bank Reconciliation", icon: Landmark },
       ],
     });
   }
