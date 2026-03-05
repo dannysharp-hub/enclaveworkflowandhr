@@ -141,6 +141,7 @@ function buildNavGroups(flags: Record<string, boolean>, userRole: string | null)
     roles: ["admin"],
     items: [
       { to: "/admin/leads", label: "Leads & Jobs", icon: Contact },
+      { to: "/admin/team", label: "Team & Invites", icon: Users },
       { to: "/admin/ghl", label: "GHL Settings", icon: Link2 },
       { to: "/admin/webhooks", label: "Webhook Logs", icon: Activity },
       { to: "/admin/bootstrap", label: "Bootstrap", icon: FileBox },

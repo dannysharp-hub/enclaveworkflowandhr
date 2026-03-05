@@ -66,6 +66,7 @@ import CustomerPortalJobsPage from "./pages/cab/CustomerPortalJobsPage";
 import CustomerPortalJobDetailPage from "./pages/cab/CustomerPortalJobDetailPage";
 import GhlSettingsPage from "./pages/cab/GhlSettingsPage";
 import WebhookLogsPage from "./pages/cab/WebhookLogsPage";
+import TeamPage from "./pages/cab/TeamPage";
 
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
@@ -91,10 +92,17 @@ const AppRoutes = () => (
     <Route path="/login" element={<LoginPage />} />
     {/* Public enquiry form */}
     <Route path="/enquiry" element={<EnquiryPage />} />
-    {/* Client Portal routes */}
+    {/* Public enquiry form */}
+    <Route path="/enquiry" element={<EnquiryPage />} />
+    {/* Client Portal routes (legacy) */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
     <Route path="/portal/job/:jobId" element={<ClientPortalJobPage />} />
+    {/* Company-scoped portal routes */}
+    <Route path="/portal/:companySlug/login" element={<ClientPortalLoginPage />} />
+    <Route path="/portal/:companySlug/jobs" element={<CustomerPortalJobsPage />} />
+    <Route path="/portal/:companySlug/job/:jobRef" element={<CustomerPortalJobDetailPage />} />
+    {/* Legacy portal routes */}
     <Route path="/portal/jobs" element={<CustomerPortalJobsPage />} />
     <Route path="/portal/cab-job/:jobRef" element={<CustomerPortalJobDetailPage />} />
     {/* Supplier Portal routes */}
@@ -112,6 +120,7 @@ const AppRoutes = () => (
               <Route path="/admin/jobs/:jobRef" element={<JobDetailPage />} />
               <Route path="/admin/ghl" element={<GhlSettingsPage />} />
               <Route path="/admin/webhooks" element={<WebhookLogsPage />} />
+              <Route path="/admin/team" element={<TeamPage />} />
 
               {/* Open to all authenticated */}
               <Route path="/" element={<Index />} />
