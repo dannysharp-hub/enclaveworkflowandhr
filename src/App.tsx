@@ -64,6 +64,7 @@ import JobDetailPage from "./pages/cab/JobDetailPage";
 import EnquiryPage from "./pages/cab/EnquiryPage";
 import CustomerPortalJobsPage from "./pages/cab/CustomerPortalJobsPage";
 import CustomerPortalJobDetailPage from "./pages/cab/CustomerPortalJobDetailPage";
+import GhlSettingsPage from "./pages/cab/GhlSettingsPage";
 
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
@@ -108,6 +109,7 @@ const AppRoutes = () => (
               <Route path="/admin/bootstrap" element={<BootstrapPage />} />
               <Route path="/admin/leads" element={<LeadsPage />} />
               <Route path="/admin/jobs/:jobRef" element={<JobDetailPage />} />
+              <Route path="/admin/ghl" element={<GhlSettingsPage />} />
 
               {/* Open to all authenticated */}
               <Route path="/" element={<Index />} />

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
-  Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle,
+  Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
@@ -37,6 +37,7 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [emitting, setEmitting] = useState<string | null>(null);
+  const [ghlSyncing, setGhlSyncing] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -177,6 +178,12 @@ export default function JobDetailPage() {
             )}
           </div>
           <h1 className="text-xl font-bold text-foreground">{job.job_title}</h1>
+          {(job.ghl_contact_id || job.ghl_opportunity_id) && (
+            <div className="flex gap-2 mt-1 flex-wrap">
+              {job.ghl_contact_id && <span className="text-[10px] font-mono text-muted-foreground">GHL Contact: {job.ghl_contact_id}</span>}
+              {job.ghl_opportunity_id && <span className="text-[10px] font-mono text-muted-foreground">GHL Opp: {job.ghl_opportunity_id}</span>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -218,6 +225,29 @@ export default function JobDetailPage() {
               {["appointment_requested", "ballpark_sent", "lead_captured", "quote_viewed"].includes(stageKey) && (
                 <Button size="sm" variant="outline" onClick={() => setQuoteDialogOpen(true)}><FileText size={14} /> Create/Send Quote</Button>
               )}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={ghlSyncing}
+                onClick={async () => {
+                  setGhlSyncing(true);
+                  try {
+                    const res = await supabase.functions.invoke("ghl-worker", {
+                      body: { company_id: companyId, job_id: job.id },
+                    });
+                    if (res.error) throw new Error(res.error.message);
+                    toast({ title: `GHL sync: ${res.data.processed} processed, ${res.data.errors} errors` });
+                    load();
+                  } catch (err: any) {
+                    toast({ title: "GHL sync failed", description: err.message, variant: "destructive" });
+                  } finally {
+                    setGhlSyncing(false);
+                  }
+                }}
+              >
+                <RefreshCw size={14} className={ghlSyncing ? "animate-spin" : ""} />
+                {ghlSyncing ? "Syncing…" : "Sync to GHL"}
+              </Button>
             </div>
           </div>
 

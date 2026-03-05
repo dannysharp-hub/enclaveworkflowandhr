@@ -1,0 +1,351 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+/* ─── Event → Stage/Tag mapping ─── */
+interface SyncAction {
+  stageKey?: string;
+  tags: string[];
+}
+
+function resolveActions(eventType: string, milestone?: string): SyncAction | null {
+  switch (eventType) {
+    case "lead.created":
+      return { stageKey: "lead_captured", tags: ["encl_lead_created"] };
+    case "ballpark.sent":
+      return { stageKey: "ballpark_sent", tags: ["encl_ballpark_sent"] };
+    case "appointment.requested":
+      return { stageKey: "appointment_requested", tags: ["encl_appointment_requested"] };
+    case "appointment.booked":
+      return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"] };
+    case "quote.sent":
+      return { stageKey: "quote_sent", tags: ["encl_quote_sent"] };
+    case "quote.viewed":
+      return { tags: ["encl_quote_viewed"] };
+    case "quote.accepted":
+      return { stageKey: "deposit_due", tags: ["encl_quote_accepted"] };
+    case "invoice.created":
+      if (milestone === "deposit") return { stageKey: "deposit_due", tags: ["encl_invoice_created_deposit"] };
+      if (milestone === "preinstall") return { tags: ["encl_invoice_created_preinstall"] };
+      if (milestone === "final") return { tags: ["encl_invoice_created_final"] };
+      return null;
+    case "invoice.paid":
+      if (milestone === "deposit")
+        return { stageKey: "project_confirmed", tags: ["encl_invoice_paid_deposit", "encl_project_confirmed"] };
+      if (milestone === "preinstall")
+        return { stageKey: "ready_for_installation", tags: ["encl_invoice_paid_preinstall", "encl_ready_for_installation"] };
+      if (milestone === "final")
+        return { stageKey: "closed_paid", tags: ["encl_invoice_paid_final", "encl_closed_paid"] };
+      return null;
+    case "materials.ordered":
+      return { stageKey: "materials_ordered", tags: ["encl_materials_ordered"] };
+    case "cnc.started":
+      return { stageKey: "manufacturing_started", tags: ["encl_manufacturing_started"] };
+    case "job.assembled":
+    case "assembly.completed":
+      return { stageKey: "cabinetry_assembled", tags: ["encl_cabinetry_assembled"] };
+    case "install.booked":
+      return { stageKey: "install_booked", tags: ["encl_install_booked"] };
+    case "install.completed":
+      return { stageKey: "installation_complete", tags: ["encl_installation_complete"] };
+    case "job.practical_completed":
+      return { stageKey: "practical_completed", tags: ["encl_practical_completed"] };
+    default:
+      return null;
+  }
+}
+
+/* ─── GHL API helpers ─── */
+const GHL_BASE = "https://services.leadconnectorhq.com";
+
+async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unknown) {
+  const opts: RequestInit = {
+    method,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      Version: "2021-07-28",
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${GHL_BASE}${path}`, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(`GHL ${method} ${path} ${res.status}: ${JSON.stringify(data)}`);
+  return data;
+}
+
+async function upsertContact(
+  apiKey: string,
+  locationId: string,
+  customer: { email?: string; phone?: string; first_name: string; last_name: string }
+) {
+  // Search by email first, then phone
+  const searchField = customer.email || customer.phone;
+  if (searchField) {
+    try {
+      const search = await ghlFetch(
+        `/contacts/search/duplicate?locationId=${locationId}&${customer.email ? "email" : "phone"}=${encodeURIComponent(searchField)}`,
+        apiKey
+      );
+      if (search.contacts?.length) return search.contacts[0];
+    } catch { /* not found, create */ }
+  }
+  const created = await ghlFetch("/contacts/", apiKey, "POST", {
+    locationId,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    email: customer.email || undefined,
+    phone: customer.phone || undefined,
+  });
+  return created.contact;
+}
+
+async function upsertOpportunity(
+  apiKey: string,
+  locationId: string,
+  pipelineId: string,
+  stageId: string,
+  contactId: string,
+  job: { job_ref: string; job_title: string; contract_value?: number },
+  existingOppId?: string
+) {
+  if (existingOppId) {
+    // Update stage
+    const updated = await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", {
+      stageId,
+      name: `${job.job_ref} — ${job.job_title}`,
+      monetaryValue: job.contract_value || 0,
+    });
+    return updated.opportunity || { id: existingOppId };
+  }
+  const created = await ghlFetch("/opportunities/", apiKey, "POST", {
+    pipelineId,
+    stageId,
+    locationId,
+    contactId,
+    name: `${job.job_ref} — ${job.job_title}`,
+    monetaryValue: job.contract_value || 0,
+    status: "open",
+  });
+  return created.opportunity;
+}
+
+async function addTags(apiKey: string, contactId: string, tags: string[]) {
+  if (!tags.length) return;
+  await ghlFetch(`/contacts/${contactId}/tags`, apiKey, "POST", { tags });
+}
+
+async function addNote(apiKey: string, contactId: string, note: string) {
+  await ghlFetch(`/contacts/${contactId}/notes`, apiKey, "POST", { body: note });
+}
+
+/* ─── Main handler ─── */
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ghlApiKey = Deno.env.get("GHL_API_KEY");
+    const ghlLocationId = Deno.env.get("GHL_LOCATION_ID");
+
+    if (!ghlApiKey) return new Response(JSON.stringify({ error: "GHL_API_KEY not configured" }), { status: 500, headers: corsHeaders });
+    if (!ghlLocationId) return new Response(JSON.stringify({ error: "GHL_LOCATION_ID not configured" }), { status: 500, headers: corsHeaders });
+
+    // Auth check
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsErr } = await userClient.auth.getUser(token);
+    if (claimsErr || !claimsData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
+    // Parse body for optional filters
+    let companyId: string | undefined;
+    let jobId: string | undefined;
+    let limit = 50;
+    try {
+      const body = await req.json();
+      companyId = body.company_id;
+      jobId = body.job_id;
+      if (body.limit) limit = Math.min(body.limit, 100);
+    } catch { /* no body */ }
+
+    // Get user's company
+    if (!companyId) {
+      const { data: profile } = await supabase
+        .from("cab_user_profiles")
+        .select("company_id")
+        .eq("id", claimsData.user.id)
+        .single();
+      companyId = profile?.company_id;
+    }
+
+    if (!companyId) {
+      return new Response(JSON.stringify({ error: "No company found" }), { status: 400, headers: corsHeaders });
+    }
+
+    // Get company settings for pipeline/stage mapping
+    const { data: company } = await supabase
+      .from("cab_companies")
+      .select("settings_json")
+      .eq("id", companyId)
+      .single();
+
+    const settings = (company?.settings_json as Record<string, unknown>) || {};
+    const pipelineId = settings.ghl_pipeline_id as string;
+    const stageIds = (settings.ghl_stage_ids as Record<string, string>) || {};
+
+    if (!pipelineId) {
+      return new Response(JSON.stringify({ error: "GHL pipeline not configured. Set up in /admin/ghl" }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    // Fetch pending events
+    let query = supabase
+      .from("cab_events")
+      .select("*")
+      .eq("company_id", companyId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(limit);
+
+    if (jobId) query = query.eq("job_id", jobId);
+
+    const { data: events } = await query;
+    if (!events?.length) {
+      return new Response(JSON.stringify({ processed: 0, message: "No pending events" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let processed = 0;
+    let errors = 0;
+
+    for (const event of events) {
+      // Mark processing
+      await supabase.from("cab_events").update({ status: "processing" }).eq("id", event.id);
+
+      try {
+        const milestone = (event.payload_json as Record<string, string>)?.milestone;
+        const actions = resolveActions(event.event_type, milestone);
+
+        if (!actions) {
+          // No GHL action needed — mark success
+          await supabase.from("cab_events").update({ status: "success", processed_at: new Date().toISOString() }).eq("id", event.id);
+          processed++;
+          continue;
+        }
+
+        // Load job + customer
+        if (!event.job_id) {
+          await supabase.from("cab_events").update({ status: "success", processed_at: new Date().toISOString() }).eq("id", event.id);
+          processed++;
+          continue;
+        }
+
+        const { data: job } = await supabase.from("cab_jobs").select("*").eq("id", event.job_id).single();
+        if (!job) throw new Error(`Job not found: ${event.job_id}`);
+
+        const { data: customer } = await supabase.from("cab_customers").select("*").eq("id", job.customer_id).single();
+        if (!customer) throw new Error(`Customer not found: ${job.customer_id}`);
+
+        // 1) Upsert contact
+        let ghlContactId = job.ghl_contact_id;
+        if (!ghlContactId) {
+          const contact = await upsertContact(ghlApiKey, ghlLocationId, customer);
+          ghlContactId = contact.id;
+          await supabase.from("cab_jobs").update({ ghl_contact_id: ghlContactId }).eq("id", job.id);
+        }
+
+        // 2) Determine target stage
+        const targetStageId = actions.stageKey ? stageIds[actions.stageKey] : undefined;
+
+        // 3) Upsert opportunity
+        let ghlOppId = job.ghl_opportunity_id;
+        if (!ghlOppId || targetStageId) {
+          const opp = await upsertOpportunity(
+            ghlApiKey,
+            ghlLocationId,
+            pipelineId,
+            targetStageId || stageIds["lead_captured"] || "",
+            ghlContactId!,
+            job,
+            ghlOppId || undefined
+          );
+          if (!ghlOppId) {
+            ghlOppId = opp.id;
+            await supabase.from("cab_jobs").update({ ghl_opportunity_id: ghlOppId }).eq("id", job.id);
+          }
+        }
+
+        // 4) Add tags
+        if (actions.tags.length && ghlContactId) {
+          await addTags(ghlApiKey, ghlContactId, actions.tags);
+        }
+
+        // 5) Add note
+        if (ghlContactId) {
+          await addNote(
+            ghlApiKey,
+            ghlContactId,
+            `Event: ${event.event_type} | Job: ${job.job_ref} | Time: ${event.created_at}`
+          );
+        }
+
+        // Mark success
+        await supabase.from("cab_events").update({ status: "success", processed_at: new Date().toISOString() }).eq("id", event.id);
+
+        // Log
+        await supabase.from("cab_ghl_sync_log").insert({
+          company_id: companyId,
+          event_id: event.id,
+          job_id: event.job_id,
+          action: `${event.event_type} → stage:${actions.stageKey || "none"} tags:${actions.tags.join(",")}`,
+          success: true,
+        });
+
+        processed++;
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const attempts = (event.attempts || 0) + 1;
+        const newStatus = attempts >= 10 ? "failed" : "pending";
+        await supabase.from("cab_events").update({ status: newStatus, attempts, last_error: errMsg }).eq("id", event.id);
+
+        await supabase.from("cab_ghl_sync_log").insert({
+          company_id: companyId!,
+          event_id: event.id,
+          job_id: event.job_id,
+          action: event.event_type,
+          success: false,
+          error: errMsg,
+        });
+
+        errors++;
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ processed, errors, total: events.length }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("GHL worker error:", errMsg);
+    return new Response(JSON.stringify({ error: errMsg }), { status: 500, headers: corsHeaders });
+  }
+});
