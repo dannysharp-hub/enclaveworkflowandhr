@@ -1,0 +1,323 @@
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, useParams } from "react-router-dom";
+import { getCabCompanyId, insertCabEvent } from "@/lib/cabHelpers";
+import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
+import {
+  ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
+} from "lucide-react";
+
+export default function JobDetailPage() {
+  const { jobRef } = useParams();
+  const navigate = useNavigate();
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [job, setJob] = useState<any>(null);
+  const [customer, setCustomer] = useState<any>(null);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    const cid = await getCabCompanyId();
+    if (!cid) return;
+    setCompanyId(cid);
+
+    const { data: jobData } = await (supabase.from("cab_jobs") as any)
+      .select("*")
+      .eq("company_id", cid)
+      .eq("job_ref", jobRef)
+      .single();
+
+    if (!jobData) { navigate("/admin/leads"); return; }
+    setJob(jobData);
+
+    const [custRes, quotesRes, invRes, eventsRes] = await Promise.all([
+      (supabase.from("cab_customers") as any).select("*").eq("id", jobData.customer_id).single(),
+      (supabase.from("cab_quotes") as any).select("*").eq("job_id", jobData.id).order("version", { ascending: false }),
+      (supabase.from("cab_invoices") as any).select("*").eq("job_id", jobData.id).order("created_at"),
+      (supabase.from("cab_events") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }).limit(20),
+    ]);
+
+    setCustomer(custRes.data);
+    setQuotes(quotesRes.data ?? []);
+    setInvoices(invRes.data ?? []);
+    setEvents(eventsRes.data ?? []);
+    setLoading(false);
+  }, [jobRef, navigate]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const updateJob = async (updates: Record<string, any>) => {
+    await (supabase.from("cab_jobs") as any).update(updates).eq("id", job.id);
+  };
+
+  const handleBallparkSent = async () => {
+    await insertCabEvent({ companyId: companyId!, eventType: "ballpark.sent", jobId: job.id });
+    await updateJob({ current_stage_key: "ballpark_sent", state: "awaiting_appointment_request" });
+    toast({ title: "Ballpark marked as sent" });
+    load();
+  };
+
+  const handleRequestAppointment = async () => {
+    const nextAction = new Date();
+    nextAction.setDate(nextAction.getDate() + 3);
+    await insertCabEvent({ companyId: companyId!, eventType: "appointment.requested", jobId: job.id });
+    await updateJob({
+      current_stage_key: "appointment_requested",
+      state: "awaiting_appointment_booking",
+      estimated_next_action_at: nextAction.toISOString(),
+    });
+    toast({ title: "Appointment requested" });
+    load();
+  };
+
+  const handleMarkDepositPaid = async (invoiceId: string, method: string) => {
+    const inv = invoices.find(i => i.id === invoiceId);
+    if (!inv) return;
+
+    await (supabase.from("cab_invoices") as any).update({
+      status: "paid", paid_at: new Date().toISOString(), payment_method: method,
+    }).eq("id", invoiceId);
+
+    await (supabase.from("cab_payments") as any).insert({
+      company_id: companyId!,
+      invoice_id: invoiceId,
+      job_id: job.id,
+      method,
+      amount: inv.amount,
+    });
+
+    await insertCabEvent({
+      companyId: companyId!, eventType: "invoice.paid", jobId: job.id,
+      payload: { milestone: inv.milestone, method },
+    });
+
+    if (inv.milestone === "deposit") {
+      await updateJob({
+        current_stage_key: "project_confirmed",
+        state: "active_production",
+        status: "active",
+      });
+    }
+
+    toast({ title: "Payment recorded" });
+    load();
+  };
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  const stageKey = job?.current_stage_key;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/admin/leads")}><ArrowLeft size={16} /></Button>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-muted-foreground">{job.job_ref}</span>
+            <Badge variant="outline">{job.status}</Badge>
+            <Badge variant="secondary" className="text-[10px]">{stageKey?.replace(/_/g, " ")}</Badge>
+          </div>
+          <h1 className="text-xl font-bold text-foreground">{job.job_title}</h1>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column — Details + actions */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Customer */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="font-mono text-sm font-bold text-foreground mb-2">Customer</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div><span className="text-muted-foreground">Name:</span> {customer?.first_name} {customer?.last_name}</div>
+              <div><span className="text-muted-foreground">Phone:</span> {customer?.phone || "—"}</div>
+              <div><span className="text-muted-foreground">Email:</span> {customer?.email || "—"}</div>
+              <div><span className="text-muted-foreground">Postcode:</span> {customer?.postcode || "—"}</div>
+            </div>
+          </div>
+
+          {/* Property */}
+          {job.property_address_json && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="font-mono text-sm font-bold text-foreground mb-2">Property</h3>
+              <p className="text-sm text-muted-foreground">
+                {job.property_address_json.address} {job.property_address_json.postcode}
+              </p>
+              {job.room_type && <p className="text-sm mt-1"><span className="text-muted-foreground">Room:</span> {job.room_type}</p>}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <h3 className="font-mono text-sm font-bold text-foreground">Actions</h3>
+            <div className="flex flex-wrap gap-2">
+              {stageKey === "lead_captured" && (
+                <Button size="sm" onClick={handleBallparkSent}><Send size={14} /> Mark Ballpark Sent</Button>
+              )}
+              {stageKey === "ballpark_sent" && (
+                <Button size="sm" onClick={handleRequestAppointment}><CalendarPlus size={14} /> Request Appointment</Button>
+              )}
+              {["appointment_requested", "ballpark_sent", "lead_captured"].includes(stageKey) || stageKey === "quote_viewed" ? (
+                <Button size="sm" variant="outline" onClick={() => setQuoteDialogOpen(true)}><FileText size={14} /> Create/Send Quote</Button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Quotes */}
+          {quotes.length > 0 && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="font-mono text-sm font-bold text-foreground mb-2">Quotes</h3>
+              <div className="space-y-2">
+                {quotes.map(q => (
+                  <div key={q.id} className="flex items-center justify-between p-2 rounded border border-border">
+                    <div>
+                      <span className="font-mono text-xs">v{q.version}</span>
+                      <span className="ml-2 text-sm">£{q.price_min?.toLocaleString()}–£{q.price_max?.toLocaleString()}</span>
+                    </div>
+                    <Badge variant={q.status === "accepted" ? "default" : "outline"}>{q.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Invoices */}
+          {invoices.length > 0 && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="font-mono text-sm font-bold text-foreground mb-2">Invoices</h3>
+              <div className="space-y-2">
+                {invoices.map(inv => (
+                  <div key={inv.id} className="flex items-center justify-between p-2 rounded border border-border">
+                    <div>
+                      <span className="font-mono text-xs">{inv.reference}</span>
+                      <span className="ml-2 text-sm">£{inv.amount?.toLocaleString()}</span>
+                      <Badge className="ml-2" variant={inv.status === "paid" ? "default" : "outline"}>{inv.status}</Badge>
+                    </div>
+                    {inv.status === "due" && (
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" onClick={() => handleMarkDepositPaid(inv.id, "bank")}>
+                          <Banknote size={12} /> Bank
+                        </Button>
+                        <Button size="sm" onClick={() => handleMarkDepositPaid(inv.id, "stripe")}>
+                          <CheckCircle2 size={12} /> Stripe
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right column — Event log */}
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="font-mono text-sm font-bold text-foreground mb-3">Event Log</h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {events.map(ev => (
+                <div key={ev.id} className="text-xs border-l-2 border-primary/30 pl-3 py-1">
+                  <span className="font-mono text-primary">{ev.event_type}</span>
+                  <span className="block text-muted-foreground">{format(new Date(ev.created_at), "dd MMM HH:mm")}</span>
+                </div>
+              ))}
+              {events.length === 0 && <p className="text-muted-foreground text-xs">No events yet</p>}
+            </div>
+          </div>
+
+          {job.estimated_next_action_at && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <p className="text-xs text-muted-foreground">Next action expected</p>
+              <p className="text-sm font-mono font-bold text-primary">{format(new Date(job.estimated_next_action_at), "dd MMM yyyy")}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <CreateQuoteDialog
+        open={quoteDialogOpen}
+        onOpenChange={setQuoteDialogOpen}
+        companyId={companyId!}
+        job={job}
+        currentVersion={quotes.length}
+        onSuccess={load}
+      />
+    </div>
+  );
+}
+
+function CreateQuoteDialog({ open, onOpenChange, companyId, job, currentVersion, onSuccess }: {
+  open: boolean; onOpenChange: (o: boolean) => void; companyId: string; job: any; currentVersion: number; onSuccess: () => void;
+}) {
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [scope, setScope] = useState("");
+  const [docUrl, setDocUrl] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await (supabase.from("cab_quotes") as any).insert({
+        company_id: companyId,
+        job_id: job.id,
+        version: currentVersion + 1,
+        status: "sent",
+        price_min: parseFloat(priceMin),
+        price_max: parseFloat(priceMax),
+        scope_summary: scope || null,
+        document_url: docUrl || null,
+        sent_at: new Date().toISOString(),
+      });
+
+      await insertCabEvent({ companyId, eventType: "quote.sent", jobId: job.id });
+
+      const nextAction = new Date();
+      nextAction.setDate(nextAction.getDate() + 7);
+      await (supabase.from("cab_jobs") as any).update({
+        status: "quoted",
+        state: "awaiting_acceptance",
+        current_stage_key: "quote_sent",
+        estimated_next_action_at: nextAction.toISOString(),
+      }).eq("id", job.id);
+
+      toast({ title: "Quote sent" });
+      onOpenChange(false);
+      onSuccess();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle className="font-mono">Send Quote</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Price Min (£) *</Label><Input required type="number" step="0.01" value={priceMin} onChange={e => setPriceMin(e.target.value)} /></div>
+            <div><Label>Price Max (£) *</Label><Input required type="number" step="0.01" value={priceMax} onChange={e => setPriceMax(e.target.value)} /></div>
+          </div>
+          <div><Label>Scope Summary</Label><textarea className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" rows={3} value={scope} onChange={e => setScope(e.target.value)} /></div>
+          <div><Label>Document URL</Label><Input value={docUrl} onChange={e => setDocUrl(e.target.value)} placeholder="https://..." /></div>
+          <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Sending…" : "Send Quote"}</Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

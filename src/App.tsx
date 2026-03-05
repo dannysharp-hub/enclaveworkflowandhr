@@ -58,6 +58,12 @@ import ClientPortalJobPage from "./pages/portal/ClientPortalJobPage";
 import SupplierPortalLoginPage from "./pages/portal/SupplierPortalLoginPage";
 import SupplierPortalDashboardPage from "./pages/portal/SupplierPortalDashboardPage";
 import NotFound from "./pages/NotFound";
+import BootstrapPage from "./pages/cab/BootstrapPage";
+import LeadsPage from "./pages/cab/LeadsPage";
+import JobDetailPage from "./pages/cab/JobDetailPage";
+import EnquiryPage from "./pages/cab/EnquiryPage";
+import CustomerPortalJobsPage from "./pages/cab/CustomerPortalJobsPage";
+import CustomerPortalJobDetailPage from "./pages/cab/CustomerPortalJobDetailPage";
 
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
@@ -81,10 +87,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<LoginPage />} />
+    {/* Public enquiry form */}
+    <Route path="/enquiry" element={<EnquiryPage />} />
     {/* Client Portal routes */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
     <Route path="/portal/job/:jobId" element={<ClientPortalJobPage />} />
+    <Route path="/portal/jobs" element={<CustomerPortalJobsPage />} />
+    <Route path="/portal/cab-job/:jobRef" element={<CustomerPortalJobDetailPage />} />
     {/* Supplier Portal routes */}
     <Route path="/supplier/login" element={<SupplierPortalLoginPage />} />
     <Route path="/supplier/dashboard" element={<SupplierPortalDashboardPage />} />
@@ -94,6 +104,11 @@ const AppRoutes = () => (
         <ProtectedRoute>
           <AppLayout>
             <Routes>
+              {/* Cab admin routes */}
+              <Route path="/admin/bootstrap" element={<BootstrapPage />} />
+              <Route path="/admin/leads" element={<LeadsPage />} />
+              <Route path="/admin/jobs/:jobRef" element={<JobDetailPage />} />
+
               {/* Open to all authenticated */}
               <Route path="/" element={<Index />} />
               <Route path="/my-work" element={<MyWorkPage />} />
