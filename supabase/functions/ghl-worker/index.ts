@@ -11,6 +11,7 @@ interface SyncAction {
   stageKey?: string;
   tags: string[];
   noteExtra?: string;
+  customerWindow?: string; // e.g. "Tue 11:00–13:00" for GHL custom field
 }
 
 function resolveActions(eventType: string, milestone?: string, payload?: Record<string, unknown>): SyncAction | null {
@@ -33,25 +34,24 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
       const endAt = payload?.appointment_end as string;
       const repName = (payload?.rep_name as string) || "";
       const calId = (payload?.ghl_calendar_id as string) || "";
-      // Internal note includes operational details (rep, calendar, postcode etc.)
       let noteExtra = "";
+      let customerWindow = "";
       if (startAt) {
         try {
           const ds = new Date(startAt);
           const de = endAt ? new Date(endAt) : null;
-          const datePart = ds.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-          const timePart = ds.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-          const endPart = de ? `–${de.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : "";
-          // Customer-facing window for GHL template variable: e.g. "Tue 11:00–13:00"
-          const customerWindow = `${ds.toLocaleDateString("en-GB", { weekday: "short" })} ${timePart}${endPart}`;
+          const datePart = ds.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" });
+          const timePart = ds.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
+          const endPart = de ? `–${de.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}` : "";
+          // Customer-facing window: e.g. "Tue 11:00–13:00"
+          customerWindow = `${ds.toLocaleDateString("en-GB", { weekday: "short", timeZone: "Europe/London" })} ${timePart}${endPart}`;
           // Internal note with full operational detail
           noteExtra = `Booked: ${datePart} ${timePart}${endPart}`;
           if (repName) noteExtra += ` | Rep: ${repName}`;
           if (calId) noteExtra += ` | Cal: ${calId}`;
-          noteExtra += ` | Customer display: "${customerWindow}"`;
         } catch { noteExtra = `Booked: ${startAt}`; }
       }
-      return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"], noteExtra };
+      return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"], noteExtra, customerWindow };
     }
     case "quote.sent":
       return { stageKey: "quote_sent", tags: ["encl_quote_sent"] };
@@ -325,6 +325,20 @@ Deno.serve(async (req) => {
         // 4) Add tags
         if (actions.tags.length && ghlContactId) {
           await addTags(ghlApiKey, ghlContactId, actions.tags);
+        }
+
+        // 4b) Update appointment window custom field if configured
+        if (actions.customerWindow && ghlContactId) {
+          const apptFieldId = settings.ghl_custom_field_appointment_window_id as string;
+          if (apptFieldId) {
+            try {
+              await ghlFetch(`/contacts/${ghlContactId}`, ghlApiKey, "PUT", {
+                customFields: [{ id: apptFieldId, value: actions.customerWindow }],
+              });
+            } catch (cfErr) {
+              console.error("Failed to update appointment window custom field:", cfErr);
+            }
+          }
         }
 
         // 5) Add note

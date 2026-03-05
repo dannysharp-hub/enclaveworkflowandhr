@@ -46,6 +46,7 @@ export default function GhlSettingsPage() {
   const [siteVisitCalendarId, setSiteVisitCalendarId] = useState("");
   const [siteVisitBookingUrl, setSiteVisitBookingUrl] = useState("");
   const [siteVisitRepName, setSiteVisitRepName] = useState("Alistair");
+  const [apptWindowFieldId, setApptWindowFieldId] = useState("");
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -64,6 +65,7 @@ export default function GhlSettingsPage() {
     setSiteVisitCalendarId(settings.site_visit_calendar_id || "");
     setSiteVisitBookingUrl(settings.site_visit_booking_url || "");
     setSiteVisitRepName(settings.site_visit_rep_name || "Alistair");
+    setApptWindowFieldId(settings.ghl_custom_field_appointment_window_id || "");
 
     const { data: jobData } = await (supabase.from("cab_jobs") as any)
       .select("id, job_ref, job_title")
@@ -103,6 +105,7 @@ export default function GhlSettingsPage() {
         site_visit_calendar_id: siteVisitCalendarId,
         site_visit_booking_url: siteVisitBookingUrl,
         site_visit_rep_name: siteVisitRepName,
+        ghl_custom_field_appointment_window_id: apptWindowFieldId,
       };
 
       await (supabase.from("cab_companies") as any)
@@ -214,6 +217,21 @@ export default function GhlSettingsPage() {
             />
           </div>
         </div>
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <Label className="text-xs">Appointment Window Custom Field ID</Label>
+            <Input
+              value={apptWindowFieldId}
+              onChange={(e) => setApptWindowFieldId(e.target.value)}
+              placeholder="Paste GHL custom field ID"
+              className="font-mono text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Create a Contact custom field "Appointment Window" in GHL, then paste its ID here.
+              The worker writes e.g. "Tue 11:00–13:00" into this field when an appointment is booked.
+            </p>
+          </div>
+        </div>
         <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
           <Info size={12} className="mt-0.5 shrink-0" />
           <span>
@@ -249,12 +267,15 @@ export default function GhlSettingsPage() {
           <div className="border-l-2 border-primary/30 pl-3">
             <p className="font-bold text-foreground">4. Appointment Booked Confirmation</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_appointment_booked</code></p>
-            <p>Action: Send SMS confirmation (customer-facing — <strong>only show appointment window</strong>):</p>
+            <p>Action: Send SMS using the <strong>Appointment Window</strong> custom field:</p>
             <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
-              "Hi {"{{contact.first_name}}"}, your site visit is confirmed for {"{{appointment.start_time}}"} – {"{{appointment.end_time}}"}. We'll see you then!"
+              "Hi {"{{contact.first_name}}"}, your site visit is confirmed for {"{{contact.appointment_window}}"}. We'll see you then!"
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              The custom field is auto-populated by the sync worker with e.g. <code className="font-mono">"Tue 11:00–13:00"</code> (Europe/London).
             </p>
             <p className="mt-1 text-destructive font-medium">⚠ Never include travel time, buffers, rep names or internal details in customer messages.</p>
-            <p className="mt-1">Optional: Send email confirmation with appointment window only.</p>
+            <p className="mt-1">Optional: Send email confirmation using the same custom field token.</p>
           </div>
         </div>
       </div>
