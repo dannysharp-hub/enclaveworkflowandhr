@@ -249,11 +249,12 @@ export default function GhlSettingsPage() {
           <div className="border-l-2 border-primary/30 pl-3">
             <p className="font-bold text-foreground">4. Appointment Booked Confirmation</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_appointment_booked</code></p>
-            <p>Action: Send SMS confirmation:</p>
+            <p>Action: Send SMS confirmation (customer-facing — <strong>only show appointment window</strong>):</p>
             <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
-              "Your site visit is booked for {"{{appointment_time}}"}. We'll see you then."
+              "Hi {"{{contact.first_name}}"}, your site visit is confirmed for {"{{appointment.start_time}}"} – {"{{appointment.end_time}}"}. We'll see you then!"
             </p>
-            <p className="mt-1">Optional: Send email confirmation with appointment details.</p>
+            <p className="mt-1 text-destructive font-medium">⚠ Never include travel time, buffers, rep names or internal details in customer messages.</p>
+            <p className="mt-1">Optional: Send email confirmation with appointment window only.</p>
           </div>
         </div>
       </div>

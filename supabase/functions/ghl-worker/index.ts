@@ -30,14 +30,28 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
     }
     case "appointment.booked": {
       const startAt = payload?.appointment_start as string;
-      let timeNote = "";
+      const endAt = payload?.appointment_end as string;
+      const repName = (payload?.rep_name as string) || "";
+      const calId = (payload?.ghl_calendar_id as string) || "";
+      // Internal note includes operational details (rep, calendar, postcode etc.)
+      let noteExtra = "";
       if (startAt) {
         try {
-          const d = new Date(startAt);
-          timeNote = `Booked: ${d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} at ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
-        } catch { timeNote = `Booked: ${startAt}`; }
+          const ds = new Date(startAt);
+          const de = endAt ? new Date(endAt) : null;
+          const datePart = ds.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+          const timePart = ds.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+          const endPart = de ? `–${de.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : "";
+          // Customer-facing window for GHL template variable: e.g. "Tue 11:00–13:00"
+          const customerWindow = `${ds.toLocaleDateString("en-GB", { weekday: "short" })} ${timePart}${endPart}`;
+          // Internal note with full operational detail
+          noteExtra = `Booked: ${datePart} ${timePart}${endPart}`;
+          if (repName) noteExtra += ` | Rep: ${repName}`;
+          if (calId) noteExtra += ` | Cal: ${calId}`;
+          noteExtra += ` | Customer display: "${customerWindow}"`;
+        } catch { noteExtra = `Booked: ${startAt}`; }
       }
-      return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"], noteExtra: timeNote };
+      return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"], noteExtra };
     }
     case "quote.sent":
       return { stageKey: "quote_sent", tags: ["encl_quote_sent"] };
