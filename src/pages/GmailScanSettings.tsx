@@ -364,9 +364,16 @@ export default function GmailScanSettings() {
 
                       <div className="flex items-center gap-2 pl-8">
                         <button
-                          onClick={() => {
-                            const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/authenticated/documents/${doc.storage_path}`;
-                            window.open(url, "_blank");
+                          onClick={async () => {
+                            if (!doc.storage_path) return;
+                            const { data, error } = await supabase.storage
+                              .from("documents")
+                              .createSignedUrl(doc.storage_path, 300);
+                            if (error || !data?.signedUrl) {
+                              toast({ title: "Error", description: "Could not generate preview link", variant: "destructive" });
+                              return;
+                            }
+                            window.open(data.signedUrl, "_blank");
                           }}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
                         >
