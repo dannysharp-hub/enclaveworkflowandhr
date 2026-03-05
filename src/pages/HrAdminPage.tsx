@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Users, Clock, Palmtree, Download, Check, X, Pencil, ChevronDown, AlertTriangle, Search } from "lucide-react";
+import { Users, Clock, Palmtree, Download, Check, X, Pencil, ChevronDown, AlertTriangle, Search, Trash2 } from "lucide-react";
 import { format, differenceInMinutes, parseISO, startOfWeek, endOfWeek } from "date-fns";
 import { exportToCsv, filterByDateRange } from "@/lib/csvExport";
 import CsvExportButton from "@/components/CsvExportButton";
@@ -50,6 +50,7 @@ export default function HrAdminPage() {
 
 /* ─── Timesheets Tab ─── */
 function TimesheetsTab() {
+  const { userRole } = useAuth();
   const [entries, setEntries] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -85,6 +86,13 @@ function TimesheetsTab() {
     const name = profiles[e.staff_id] || "";
     return name.toLowerCase().includes(search.toLowerCase());
   });
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this time entry? This cannot be undone.")) return;
+    const { error } = await supabase.from("time_entries").delete().eq("id", id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: "Entry deleted" }); load(); }
+  };
 
   const missingClockOuts = entries.filter(e => !e.clock_out);
 
@@ -128,6 +136,7 @@ function TimesheetsTab() {
                 <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Break</th>
                 <th className="text-right px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Total</th>
                 <th className="text-center px-4 py-2 font-mono text-[10px] text-muted-foreground uppercase">Status</th>
+                {userRole === "admin" && <th className="px-4 py-2"></th>}
               </tr>
             </thead>
             <tbody>
@@ -142,9 +151,14 @@ function TimesheetsTab() {
                   <td className="px-4 py-2 text-center">
                     <span className={cn("text-[10px] font-mono px-2 py-0.5 rounded-full", e.approved ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>{e.approved ? "Approved" : "Pending"}</span>
                   </td>
+                  {userRole === "admin" && (
+                    <td className="px-4 py-2 text-center">
+                      <button onClick={() => handleDelete(e.id)} className="h-7 w-7 rounded-md flex items-center justify-center bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors" title="Delete entry"><Trash2 size={13} /></button>
+                    </td>
+                  )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No entries found</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={userRole === "admin" ? 8 : 7} className="px-4 py-8 text-center text-muted-foreground">No entries found</td></tr>}
             </tbody>
           </table>
         </div>
