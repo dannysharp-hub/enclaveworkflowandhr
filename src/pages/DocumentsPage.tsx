@@ -2,8 +2,9 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DocumentDialog from "@/components/DocumentDialog";
-import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign } from "lucide-react";
+import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 interface DbFile {
   id: string;
@@ -14,6 +15,7 @@ interface DbFile {
   requires_acknowledgement: boolean;
   status: string;
   created_at: string;
+  file_reference: string | null;
 }
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -28,7 +30,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 export default function DocumentsPage() {
-  const { userRole } = useAuth();
+  const { userRole, session } = useAuth();
   const [files, setFiles] = useState<DbFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -51,6 +53,41 @@ export default function DocumentsPage() {
   }, [files, search]);
 
   const reqAck = files.filter(f => f.requires_acknowledgement);
+
+  const handleViewDocument = async (file: DbFile) => {
+    if (!file.file_reference) return;
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scan-gmail`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
+            "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ action: "view_file_asset", file_reference: file.file_reference }),
+        }
+      );
+      if (!resp.ok) {
+        toast({ title: "Error", description: "Could not load document", variant: "destructive" });
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.download = file.title || "document";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      toast({ title: "Error", description: "Failed to load document", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -96,7 +133,7 @@ export default function DocumentsPage() {
         ) : (
           <div className="divide-y divide-border">
             {filtered.map(file => (
-              <div key={file.id} className="p-4 hover:bg-secondary/30 transition-colors cursor-pointer">
+              <div key={file.id} className="p-4 hover:bg-secondary/30 transition-colors">
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 rounded-md bg-secondary flex items-center justify-center shrink-0 text-secondary-foreground">
                     {categoryIcons[file.category] || <FileText size={16} />}
@@ -112,6 +149,15 @@ export default function DocumentsPage() {
                       <span className="text-[10px] text-muted-foreground">{new Date(file.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
+                  {file.file_reference && (
+                    <button
+                      onClick={() => handleViewDocument(file)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors shrink-0"
+                    >
+                      <Eye size={14} />
+                      View
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

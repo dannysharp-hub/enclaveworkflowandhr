@@ -682,6 +682,52 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── VIEW FILE ASSET (proxy file bytes by storage path) ───
+    if (action === "view_file_asset") {
+      const { file_reference } = body;
+      if (!file_reference) {
+        return new Response(JSON.stringify({ error: "file_reference required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Verify the file belongs to this tenant
+      if (!file_reference.startsWith(tenantId + "/")) {
+        return new Response(JSON.stringify({ error: "Access denied" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: fileData, error: dlError } = await supabaseAdmin.storage
+        .from("documents")
+        .download(file_reference);
+
+      if (dlError || !fileData) {
+        return new Response(JSON.stringify({ error: "Could not download file" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const fileName = file_reference.split("/").pop() || "document";
+      const ext = fileName.split(".").pop()?.toLowerCase();
+      const mimeMap: Record<string, string> = {
+        pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg",
+        png: "image/png", csv: "text/csv", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        xls: "application/vnd.ms-excel", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      };
+
+      return new Response(fileData, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": mimeMap[ext || ""] || "application/octet-stream",
+          "Content-Disposition": `inline; filename="${fileName}"`,
+        },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
