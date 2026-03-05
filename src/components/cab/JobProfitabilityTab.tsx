@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Package, Wrench,
-  Truck, Building2, HelpCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Target, RefreshCw,
+  Truck, Building2, HelpCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Target, RefreshCw, Clock,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -63,6 +63,7 @@ export default function JobProfitabilityTab({ companyId, job, onRefresh }: Props
   const [targetMargin, setTargetMargin] = useState("");
   const [savingBudgets, setSavingBudgets] = useState(false);
   const [recalcing, setRecalcing] = useState(false);
+  const [syncingLabour, setSyncingLabour] = useState(false);
   // Form state
   const [formType, setFormType] = useState("materials");
   const [formDesc, setFormDesc] = useState("");
@@ -206,6 +207,23 @@ export default function JobProfitabilityTab({ companyId, job, onRefresh }: Props
     } finally { setRecalcing(false); }
   };
 
+  const handleSyncLabour = async () => {
+    setSyncingLabour(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-labour-to-cab", {
+        body: { company_id: companyId, job_id: job.id },
+      });
+      if (error) throw error;
+      toast({
+        title: "Labour sync complete",
+        description: `${data?.synced ?? 0} cost line(s) synced, ${data?.jobs_recalc_queued ?? 0} recalc(s) queued.`,
+      });
+      setTimeout(() => { load(); onRefresh(); }, 1500);
+    } catch (err: any) {
+      toast({ title: "Sync error", description: err.message, variant: "destructive" });
+    } finally { setSyncingLabour(false); }
+  };
+
   if (loading) {
     return <div className="h-20 flex items-center justify-center"><div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
@@ -244,10 +262,16 @@ export default function JobProfitabilityTab({ companyId, job, onRefresh }: Props
           <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
             <TrendingUp size={14} className="text-primary" /> Profitability
           </h3>
-          <Button size="sm" variant="outline" className="text-[10px] h-7 gap-1" onClick={handleRecalcNow} disabled={recalcing}>
-            <RefreshCw size={10} className={recalcing ? "animate-spin" : ""} />
-            {recalcing ? "Queued…" : "Recalculate Profit Now"}
-          </Button>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" className="text-[10px] h-7 gap-1" onClick={handleSyncLabour} disabled={syncingLabour}>
+              <Clock size={10} className={syncingLabour ? "animate-spin" : ""} />
+              {syncingLabour ? "Syncing…" : "Sync Labour"}
+            </Button>
+            <Button size="sm" variant="outline" className="text-[10px] h-7 gap-1" onClick={handleRecalcNow} disabled={recalcing}>
+              <RefreshCw size={10} className={recalcing ? "animate-spin" : ""} />
+              {recalcing ? "Queued…" : "Recalculate"}
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
