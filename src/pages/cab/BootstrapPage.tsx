@@ -15,57 +15,17 @@ export default function BootstrapPage() {
     if (!user) return;
     setLoading(true);
     try {
-      // Check if already linked
-      const { data: existing } = await (supabase.from("cab_user_profiles") as any)
-        .select("company_id")
-        .eq("id", user.id)
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke("bootstrap-admin");
 
-      if (existing?.company_id) {
-        toast({ title: "Already set up", description: "You already have a company linked." });
-        navigate("/admin/leads");
-        return;
-      }
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Bootstrap failed");
 
-      // Check if company already exists
-      const { data: existingCompany } = await (supabase.from("cab_companies") as any)
-        .select("id")
-        .eq("name", "Enclave Cabinetry")
-        .maybeSingle();
-
-      let companyId: string;
-
-      if (existingCompany?.id) {
-        companyId = existingCompany.id;
-      } else {
-        const { data: company, error: compErr } = await (supabase.from("cab_companies") as any)
-          .insert({
-            name: "Enclave Cabinetry",
-            base_postcode: "PE20 3QF",
-            service_radius_miles: 50,
-            brand_phone: "07944608098",
-            timezone: "Europe/London",
-          })
-          .select("id")
-          .single();
-        if (compErr) throw compErr;
-        companyId = company.id;
-      }
-
-      // Link user profile
-      const { error: profErr } = await (supabase.from("cab_user_profiles") as any)
-        .upsert({
-          id: user.id,
-          company_id: companyId,
-          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin",
-          email: user.email!,
-          role: "admin",
-          is_active: true,
-        });
-
-      if (profErr) throw profErr;
-
-      toast({ title: "Linked", description: existingCompany ? "Linked to existing Enclave Cabinetry." : "Enclave Cabinetry created and linked." });
+      toast({
+        title: data.already_linked ? "Already set up" : "Company linked",
+        description: data.already_linked
+          ? "You already have a company linked."
+          : "Enclave Cabinetry is ready.",
+      });
       navigate("/admin/leads");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
