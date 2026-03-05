@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.bootstrap-admin]
 verify_jwt = false
+
+[functions.ghl-form]
+verify_jwt = false
