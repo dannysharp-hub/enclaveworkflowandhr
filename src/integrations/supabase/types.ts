@@ -642,6 +642,76 @@ export type Database = {
           },
         ]
       }
+      cab_appointments: {
+        Row: {
+          company_id: string
+          created_at: string
+          customer_id: string
+          end_at: string | null
+          ghl_appointment_id: string | null
+          ghl_calendar_id: string | null
+          id: string
+          job_id: string
+          notes: string | null
+          start_at: string
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          customer_id: string
+          end_at?: string | null
+          ghl_appointment_id?: string | null
+          ghl_calendar_id?: string | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          start_at: string
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          customer_id?: string
+          end_at?: string | null
+          ghl_appointment_id?: string | null
+          ghl_calendar_id?: string | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          start_at?: string
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_appointments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_appointments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "cab_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_appointments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_companies: {
         Row: {
           base_postcode: string | null

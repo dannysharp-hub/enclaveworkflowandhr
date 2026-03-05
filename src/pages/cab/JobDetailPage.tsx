@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
-  CalendarDays,
+  CalendarDays, Calendar,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
@@ -35,6 +35,7 @@ export default function JobDetailPage() {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [emitting, setEmitting] = useState<string | null>(null);
@@ -57,17 +58,19 @@ export default function JobDetailPage() {
     if (!jobData) { navigate("/admin/leads"); return; }
     setJob(jobData);
 
-    const [custRes, quotesRes, invRes, eventsRes] = await Promise.all([
+    const [custRes, quotesRes, invRes, eventsRes, apptRes] = await Promise.all([
       (supabase.from("cab_customers") as any).select("*").eq("id", jobData.customer_id).single(),
       (supabase.from("cab_quotes") as any).select("*").eq("job_id", jobData.id).order("version", { ascending: false }),
       (supabase.from("cab_invoices") as any).select("*").eq("job_id", jobData.id).order("created_at"),
       (supabase.from("cab_events") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }).limit(20),
+      (supabase.from("cab_appointments") as any).select("*").eq("job_id", jobData.id).order("start_at", { ascending: true }),
     ]);
 
     setCustomer(custRes.data);
     setQuotes(quotesRes.data ?? []);
     setInvoices(invRes.data ?? []);
     setEvents(eventsRes.data ?? []);
+    setAppointments(apptRes.data ?? []);
     setLoading(false);
   }, [jobRef, navigate]);
 
@@ -89,7 +92,6 @@ export default function JobDetailPage() {
     const repName = settings.site_visit_rep_name || "Alistair";
     const calId = settings.site_visit_calendar_id || "";
 
-    // Postcode eligibility check
     const jobPostcode = job.property_address_json?.postcode;
     if (jobPostcode && company?.base_postcode && company?.service_radius_miles) {
       const dist = estimatePostcodeDistance(company.base_postcode, jobPostcode);
@@ -113,11 +115,7 @@ export default function JobDetailPage() {
     const nextAction = new Date();
     nextAction.setDate(nextAction.getDate() + 3);
 
-    // Assign rep and calendar to job
-    await updateJob({
-      assigned_rep_name: repName,
-      assigned_rep_calendar_id: calId,
-    });
+    await updateJob({ assigned_rep_name: repName, assigned_rep_calendar_id: calId });
 
     await insertCabEvent({
       companyId: companyId!,
@@ -200,6 +198,7 @@ export default function JobDetailPage() {
 
   const stageKey = job?.current_stage_key;
   const settings = company?.settings_json || {};
+  const nextAppointment = appointments.find(a => a.status === "booked" && new Date(a.start_at) > new Date());
 
   return (
     <div className="space-y-6">
@@ -249,6 +248,45 @@ export default function JobDetailPage() {
               {job.room_type && <p className="text-sm mt-1"><span className="text-muted-foreground">Room:</span> {job.room_type}</p>}
             </div>
           )}
+
+          {/* Appointments */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <Calendar size={14} className="text-primary" /> Appointments
+            </h3>
+            {appointments.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No appointments booked yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {appointments.map(appt => (
+                  <div key={appt.id} className="flex items-center justify-between p-2 rounded border border-border">
+                    <div>
+                      <span className="text-sm font-medium text-foreground">
+                        {format(new Date(appt.start_at), "EEEE d MMMM yyyy 'at' HH:mm")}
+                      </span>
+                      {appt.end_at && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          – {format(new Date(appt.end_at), "HH:mm")}
+                        </span>
+                      )}
+                      <span className="block text-[10px] font-mono text-muted-foreground capitalize">{appt.type}</span>
+                    </div>
+                    <Badge variant={appt.status === "booked" ? "default" : appt.status === "completed" ? "secondary" : "outline"}>
+                      {appt.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+            {nextAppointment && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <p className="text-xs text-muted-foreground">Next site visit</p>
+                <p className="text-sm font-mono font-bold text-primary">
+                  {format(new Date(nextAppointment.start_at), "EEEE d MMMM yyyy 'at' HH:mm")}
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
