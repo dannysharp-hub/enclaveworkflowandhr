@@ -1154,6 +1154,13 @@ export type Database = {
           assigned_rep_calendar_id: string | null
           assigned_rep_name: string | null
           assigned_user_id: string | null
+          ballpark_currency: string
+          ballpark_customer_message: string | null
+          ballpark_internal_notes: string | null
+          ballpark_max: number | null
+          ballpark_min: number | null
+          ballpark_sent_at: string | null
+          ballpark_sent_by: string | null
           company_id: string
           contract_currency: string | null
           contract_value: number | null
@@ -1176,6 +1183,13 @@ export type Database = {
           assigned_rep_calendar_id?: string | null
           assigned_rep_name?: string | null
           assigned_user_id?: string | null
+          ballpark_currency?: string
+          ballpark_customer_message?: string | null
+          ballpark_internal_notes?: string | null
+          ballpark_max?: number | null
+          ballpark_min?: number | null
+          ballpark_sent_at?: string | null
+          ballpark_sent_by?: string | null
           company_id: string
           contract_currency?: string | null
           contract_value?: number | null
@@ -1198,6 +1212,13 @@ export type Database = {
           assigned_rep_calendar_id?: string | null
           assigned_rep_name?: string | null
           assigned_user_id?: string | null
+          ballpark_currency?: string
+          ballpark_customer_message?: string | null
+          ballpark_internal_notes?: string | null
+          ballpark_max?: number | null
+          ballpark_min?: number | null
+          ballpark_sent_at?: string | null
+          ballpark_sent_by?: string | null
           company_id?: string
           contract_currency?: string | null
           contract_value?: number | null

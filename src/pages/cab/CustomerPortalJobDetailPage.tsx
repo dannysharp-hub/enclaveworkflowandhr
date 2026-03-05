@@ -233,6 +233,24 @@ export default function CustomerPortalJobDetailPage() {
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-6">
+        {/* Ballpark Estimate — only shown after sent */}
+        {job.ballpark_sent_at && job.ballpark_min != null && job.ballpark_max != null && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <h2 className="font-mono text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+              <Banknote size={14} className="text-primary" /> Ballpark Estimate
+            </h2>
+            <p className="text-2xl font-mono font-bold text-foreground">
+              £{Number(job.ballpark_min).toLocaleString()} – £{Number(job.ballpark_max).toLocaleString()}
+            </p>
+            {job.ballpark_customer_message && (
+              <p className="text-sm text-muted-foreground mt-2">{job.ballpark_customer_message}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-3 italic">
+              Final price confirmed after a design visit and detailed quote.
+            </p>
+          </div>
+        )}
+
         {(contractVal || latestQuote) && (
           <div className="rounded-lg border border-border bg-card p-4">
             <h2 className="font-mono text-sm font-bold text-foreground mb-2">Project Value</h2>
