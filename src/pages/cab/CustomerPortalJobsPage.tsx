@@ -17,12 +17,29 @@ export default function CustomerPortalJobsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/portal/login"); return; }
 
-    // Find customer by email across cab_customers
-    const { data: customer } = await (supabase.from("cab_customers") as any)
-      .select("id, first_name, last_name, company_id")
-      .eq("email", user.email)
+    // Find customer by auth user id first, fallback to email
+    let customer: any = null;
+    const { data: profileLink } = await (supabase.from("cab_customer_auth_links" as any) as any)
+      .select("customer_id")
+      .eq("auth_user_id", user.id)
       .limit(1)
       .maybeSingle();
+
+    if (profileLink) {
+      const { data: c } = await (supabase.from("cab_customers") as any)
+        .select("id, first_name, last_name, company_id")
+        .eq("id", profileLink.customer_id)
+        .single();
+      customer = c;
+    } else {
+      // Fallback: match by email (v1 compat)
+      const { data: c } = await (supabase.from("cab_customers") as any)
+        .select("id, first_name, last_name, company_id")
+        .eq("email", user.email)
+        .limit(1)
+        .maybeSingle();
+      customer = c;
+    }
 
     if (!customer) { setLoading(false); return; }
     setCustomerName(`${customer.first_name} ${customer.last_name}`);
