@@ -158,7 +158,7 @@ export default function GmailScanSettings() {
 
   const handleRequestGmailScope = async () => {
     try {
-      const redirectUri = "https://enclaveworkflowandhr.lovable.app/settings";
+      const redirectUri = window.location.origin + "/settings";
       const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
         body: { action: "initiate_gmail", redirect_uri: redirectUri },
       });
