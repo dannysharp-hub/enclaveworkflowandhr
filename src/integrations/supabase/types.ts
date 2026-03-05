@@ -1151,6 +1151,8 @@ export type Database = {
       }
       cab_jobs: {
         Row: {
+          appointment_requested_at: string | null
+          appointment_requested_by: string | null
           assigned_rep_calendar_id: string | null
           assigned_rep_name: string | null
           assigned_user_id: string | null
@@ -1161,6 +1163,7 @@ export type Database = {
           ballpark_min: number | null
           ballpark_sent_at: string | null
           ballpark_sent_by: string | null
+          booking_url: string | null
           company_id: string
           contract_currency: string | null
           contract_value: number | null
@@ -1180,6 +1183,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          appointment_requested_at?: string | null
+          appointment_requested_by?: string | null
           assigned_rep_calendar_id?: string | null
           assigned_rep_name?: string | null
           assigned_user_id?: string | null
@@ -1190,6 +1195,7 @@ export type Database = {
           ballpark_min?: number | null
           ballpark_sent_at?: string | null
           ballpark_sent_by?: string | null
+          booking_url?: string | null
           company_id: string
           contract_currency?: string | null
           contract_value?: number | null
@@ -1209,6 +1215,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          appointment_requested_at?: string | null
+          appointment_requested_by?: string | null
           assigned_rep_calendar_id?: string | null
           assigned_rep_name?: string | null
           assigned_user_id?: string | null
@@ -1219,6 +1227,7 @@ export type Database = {
           ballpark_min?: number | null
           ballpark_sent_at?: string | null
           ballpark_sent_by?: string | null
+          booking_url?: string | null
           company_id?: string
           contract_currency?: string | null
           contract_value?: number | null

@@ -206,23 +206,28 @@ export default function JobDetailPage() {
     const nextAction = new Date();
     nextAction.setDate(nextAction.getDate() + 3);
 
-    await updateJob({ assigned_rep_name: repName, assigned_rep_calendar_id: calId });
-
     const bookingUrl = calId
       ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
       : "";
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    await updateJob({
+      assigned_rep_name: repName,
+      assigned_rep_calendar_id: calId,
+      booking_url: bookingUrl || null,
+      appointment_requested_at: new Date().toISOString(),
+      appointment_requested_by: user?.id || null,
+      current_stage_key: "appointment_requested",
+      state: "awaiting_appointment_booking",
+      estimated_next_action_at: nextAction.toISOString(),
+    });
 
     await insertCabEvent({
       companyId: companyId!,
       eventType: "appointment.requested",
       jobId: job.id,
       payload: { rep_name: repName, calendar_id: calId, booking_url: bookingUrl, job_ref: job.job_ref },
-    });
-
-    await updateJob({
-      current_stage_key: "appointment_requested",
-      state: "awaiting_appointment_booking",
-      estimated_next_action_at: nextAction.toISOString(),
     });
 
     toast({ title: "Appointment requested — GHL will send booking link" });

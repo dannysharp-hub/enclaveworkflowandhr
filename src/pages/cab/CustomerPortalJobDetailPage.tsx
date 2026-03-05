@@ -273,6 +273,32 @@ export default function CustomerPortalJobDetailPage() {
           </div>
         )}
 
+        {/* Book your design visit CTA — shown after ballpark sent, before appointment booked */}
+        {job.ballpark_sent_at && appointments.length === 0 && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <h2 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <Calendar size={14} className="text-primary" /> Book Your Design Visit
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              We'd love to visit your home to discuss the project in detail and finalise the design.
+            </p>
+            {job.booking_url ? (
+              <a
+                href={job.booking_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Calendar size={14} /> Choose a Date &amp; Time
+              </a>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                We'll text you a booking link shortly.
+              </p>
+            )}
+          </div>
+        )}
+
         {appointments.length > 0 && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
             <h2 className="font-mono text-sm font-bold text-foreground mb-2 flex items-center gap-2">
