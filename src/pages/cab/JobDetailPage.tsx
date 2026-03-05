@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import QuoteBuilder from "@/components/QuoteBuilder";
+import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
 import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
@@ -534,6 +535,11 @@ export default function JobDetailPage() {
 
           {/* Quote Builder */}
           <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+
+          {/* Purchasing Tab — only after project confirmed */}
+          {isProjectConfirmed && (
+            <JobPurchasingTab companyId={companyId!} job={job} onRefresh={load} />
+          )}
 
           {/* Site Visit Debug Panel */}
           {(() => {

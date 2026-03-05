@@ -712,6 +712,89 @@ export type Database = {
           },
         ]
       }
+      cab_buylist_items: {
+        Row: {
+          category: string
+          chosen_supplier_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          job_id: string
+          name: string
+          preferred_supplier_id: string | null
+          qty: number
+          required_by_stage: string | null
+          spec: string | null
+          status: string
+          target_cost: number | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          chosen_supplier_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          job_id: string
+          name: string
+          preferred_supplier_id?: string | null
+          qty?: number
+          required_by_stage?: string | null
+          spec?: string | null
+          status?: string
+          target_cost?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          chosen_supplier_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          name?: string
+          preferred_supplier_id?: string | null
+          qty?: number
+          required_by_stage?: string | null
+          spec?: string | null
+          status?: string
+          target_cost?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_buylist_items_chosen_supplier_id_fkey"
+            columns: ["chosen_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "cab_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_buylist_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_buylist_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_buylist_items_preferred_supplier_id_fkey"
+            columns: ["preferred_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "cab_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_companies: {
         Row: {
           base_postcode: string | null
@@ -1328,6 +1411,125 @@ export type Database = {
           },
         ]
       }
+      cab_purchase_order_items: {
+        Row: {
+          buylist_item_id: string
+          company_id: string
+          created_at: string
+          id: string
+          line_total: number | null
+          po_id: string
+          qty: number
+          unit_price: number | null
+        }
+        Insert: {
+          buylist_item_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          line_total?: number | null
+          po_id: string
+          qty?: number
+          unit_price?: number | null
+        }
+        Update: {
+          buylist_item_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          line_total?: number | null
+          po_id?: string
+          qty?: number
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_purchase_order_items_buylist_item_id_fkey"
+            columns: ["buylist_item_id"]
+            isOneToOne: false
+            referencedRelation: "cab_buylist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_purchase_order_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_purchase_order_items_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "cab_purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_purchase_orders: {
+        Row: {
+          company_id: string
+          created_at: string
+          delivered_at: string | null
+          id: string
+          job_id: string
+          notes: string | null
+          ordered_at: string | null
+          po_ref: string
+          status: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          ordered_at?: string | null
+          po_ref: string
+          status?: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          ordered_at?: string | null
+          po_ref?: string
+          status?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_purchase_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_purchase_orders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "cab_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_quote_acceptances: {
         Row: {
           accepted_at: string
@@ -1560,6 +1762,239 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_rfq_items: {
+        Row: {
+          buylist_item_id: string
+          company_id: string
+          created_at: string
+          id: string
+          qty: number
+          rfq_id: string
+          spec_snapshot: string | null
+        }
+        Insert: {
+          buylist_item_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          qty?: number
+          rfq_id: string
+          spec_snapshot?: string | null
+        }
+        Update: {
+          buylist_item_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          qty?: number
+          rfq_id?: string
+          spec_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_rfq_items_buylist_item_id_fkey"
+            columns: ["buylist_item_id"]
+            isOneToOne: false
+            referencedRelation: "cab_buylist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_rfq_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_rfq_items_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "cab_rfqs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_rfqs: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          job_id: string
+          notes: string | null
+          responded_at: string | null
+          rfq_ref: string
+          sent_at: string | null
+          status: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          responded_at?: string | null
+          rfq_ref: string
+          sent_at?: string | null
+          status?: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          responded_at?: string | null
+          rfq_ref?: string
+          sent_at?: string | null
+          status?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_rfqs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_rfqs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_rfqs_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "cab_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_supplier_quotes: {
+        Row: {
+          attachment_url: string | null
+          company_id: string
+          created_at: string
+          currency: string
+          id: string
+          lead_time_days: number | null
+          notes: string | null
+          rfq_id: string
+          supplier_id: string
+          total_price: number | null
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          attachment_url?: string | null
+          company_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          lead_time_days?: number | null
+          notes?: string | null
+          rfq_id: string
+          supplier_id: string
+          total_price?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          attachment_url?: string | null
+          company_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          lead_time_days?: number | null
+          notes?: string | null
+          rfq_id?: string
+          supplier_id?: string
+          total_price?: number | null
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_supplier_quotes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_supplier_quotes_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "cab_rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_supplier_quotes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "cab_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_suppliers: {
+        Row: {
+          address: string | null
+          categories: string[] | null
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          categories?: string[] | null
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          categories?: string[] | null
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_suppliers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
             referencedColumns: ["id"]
           },
         ]
@@ -9343,6 +9778,8 @@ export type Database = {
     }
     Functions: {
       cab_next_job_number: { Args: { _company_id: string }; Returns: number }
+      cab_next_po_ref: { Args: { _company_id: string }; Returns: string }
+      cab_next_rfq_ref: { Args: { _company_id: string }; Returns: string }
       check_staff_stage_authorisation: {
         Args: { _staff_id: string; _stage_name: string }
         Returns: {
