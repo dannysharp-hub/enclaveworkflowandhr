@@ -142,7 +142,7 @@ export default function GoogleIntegrationSettings() {
     (async () => {
       setConnecting(true);
       try {
-        const redirectUri = "https://enclaveworkflowandhr.lovable.app/settings";
+        const redirectUri = window.location.origin + "/settings";
         console.log("[GoogleAuth] Calling callback with redirect_uri:", redirectUri);
         
         const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
@@ -186,7 +186,7 @@ export default function GoogleIntegrationSettings() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const redirectUri = "https://enclaveworkflowandhr.lovable.app/settings";
+      const redirectUri = window.location.origin + "/settings";
       const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
         body: { action: "initiate", redirect_uri: redirectUri },
       });
