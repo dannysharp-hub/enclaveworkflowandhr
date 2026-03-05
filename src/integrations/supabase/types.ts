@@ -1439,6 +1439,56 @@ export type Database = {
           },
         ]
       }
+      cab_webhook_logs: {
+        Row: {
+          company_id: string | null
+          contact_id: string | null
+          created_at: string
+          email: string | null
+          event_type: string | null
+          id: string
+          job_ref: string | null
+          payload_json: Json | null
+          phone: string | null
+          source: string
+          status: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email?: string | null
+          event_type?: string | null
+          id?: string
+          job_ref?: string | null
+          payload_json?: Json | null
+          phone?: string | null
+          source?: string
+          status?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email?: string | null
+          event_type?: string | null
+          id?: string
+          job_ref?: string | null
+          payload_json?: Json | null
+          phone?: string | null
+          source?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_webhook_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           assigned_staff_ids: string[] | null

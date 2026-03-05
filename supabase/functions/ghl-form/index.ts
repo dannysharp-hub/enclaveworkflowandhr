@@ -83,7 +83,18 @@ Deno.serve(async (req) => {
     const raw = await req.text();
     console.log("ghl-form content-type:", contentType, "body length:", raw.length);
 
+    // Log every webhook hit to cab_webhook_logs
     const { payload, parsed } = parsePayload(raw, contentType);
+
+    await supabase.from("cab_webhook_logs").insert({
+      source: "ghl-form",
+      event_type: "form.submitted",
+      email: (payload.email || (payload.contact as any)?.email || null) as string | null,
+      phone: (payload.phone || (payload.contact as any)?.phone || null) as string | null,
+      contact_id: (payload.contact_id || payload.contactId || null) as string | null,
+      payload_json: payload,
+      status: parsed ? "received" : "unparsed",
+    });
 
     // If we couldn't parse at all, log and return success to prevent GHL retries
     if (!parsed) {
