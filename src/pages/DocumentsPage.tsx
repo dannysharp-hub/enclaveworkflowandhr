@@ -6,6 +6,7 @@ import DocumentDialog from "@/components/DocumentDialog";
 import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign, Eye, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface DbFile {
   id: string;
@@ -37,6 +38,8 @@ export default function DocumentsPage() {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const canManage = userRole === "admin" || userRole === "office";
 
@@ -50,6 +53,36 @@ export default function DocumentsPage() {
       fetchFiles();
     }
     setDeleteId(null);
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    const { error } = await supabase.from("file_assets").update({ status: "archived" }).in("id", ids);
+    if (error) {
+      toast({ title: "Error", description: "Failed to delete documents", variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: `${ids.length} document(s) removed successfully` });
+      setSelected(new Set());
+      fetchFiles();
+    }
+    setBulkDeleteOpen(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map(f => f.id)));
+    }
   };
 
   const fetchFiles = useCallback(async () => {
@@ -110,11 +143,21 @@ export default function DocumentsPage() {
           <h2 className="text-2xl font-mono font-bold text-foreground">Documents</h2>
           <p className="text-sm text-muted-foreground">SOPs, safety docs, and compliance tracking</p>
         </div>
-        {canManage && (
-          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-            <Upload size={16} /> Upload
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canManage && selected.size > 0 && (
+            <button
+              onClick={() => setBulkDeleteOpen(true)}
+              className="flex items-center gap-2 rounded-md bg-destructive px-4 py-2.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
+            >
+              <Trash2 size={16} /> Delete {selected.size}
+            </button>
+          )}
+          {canManage && (
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              <Upload size={16} /> Upload
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -146,9 +189,28 @@ export default function DocumentsPage() {
           </div>
         ) : (
           <div className="divide-y divide-border">
+            {canManage && filtered.length > 0 && (
+              <div className="px-4 py-2 bg-secondary/20 flex items-center gap-3">
+                <Checkbox
+                  checked={selected.size === filtered.length && filtered.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {selected.size > 0 ? `${selected.size} selected` : "Select all"}
+                </span>
+              </div>
+            )}
             {filtered.map(file => (
-              <div key={file.id} className="p-4 hover:bg-secondary/30 transition-colors">
+              <div key={file.id} className={cn("p-4 hover:bg-secondary/30 transition-colors", selected.has(file.id) && "bg-primary/5")}>
                 <div className="flex items-start gap-3">
+                  {canManage && (
+                    <div className="pt-2 shrink-0">
+                      <Checkbox
+                        checked={selected.has(file.id)}
+                        onCheckedChange={() => toggleSelect(file.id)}
+                      />
+                    </div>
+                  )}
                   <div className="h-10 w-10 rounded-md bg-secondary flex items-center justify-center shrink-0 text-secondary-foreground">
                     {categoryIcons[file.category] || <FileText size={16} />}
                   </div>
@@ -199,6 +261,19 @@ export default function DocumentsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selected.size} document{selected.size !== 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>This will archive all selected documents. They won't appear in the list anymore.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete {selected.size}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
