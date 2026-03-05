@@ -515,8 +515,8 @@ export default function CustomerPortalJobDetailPage() {
           </div>
         )}
 
-        {/* Customer Sign-Off Card — visible after install complete, before signoff */}
-        {job.install_completed_at && !job.customer_signoff_at && (
+        {/* Customer Sign-Off Card — visible when awaiting_signoff or install_completed_at set */}
+        {(job.current_stage_key === 'awaiting_signoff' || (job.install_completed_at && !job.customer_signoff_at)) && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
             <h2 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
               <CheckCircle2 size={14} className="text-primary" /> Confirm Installation
