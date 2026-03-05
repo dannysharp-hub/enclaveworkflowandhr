@@ -64,6 +64,9 @@ export const MODULE_VISIBILITY: Record<string, AppRole[]> = {
 
   // Purchasing
   "/purchasing": [...ADMIN_ROLES, "finance"],
+
+  // Cabinetry admin
+  "/admin": SETTINGS_ROLES,
 };
 
 /**

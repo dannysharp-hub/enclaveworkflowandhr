@@ -10,7 +10,7 @@ import {
   ClipboardCheck, Palmtree, Settings, ChevronDown, Activity, BarChart3,
   BadgePoundSterling, Receipt, Wallet, Clock, Building, Truck, FileSpreadsheet,
   Download, TrendingUp, TrendingDown, Factory, Timer, Banknote, Brain, UserCog,
-  Home, MoreHorizontal, Landmark,
+  Home, MoreHorizontal, Landmark, Briefcase, Contact, FileBox, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -132,6 +132,19 @@ function buildNavGroups(flags: Record<string, boolean>, userRole: string | null)
       ],
     });
   }
+
+  // 🗄 Cabinetry Admin
+  groups.push({
+    id: "cab-admin",
+    label: "Cabinetry Admin",
+    icon: Briefcase,
+    roles: ["admin"],
+    items: [
+      { to: "/admin/leads", label: "Leads & Jobs", icon: Contact },
+      { to: "/admin/ghl", label: "GHL Settings", icon: Link2 },
+      { to: "/admin/bootstrap", label: "Bootstrap", icon: FileBox },
+    ],
+  });
 
   // ⚙ System
   groups.push({
