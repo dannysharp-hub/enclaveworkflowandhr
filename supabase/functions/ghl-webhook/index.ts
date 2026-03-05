@@ -34,6 +34,7 @@ Deno.serve(async (req) => {
     const appointmentStart = payload.startTime || payload.calendarData?.startTime || payload.appointment?.startTime;
     const appointmentEnd = payload.endTime || payload.calendarData?.endTime || payload.appointment?.endTime;
     const ghlAppointmentId = payload.id || payload.appointmentId;
+    const calendarId = payload.calendarId || payload.calendarData?.calendarId || payload.calendar_id;
     const notes = payload.notes || payload.calendarData?.notes || "";
 
     if (!email && !phone && !jobRef) {
@@ -49,7 +50,6 @@ Deno.serve(async (req) => {
     let companyId: string | null = null;
 
     if (jobRef) {
-      // Best path: find by job_ref
       const { data: job } = await supabase
         .from("cab_jobs")
         .select("id, company_id, customer_id")
@@ -119,6 +119,11 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Update assigned_rep_calendar_id if missing and we got one from webhook
+    if (calendarId && !job.assigned_rep_calendar_id) {
+      await supabase.from("cab_jobs").update({ assigned_rep_calendar_id: calendarId }).eq("id", job.id);
+    }
+
     // Insert cab_events — the DB trigger handles state transition
     const { error: insertErr } = await supabase.from("cab_events").insert({
       company_id: companyId,
@@ -129,6 +134,7 @@ Deno.serve(async (req) => {
         appointment_start: appointmentStart,
         appointment_end: appointmentEnd,
         ghl_appointment_id: ghlAppointmentId,
+        calendar_id: calendarId,
         notes,
         source: "ghl_webhook",
       },

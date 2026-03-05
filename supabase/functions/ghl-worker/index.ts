@@ -10,16 +10,24 @@ const corsHeaders = {
 interface SyncAction {
   stageKey?: string;
   tags: string[];
+  noteExtra?: string;
 }
 
-function resolveActions(eventType: string, milestone?: string): SyncAction | null {
+function resolveActions(eventType: string, milestone?: string, payload?: Record<string, unknown>): SyncAction | null {
   switch (eventType) {
     case "lead.created":
       return { stageKey: "lead_captured", tags: ["encl_lead_created"] };
     case "ballpark.sent":
       return { stageKey: "ballpark_sent", tags: ["encl_ballpark_sent"] };
-    case "appointment.requested":
-      return { stageKey: "appointment_requested", tags: ["encl_appointment_requested"] };
+    case "appointment.requested": {
+      const calId = (payload?.calendar_id as string) || "";
+      const repName = (payload?.rep_name as string) || "Alistair";
+      return {
+        stageKey: "appointment_requested",
+        tags: ["encl_appointment_requested"],
+        noteExtra: `Booking calendar: ${calId} (${repName})`,
+      };
+    }
     case "appointment.booked":
       return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"] };
     case "quote.sent":
@@ -83,7 +91,6 @@ async function upsertContact(
   locationId: string,
   customer: { email?: string; phone?: string; first_name: string; last_name: string }
 ) {
-  // Search by email first, then phone
   const searchField = customer.email || customer.phone;
   if (searchField) {
     try {
@@ -114,7 +121,6 @@ async function upsertOpportunity(
   existingOppId?: string
 ) {
   if (existingOppId) {
-    // Update stage
     const updated = await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", {
       stageId,
       name: `${job.job_ref} — ${job.job_title}`,
@@ -161,7 +167,6 @@ Deno.serve(async (req) => {
     if (!ghlApiKey) return new Response(JSON.stringify({ error: "GHL_API_KEY not configured" }), { status: 500, headers: corsHeaders });
     if (!ghlLocationId) return new Response(JSON.stringify({ error: "GHL_LOCATION_ID not configured" }), { status: 500, headers: corsHeaders });
 
-    // Auth check
     const supabase = createClient(supabaseUrl, supabaseKey);
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
@@ -172,7 +177,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    // Parse body for optional filters
     let companyId: string | undefined;
     let jobId: string | undefined;
     let limit = 50;
@@ -180,10 +184,9 @@ Deno.serve(async (req) => {
       const body = await req.json();
       companyId = body.company_id;
       jobId = body.job_id;
-      if (body.limit) limit = Math.min(body.limit, 100);
+      if (body.limit !== undefined) limit = Math.min(body.limit, 100);
     } catch { /* no body */ }
 
-    // Get user's company
     if (!companyId) {
       const { data: profile } = await supabase
         .from("cab_user_profiles")
@@ -197,7 +200,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "No company found" }), { status: 400, headers: corsHeaders });
     }
 
-    // Get company settings for pipeline/stage mapping
     const { data: company } = await supabase
       .from("cab_companies")
       .select("settings_json")
@@ -215,7 +217,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch pending events
+    // If limit is 0, just test connection
+    if (limit === 0) {
+      return new Response(JSON.stringify({ processed: 0, errors: 0, message: "Connection OK" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     let query = supabase
       .from("cab_events")
       .select("*")
@@ -228,7 +236,7 @@ Deno.serve(async (req) => {
 
     const { data: events } = await query;
     if (!events?.length) {
-      return new Response(JSON.stringify({ processed: 0, message: "No pending events" }), {
+      return new Response(JSON.stringify({ processed: 0, errors: 0, message: "No pending events" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -237,21 +245,19 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const event of events) {
-      // Mark processing
       await supabase.from("cab_events").update({ status: "processing" }).eq("id", event.id);
 
       try {
-        const milestone = (event.payload_json as Record<string, string>)?.milestone;
-        const actions = resolveActions(event.event_type, milestone);
+        const payload = (event.payload_json as Record<string, unknown>) || {};
+        const milestone = payload.milestone as string | undefined;
+        const actions = resolveActions(event.event_type, milestone, payload);
 
         if (!actions) {
-          // No GHL action needed — mark success
           await supabase.from("cab_events").update({ status: "success", processed_at: new Date().toISOString() }).eq("id", event.id);
           processed++;
           continue;
         }
 
-        // Load job + customer
         if (!event.job_id) {
           await supabase.from("cab_events").update({ status: "success", processed_at: new Date().toISOString() }).eq("id", event.id);
           processed++;
@@ -300,11 +306,11 @@ Deno.serve(async (req) => {
 
         // 5) Add note
         if (ghlContactId) {
-          await addNote(
-            ghlApiKey,
-            ghlContactId,
-            `Event: ${event.event_type} | Job: ${job.job_ref} | Time: ${event.created_at}`
-          );
+          let noteText = `Event: ${event.event_type} | Job: ${job.job_ref} | Time: ${event.created_at}`;
+          if (actions.noteExtra) {
+            noteText += ` | ${actions.noteExtra}`;
+          }
+          await addNote(ghlApiKey, ghlContactId, noteText);
         }
 
         // Mark success
