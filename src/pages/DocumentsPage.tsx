@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DocumentDialog from "@/components/DocumentDialog";
-import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign, Eye } from "lucide-react";
+import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign, Eye, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
@@ -35,8 +36,21 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const canManage = userRole === "admin" || userRole === "office";
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const { error } = await supabase.from("file_assets").update({ status: "archived" }).eq("id", deleteId);
+    if (error) {
+      toast({ title: "Error", description: "Failed to delete document", variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: "Document removed successfully" });
+      fetchFiles();
+    }
+    setDeleteId(null);
+  };
 
   const fetchFiles = useCallback(async () => {
     const { data } = await supabase.from("file_assets").select("*").eq("status", "active").order("created_at", { ascending: false });
@@ -149,21 +163,45 @@ export default function DocumentsPage() {
                       <span className="text-[10px] text-muted-foreground">{new Date(file.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  {file.file_reference && (
-                    <button
-                      onClick={() => handleViewDocument(file)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors shrink-0"
-                    >
-                      <Eye size={14} />
-                      View
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {file.file_reference && (
+                      <button
+                        onClick={() => handleViewDocument(file)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                      >
+                        <Eye size={14} />
+                        View
+                      </button>
+                    )}
+                    {canManage && (
+                      <button
+                        onClick={() => setDeleteId(file.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-destructive/30 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>This will archive the document. It won't appear in the list anymore.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <DocumentDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={fetchFiles} />
     </div>
