@@ -6,6 +6,67 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const GHL_BASE = "https://services.leadconnectorhq.com";
+
+async function ghlFetchContact(apiKey: string, contactId: string) {
+  const res = await fetch(`${GHL_BASE}/contacts/${contactId}`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      Version: "2021-07-28",
+    },
+  });
+  if (!res.ok) throw new Error(`GHL contact fetch ${res.status}`);
+  const data = await res.json();
+  return data.contact;
+}
+
+function parseFormUrlEncoded(raw: string): Record<string, string> {
+  const params = new URLSearchParams(raw);
+  const result: Record<string, string> = {};
+  for (const [key, value] of params.entries()) {
+    result[key] = value;
+  }
+  return result;
+}
+
+function parsePayload(raw: string, contentType: string): { payload: Record<string, unknown>; parsed: boolean } {
+  if (!raw || raw.trim() === "") return { payload: {}, parsed: true };
+
+  // Try JSON first
+  try {
+    return { payload: JSON.parse(raw), parsed: true };
+  } catch { /* not JSON */ }
+
+  // Try form-urlencoded
+  if (contentType.includes("application/x-www-form-urlencoded") || raw.includes("=")) {
+    try {
+      const formData = parseFormUrlEncoded(raw);
+      if (Object.keys(formData).length > 0) {
+        return { payload: formData, parsed: true };
+      }
+    } catch { /* not form data */ }
+  }
+
+  // Unparseable — store raw snippet
+  return { payload: { payload_raw: raw.slice(0, 2000) }, parsed: false };
+}
+
+function extractFields(payload: Record<string, unknown>) {
+  const contact = (payload.contact || {}) as Record<string, unknown>;
+  return {
+    firstName: (payload.first_name || payload.firstName || contact.first_name || contact.firstName || "Unknown") as string,
+    lastName: (payload.last_name || payload.lastName || contact.last_name || contact.lastName || "") as string,
+    email: (payload.email || contact.email || null) as string | null,
+    phone: (payload.phone || contact.phone || null) as string | null,
+    postcode: (payload.postcode || payload.postal_code || contact.postalCode || contact.postal_code || null) as string | null,
+    formName: (payload.form_name || payload.formName || (payload.page as Record<string, unknown>)?.name || "unknown") as string,
+    contactId: (payload.contact_id || payload.contactId || contact.id || null) as string | null,
+    addressLine1: (payload.address1 || contact.address1 || null) as string | null,
+    city: (payload.city || contact.city || null) as string | null,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -18,19 +79,51 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const payload = await req.json();
-    console.log("ghl-form received:", JSON.stringify(payload));
+    const contentType = req.headers.get("content-type") || "";
+    const raw = await req.text();
+    console.log("ghl-form content-type:", contentType, "body length:", raw.length);
 
-    // Extract fields (flexible — GHL payloads vary)
-    const firstName = payload.first_name || payload.firstName || payload.contact?.first_name || "Unknown";
-    const lastName = payload.last_name || payload.lastName || payload.contact?.last_name || "";
-    const email = payload.email || payload.contact?.email || null;
-    const phone = payload.phone || payload.contact?.phone || null;
-    const postcode = payload.postcode || payload.postal_code || payload.contact?.postalCode || null;
-    const formName = payload.form_name || payload.formName || payload.page?.name || "unknown";
-    const contactId = payload.contact_id || payload.contactId || payload.contact?.id || null;
-    const addressLine1 = payload.address1 || payload.contact?.address1 || null;
-    const city = payload.city || payload.contact?.city || null;
+    const { payload, parsed } = parsePayload(raw, contentType);
+
+    // If we couldn't parse at all, log and return success to prevent GHL retries
+    if (!parsed) {
+      console.warn("ghl-form: unparseable body, logging for inspection");
+      await supabase.from("cab_ghl_sync_log").insert({
+        company_id: "00000000-0000-0000-0000-000000000000",
+        action: "form.submitted_unparsed",
+        success: false,
+        error: `content_type=${contentType} raw_snippet=${raw.slice(0, 200)}`,
+      });
+      // Still try to extract a contact_id from the raw string
+      const contactIdMatch = raw.match(/contact_id[=:]?\s*["']?([a-zA-Z0-9]+)/);
+      if (!contactIdMatch) {
+        return ok({ success: true, note: "unparsed_logged" });
+      }
+      // If we found a contact_id, put it in payload and continue
+      payload.contact_id = contactIdMatch[1];
+    }
+
+    let fields = extractFields(payload);
+
+    // If we have a contact_id but missing key fields, fetch from GHL API
+    const missingKeyFields = !fields.email && !fields.phone && fields.firstName === "Unknown";
+    if (fields.contactId && missingKeyFields) {
+      const ghlApiKey = Deno.env.get("GHL_API_KEY");
+      if (ghlApiKey) {
+        try {
+          console.log("ghl-form: fetching contact from GHL:", fields.contactId);
+          const ghlContact = await ghlFetchContact(ghlApiKey, fields.contactId);
+          // Merge GHL contact data into payload and re-extract
+          const enriched = { ...payload, contact: ghlContact };
+          fields = extractFields(enriched);
+          console.log("ghl-form: enriched from GHL:", fields.firstName, fields.email);
+        } catch (ghlErr) {
+          console.error("ghl-form: GHL contact fetch failed:", ghlErr);
+        }
+      }
+    }
+
+    const { firstName, lastName, email, phone, postcode, formName, contactId, addressLine1, city } = fields;
 
     // Resolve company
     const { data: company, error: compErr } = await supabase
@@ -76,7 +169,6 @@ Deno.serve(async (req) => {
     }
 
     if (customer) {
-      // Update existing
       await supabase.from("cab_customers").update({
         first_name: firstName,
         last_name: lastName,
@@ -186,6 +278,8 @@ Deno.serve(async (req) => {
         postcode,
         ghl_contact_id: contactId,
         source: "ghl_form",
+        content_type: contentType,
+        body_parsed: parsed,
       },
       status: "pending",
     });
@@ -203,6 +297,6 @@ Deno.serve(async (req) => {
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("ghl-form error:", errMsg);
-    return ok({ success: false, error: errMsg });
+    return ok({ success: true, note: "error_logged", error: errMsg });
   }
 });
