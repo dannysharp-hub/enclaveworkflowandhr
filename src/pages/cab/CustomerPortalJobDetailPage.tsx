@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
 import {
-  ShieldCheck, ArrowLeft, LogOut, CheckCircle2, Circle, Clock, Banknote, Lock, FileText,
+  ShieldCheck, ArrowLeft, LogOut, CheckCircle2, Circle, Clock, Banknote, Lock, FileText, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,7 @@ export default function CustomerPortalJobDetailPage() {
   const [job, setJob] = useState<any>(null);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [accepting, setAccepting] = useState(false);
@@ -59,13 +60,15 @@ export default function CustomerPortalJobDetailPage() {
     if (!jobData) { setLoading(false); return; }
     setJob(jobData);
 
-    const [quotesRes, invoicesRes] = await Promise.all([
+    const [quotesRes, invoicesRes, apptRes] = await Promise.all([
       (supabase.from("cab_quotes") as any).select("*").eq("job_id", jobData.id).order("version", { ascending: false }),
       (supabase.from("cab_invoices") as any).select("*").eq("job_id", jobData.id).order("created_at"),
+      (supabase.from("cab_appointments") as any).select("*").eq("job_id", jobData.id).eq("status", "booked").order("start_at"),
     ]);
 
     setQuotes(quotesRes.data ?? []);
     setInvoices(invoicesRes.data ?? []);
+    setAppointments(apptRes.data ?? []);
 
     // Track quote view (dedupe: 1 per day)
     const latestQuote = (quotesRes.data ?? [])[0];
@@ -248,6 +251,29 @@ export default function CustomerPortalJobDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Site Visit Appointment */}
+        {appointments.length > 0 && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <h2 className="font-mono text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+              <Calendar size={14} className="text-primary" /> Site Visit Booked
+            </h2>
+            {appointments.map(appt => (
+              <div key={appt.id} className="flex items-center gap-3">
+                <div>
+                  <p className="text-lg font-mono font-bold text-primary">
+                    {format(new Date(appt.start_at), "EEEE d MMMM yyyy")}
+                  </p>
+                  <p className="text-sm font-mono text-foreground">
+                    {format(new Date(appt.start_at), "HH:mm")}
+                    {appt.end_at && ` – ${format(new Date(appt.end_at), "HH:mm")}`}
+                  </p>
+                </div>
+                <Badge variant="default" className="ml-auto">Confirmed</Badge>
+              </div>
+            ))}
           </div>
         )}
 

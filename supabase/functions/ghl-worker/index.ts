@@ -28,8 +28,17 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
         noteExtra: `Booking calendar: ${calId} (${repName})`,
       };
     }
-    case "appointment.booked":
-      return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"] };
+    case "appointment.booked": {
+      const startAt = payload?.appointment_start as string;
+      let timeNote = "";
+      if (startAt) {
+        try {
+          const d = new Date(startAt);
+          timeNote = `Booked: ${d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} at ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+        } catch { timeNote = `Booked: ${startAt}`; }
+      }
+      return { stageKey: "appointment_booked", tags: ["encl_appointment_booked"], noteExtra: timeNote };
+    }
     case "quote.sent":
       return { stageKey: "quote_sent", tags: ["encl_quote_sent"] };
     case "quote.viewed":

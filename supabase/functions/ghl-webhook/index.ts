@@ -9,6 +9,10 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Always return 200 to avoid webhook retry storms
+  const ok = (body: Record<string, unknown>) =>
+    new Response(JSON.stringify(body), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -17,17 +21,13 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log("GHL webhook received:", JSON.stringify(payload));
 
-    // GHL appointment booked payload structure varies — handle common shapes
     const eventType = payload.type || payload.event || "appointment.booked";
 
-    // Only handle appointment-related events for now
     if (!eventType.includes("appointment") && eventType !== "AppointmentBooked") {
-      return new Response(JSON.stringify({ ok: true, skipped: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return ok({ ok: true, skipped: true });
     }
 
-    // Extract customer identifiers
+    // Extract fields from various GHL payload shapes
     const email = payload.email || payload.contact?.email || payload.calendarData?.email;
     const phone = payload.phone || payload.contact?.phone || payload.calendarData?.phone;
     const jobRef = payload.customData?.job_ref || payload.job_ref;
@@ -39,10 +39,14 @@ Deno.serve(async (req) => {
 
     if (!email && !phone && !jobRef) {
       console.error("GHL webhook: no identifiers found in payload");
-      return new Response(JSON.stringify({ error: "No customer identifier found" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Log unmatched and return 200
+      await supabase.from("cab_ghl_sync_log").insert({
+        company_id: "00000000-0000-0000-0000-000000000000",
+        action: "appointment.booked_unmatched",
+        success: false,
+        error: "No customer identifier in webhook payload",
       });
+      return ok({ ok: true, unmatched: true, reason: "no_identifier" });
     }
 
     // Find customer + company
@@ -65,44 +69,45 @@ Deno.serve(async (req) => {
 
     if (!customer && email) {
       const { data: custs } = await supabase.from("cab_customers").select("*").eq("email", email).limit(1);
-      if (custs?.length) {
-        customer = custs[0];
-        companyId = customer.company_id;
-      }
+      if (custs?.length) { customer = custs[0]; companyId = customer.company_id; }
     }
 
     if (!customer && phone) {
       const { data: custs } = await supabase.from("cab_customers").select("*").eq("phone", phone).limit(1);
-      if (custs?.length) {
-        customer = custs[0];
-        companyId = customer.company_id;
-      }
+      if (custs?.length) { customer = custs[0]; companyId = customer.company_id; }
     }
 
     if (!customer || !companyId) {
       console.error("GHL webhook: customer not found", { email, phone, jobRef });
-      return new Response(JSON.stringify({ error: "Customer not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Insert unmatched event so admin can resolve
+      if (companyId) {
+        await supabase.from("cab_events").insert({
+          company_id: companyId,
+          event_type: "appointment.booked_unmatched",
+          payload_json: { email, phone, jobRef, raw_payload: payload },
+          status: "pending",
+        });
+      }
+      await supabase.from("cab_ghl_sync_log").insert({
+        company_id: companyId || "00000000-0000-0000-0000-000000000000",
+        action: "appointment.booked_unmatched",
+        success: false,
+        error: `Customer not found: email=${email}, phone=${phone}, jobRef=${jobRef}`,
       });
+      return ok({ ok: true, unmatched: true, reason: "customer_not_found" });
     }
 
-    // Find the job (prefer jobRef, fallback to most recent open job for customer)
+    // Find the job
     let job: any = null;
     if (jobRef) {
-      const { data } = await supabase
-        .from("cab_jobs")
-        .select("*")
-        .eq("company_id", companyId)
-        .eq("job_ref", jobRef)
-        .single();
+      const { data } = await supabase.from("cab_jobs").select("*")
+        .eq("company_id", companyId).eq("job_ref", jobRef).single();
       job = data;
     }
 
     if (!job) {
-      const { data } = await supabase
-        .from("cab_jobs")
-        .select("*")
+      // Find most recent open job in relevant states
+      const { data } = await supabase.from("cab_jobs").select("*")
         .eq("company_id", companyId)
         .eq("customer_id", customer.id)
         .neq("status", "closed")
@@ -113,13 +118,63 @@ Deno.serve(async (req) => {
 
     if (!job) {
       console.error("GHL webhook: no open job found for customer", customer.id);
-      return new Response(JSON.stringify({ error: "No open job found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      await supabase.from("cab_events").insert({
+        company_id: companyId,
+        event_type: "appointment.booked_unmatched",
+        customer_id: customer.id,
+        payload_json: { email, phone, jobRef, ghl_appointment_id: ghlAppointmentId, raw_payload: payload },
+        status: "pending",
+      });
+      await supabase.from("cab_ghl_sync_log").insert({
+        company_id: companyId,
+        action: "appointment.booked_unmatched",
+        success: false,
+        error: `No open job for customer ${customer.id}`,
+      });
+      return ok({ ok: true, unmatched: true, reason: "no_open_job" });
+    }
+
+    // Upsert cab_appointments
+    if (ghlAppointmentId) {
+      const { data: existing } = await supabase.from("cab_appointments")
+        .select("id").eq("ghl_appointment_id", ghlAppointmentId).maybeSingle();
+
+      if (existing) {
+        await supabase.from("cab_appointments").update({
+          start_at: appointmentStart || new Date().toISOString(),
+          end_at: appointmentEnd || null,
+          ghl_calendar_id: calendarId || null,
+          notes: notes || null,
+          status: "booked",
+          updated_at: new Date().toISOString(),
+        }).eq("id", existing.id);
+      } else {
+        await supabase.from("cab_appointments").insert({
+          company_id: companyId,
+          job_id: job.id,
+          customer_id: customer.id,
+          type: "site_visit",
+          start_at: appointmentStart || new Date().toISOString(),
+          end_at: appointmentEnd || null,
+          ghl_appointment_id: ghlAppointmentId,
+          ghl_calendar_id: calendarId || null,
+          notes: notes || null,
+        });
+      }
+    } else {
+      await supabase.from("cab_appointments").insert({
+        company_id: companyId,
+        job_id: job.id,
+        customer_id: customer.id,
+        type: "site_visit",
+        start_at: appointmentStart || new Date().toISOString(),
+        end_at: appointmentEnd || null,
+        ghl_calendar_id: calendarId || null,
+        notes: notes || null,
       });
     }
 
-    // Update assigned_rep_calendar_id if missing and we got one from webhook
+    // Update assigned_rep_calendar_id if missing
     if (calendarId && !job.assigned_rep_calendar_id) {
       await supabase.from("cab_jobs").update({ assigned_rep_calendar_id: calendarId }).eq("id", job.id);
     }
@@ -134,7 +189,7 @@ Deno.serve(async (req) => {
         appointment_start: appointmentStart,
         appointment_end: appointmentEnd,
         ghl_appointment_id: ghlAppointmentId,
-        calendar_id: calendarId,
+        ghl_calendar_id: calendarId,
         notes,
         source: "ghl_webhook",
       },
@@ -143,22 +198,15 @@ Deno.serve(async (req) => {
 
     if (insertErr) {
       console.error("GHL webhook: failed to insert event", insertErr);
-      return new Response(JSON.stringify({ error: insertErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return ok({ ok: true, error: insertErr.message });
     }
 
     console.log(`GHL webhook: appointment.booked event created for job ${job.job_ref}`);
-    return new Response(JSON.stringify({ ok: true, job_ref: job.job_ref }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return ok({ ok: true, job_ref: job.job_ref });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("GHL webhook error:", errMsg);
-    return new Response(JSON.stringify({ error: errMsg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Always 200 to prevent retry storms
+    return ok({ ok: false, error: errMsg });
   }
 });
