@@ -1209,6 +1209,51 @@ export type Database = {
           },
         ]
       }
+      cab_job_files: {
+        Row: {
+          company_id: string
+          created_at: string
+          file_type: string
+          id: string
+          job_id: string
+          uploaded_by: string | null
+          url: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          file_type?: string
+          id?: string
+          job_id: string
+          uploaded_by?: string | null
+          url: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          file_type?: string
+          id?: string
+          job_id?: string
+          uploaded_by?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_job_files_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_job_files_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_job_sequences: {
         Row: {
           company_id: string
@@ -1253,12 +1298,18 @@ export type Database = {
           created_at: string
           current_stage_key: string | null
           customer_id: string
+          customer_signoff_at: string | null
           estimated_next_action_at: string | null
           ghl_contact_id: string | null
           ghl_opportunity_id: string | null
           id: string
+          install_assigned_to: string | null
+          install_completed_at: string | null
+          install_window_end: string | null
+          install_window_start: string | null
           job_ref: string
           job_title: string
+          production_stage_key: string
           property_address_json: Json | null
           room_type: string | null
           state: string | null
@@ -1285,12 +1336,18 @@ export type Database = {
           created_at?: string
           current_stage_key?: string | null
           customer_id: string
+          customer_signoff_at?: string | null
           estimated_next_action_at?: string | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
           id?: string
+          install_assigned_to?: string | null
+          install_completed_at?: string | null
+          install_window_end?: string | null
+          install_window_start?: string | null
           job_ref: string
           job_title: string
+          production_stage_key?: string
           property_address_json?: Json | null
           room_type?: string | null
           state?: string | null
@@ -1317,12 +1374,18 @@ export type Database = {
           created_at?: string
           current_stage_key?: string | null
           customer_id?: string
+          customer_signoff_at?: string | null
           estimated_next_action_at?: string | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
           id?: string
+          install_assigned_to?: string | null
+          install_completed_at?: string | null
+          install_window_end?: string | null
+          install_window_start?: string | null
           job_ref?: string
           job_title?: string
+          production_stage_key?: string
           property_address_json?: Json | null
           room_type?: string | null
           state?: string | null

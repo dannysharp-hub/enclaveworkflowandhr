@@ -14,7 +14,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
-  CalendarDays, Calendar, Copy,
+  CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
@@ -39,10 +39,12 @@ export default function JobDetailPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [emitting, setEmitting] = useState<string | null>(null);
   const [ghlSyncing, setGhlSyncing] = useState(false);
+  const [installAssigning, setInstallAssigning] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -61,12 +63,13 @@ export default function JobDetailPage() {
     if (!jobData) { navigate("/admin/leads"); return; }
     setJob(jobData);
 
-    const [custRes, quotesRes, invRes, eventsRes, apptRes] = await Promise.all([
+    const [custRes, quotesRes, invRes, eventsRes, apptRes, teamRes] = await Promise.all([
       (supabase.from("cab_customers") as any).select("*").eq("id", jobData.customer_id).single(),
       (supabase.from("cab_quotes") as any).select("*").eq("job_id", jobData.id).order("version", { ascending: false }),
       (supabase.from("cab_invoices") as any).select("*").eq("job_id", jobData.id).order("created_at"),
       (supabase.from("cab_events") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }).limit(20),
       (supabase.from("cab_appointments") as any).select("*").eq("job_id", jobData.id).order("start_at", { ascending: true }),
+      (supabase.from("cab_company_memberships") as any).select("user_id, role").eq("company_id", cid),
     ]);
 
     setCustomer(custRes.data);
@@ -74,6 +77,7 @@ export default function JobDetailPage() {
     setInvoices(invRes.data ?? []);
     setEvents(eventsRes.data ?? []);
     setAppointments(apptRes.data ?? []);
+    setTeamMembers(teamRes.data ?? []);
     setLoading(false);
   }, [jobRef, navigate]);
 
@@ -529,6 +533,78 @@ export default function JobDetailPage() {
                 <Button size="sm" variant="outline" onClick={() => toast({ title: "BOM upload coming soon" })}>
                   <Cog size={12} /> Upload BOM
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Production Stage + Installer Assignment — only after project confirmed */}
+          {isProjectConfirmed && (
+            <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+              <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                <Factory size={14} className="text-primary" /> Production Stage
+              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-xs font-mono">
+                  {(job.production_stage_key || "not_ready").replace(/_/g, " ")}
+                </Badge>
+                {job.production_stage_key !== "not_ready" && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Use the <a href="/admin/production" className="text-primary hover:underline">Production Board</a> to move stages
+                  </span>
+                )}
+              </div>
+
+              {/* Assign Installer */}
+              <div className="border-t border-border pt-3 space-y-2">
+                <h4 className="text-xs font-bold text-foreground flex items-center gap-1">
+                  <UserPlus size={12} /> Assign Installer
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px]">Installer</Label>
+                    <select
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                      value={job.install_assigned_to || ""}
+                      onChange={async (e) => {
+                        const userId = e.target.value || null;
+                        setInstallAssigning(true);
+                        await (supabase.from("cab_jobs") as any).update({ install_assigned_to: userId }).eq("id", job.id);
+                        if (userId) {
+                          await insertCabEvent({ companyId: companyId!, eventType: "install.assigned", jobId: job.id, payload: { assigned_to: userId } });
+                        }
+                        toast({ title: userId ? "Installer assigned" : "Installer unassigned" });
+                        setInstallAssigning(false);
+                        load();
+                      }}
+                      disabled={installAssigning}
+                    >
+                      <option value="">— Unassigned —</option>
+                      {teamMembers.map((m: any) => (
+                        <option key={m.user_id} value={m.user_id}>{m.user_id} ({m.role})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">Install Window Start</Label>
+                    <Input
+                      type="datetime-local"
+                      className="text-xs"
+                      value={job.install_window_start ? new Date(job.install_window_start).toISOString().slice(0, 16) : ""}
+                      onChange={async (e) => {
+                        await (supabase.from("cab_jobs") as any).update({
+                          install_window_start: e.target.value ? new Date(e.target.value).toISOString() : null,
+                        }).eq("id", job.id);
+                        load();
+                      }}
+                    />
+                  </div>
+                </div>
+                {job.install_completed_at && (
+                  <p className="text-xs text-emerald-600">✔ Install completed {format(new Date(job.install_completed_at), "dd MMM yyyy HH:mm")}</p>
+                )}
+                {job.customer_signoff_at && (
+                  <p className="text-xs text-emerald-600">✔ Customer signed off {format(new Date(job.customer_signoff_at), "dd MMM yyyy HH:mm")}</p>
+                )}
               </div>
             </div>
           )}

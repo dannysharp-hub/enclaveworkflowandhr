@@ -49,6 +49,9 @@ export default function CustomerPortalJobDetailPage() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [signoffAccepted, setSignoffAccepted] = useState(false);
+  const [signingOff, setSigningOff] = useState(false);
+  const [customerData, setCustomerData] = useState<any>(null);
 
   const load = useCallback(async () => {
     if (!company) return;
@@ -58,6 +61,7 @@ export default function CustomerPortalJobDetailPage() {
     const customer = await getPortalCustomer(user.id, user.email!, company.id);
     if (!customer) { navigate(`/portal/${companySlug}/login`); return; }
     setCustomerId(customer.id);
+    setCustomerData(customer);
 
     const { data: jobData } = await (supabase.from("cab_jobs") as any)
       .select("*")
@@ -508,6 +512,62 @@ export default function CustomerPortalJobDetailPage() {
                 <span className="text-sm text-foreground font-medium">Quote accepted — thank you!</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Customer Sign-Off Card — visible after install complete, before signoff */}
+        {job.install_completed_at && !job.customer_signoff_at && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <h2 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <CheckCircle2 size={14} className="text-primary" /> Confirm Installation
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Your installation has been completed. Please review the work and confirm you're happy.
+            </p>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={signoffAccepted} onCheckedChange={(v) => setSignoffAccepted(!!v)} />
+              <span className="text-sm text-muted-foreground">
+                I confirm the installation is complete and I'm happy with the work
+              </span>
+            </div>
+            <Button
+              className="w-full"
+              disabled={!signoffAccepted || signingOff}
+              onClick={async () => {
+                setSigningOff(true);
+                try {
+                  await insertCabEvent({
+                    companyId: company!.id,
+                    eventType: "customer.signoff.completed",
+                    jobId: job.id,
+                    payload: {
+                      signed_by: customerData ? `${customerData.first_name} ${customerData.last_name}` : "Customer",
+                    },
+                  });
+                  toast({ title: "Thank you!", description: "Your sign-off has been recorded." });
+                  load();
+                } catch (err: any) {
+                  toast({ title: "Error", description: err.message, variant: "destructive" });
+                } finally {
+                  setSigningOff(false);
+                }
+              }}
+            >
+              {signingOff ? "Submitting…" : "Confirm & Sign Off"}
+            </Button>
+          </div>
+        )}
+
+        {/* Signed off confirmation */}
+        {job.customer_signoff_at && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-2">
+            <CheckCircle2 size={18} className="text-emerald-500" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Installation Signed Off</p>
+              <p className="text-xs text-muted-foreground">
+                Signed off on {format(new Date(job.customer_signoff_at), "dd MMMM yyyy")}
+              </p>
+            </div>
           </div>
         )}
 
