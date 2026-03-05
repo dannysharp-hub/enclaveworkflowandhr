@@ -87,7 +87,13 @@ export default function JobDetailPage() {
     load();
   };
 
+  const APPOINTMENT_ALLOWED_STAGES = ["ballpark_sent", "appointment_requested", "appointment_booked"];
+
   const handleRequestAppointment = async () => {
+    if (!APPOINTMENT_ALLOWED_STAGES.includes(job?.current_stage_key || "")) {
+      toast({ title: "Send ballpark first", description: "Appointment booking is only available after a ballpark has been sent.", variant: "destructive" });
+      return;
+    }
     const settings = company?.settings_json || {};
     const repName = settings.site_visit_rep_name || "Alistair";
     const calId = settings.site_visit_calendar_id || "";
@@ -176,6 +182,10 @@ export default function JobDetailPage() {
   };
 
   const handleSendBookingLink = async () => {
+    if (!APPOINTMENT_ALLOWED_STAGES.includes(job?.current_stage_key || "")) {
+      toast({ title: "Send ballpark first", description: "Booking link can only be sent after a ballpark has been sent.", variant: "destructive" });
+      return;
+    }
     setEmitting("booking_link");
     try {
       const calId = job.assigned_rep_calendar_id || company?.settings_json?.site_visit_calendar_id || "";
@@ -383,7 +393,7 @@ export default function JobDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={emitting !== null}
+                  disabled={emitting !== null || !APPOINTMENT_ALLOWED_STAGES.includes(job?.current_stage_key || "")}
                   onClick={handleSendBookingLink}
                   className="text-xs"
                 >
@@ -392,6 +402,9 @@ export default function JobDetailPage() {
                 </Button>
                 <p className="text-[10px] text-muted-foreground">
                   Inserts an <code className="font-mono">appointment.requested</code> event with booking URL. GHL workflow sends the SMS.
+                  {!APPOINTMENT_ALLOWED_STAGES.includes(job?.current_stage_key || "") && (
+                    <span className="text-destructive font-bold ml-1">⚠ Send ballpark first to enable.</span>
+                  )}
                 </p>
               </div>
             );
