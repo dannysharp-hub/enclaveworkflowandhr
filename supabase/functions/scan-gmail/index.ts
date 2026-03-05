@@ -547,6 +547,47 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── VIEW DOCUMENT (proxy file to avoid blocked domains) ───
+    if (action === "view_document") {
+      const { document_id } = body;
+      if (!document_id) {
+        return new Response(JSON.stringify({ error: "document_id required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: doc } = await supabaseAdmin
+        .from("gmail_extracted_documents")
+        .select("storage_path, mime_type, file_name")
+        .eq("id", document_id)
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!doc?.storage_path) {
+        return new Response(JSON.stringify({ error: "Document not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: signedData, error: signError } = await supabaseAdmin.storage
+        .from("documents")
+        .createSignedUrl(doc.storage_path, 300);
+
+      if (signError || !signedData?.signedUrl) {
+        return new Response(JSON.stringify({ error: "Could not generate URL" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Return the signed URL for the client to open
+      return new Response(JSON.stringify({ url: signedData.signedUrl, file_name: doc.file_name, mime_type: doc.mime_type }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
