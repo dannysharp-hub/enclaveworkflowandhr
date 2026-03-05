@@ -69,7 +69,6 @@ export default function GmailScanSettings() {
   const fetchStatus = useCallback(async () => {
     if (!session?.access_token) return;
     try {
-      // Check Google connection status
       const { data: statusData } = await supabase.functions.invoke("google-calendar-auth", {
         body: { action: "status" },
       });
@@ -81,7 +80,6 @@ export default function GmailScanSettings() {
         setHasGmailScope(Array.isArray(scopes) && scopes.some((s: string) => s.includes("gmail.readonly")));
       }
 
-      // Get Gmail scan settings
       const { data, error } = await supabase.functions.invoke("scan-gmail", {
         body: { action: "get_settings" },
       });
@@ -157,6 +155,32 @@ export default function GmailScanSettings() {
       toast({ title: decision === "approve" ? "Document filed" : "Document rejected" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleViewDocument = async (docId: string) => {
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scan-gmail`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
+            "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ action: "view_document", document_id: docId }),
+        }
+      );
+      if (!resp.ok) {
+        toast({ title: "Error", description: "Could not load document", variant: "destructive" });
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch {
+      toast({ title: "Error", description: "Failed to load document", variant: "destructive" });
     }
   };
 
@@ -364,20 +388,7 @@ export default function GmailScanSettings() {
 
                       <div className="flex items-center gap-2 pl-8">
                         <button
-                          onClick={async () => {
-                            try {
-                              const { data, error } = await supabase.functions.invoke("scan-gmail", {
-                                body: { action: "view_document", document_id: doc.id },
-                              });
-                              if (error || !data?.url) {
-                                toast({ title: "Error", description: "Could not generate preview link", variant: "destructive" });
-                                return;
-                              }
-                              window.open(data.url, "_blank");
-                            } catch {
-                              toast({ title: "Error", description: "Failed to load document", variant: "destructive" });
-                            }
-                          }}
+                          onClick={() => handleViewDocument(doc.id)}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
                         >
                           <Eye size={12} /> View

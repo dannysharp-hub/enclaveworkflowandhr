@@ -547,7 +547,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── VIEW DOCUMENT (proxy file to avoid blocked domains) ───
+    // ─── VIEW DOCUMENT (proxy file bytes to avoid blocked domains) ───
     if (action === "view_document") {
       const { document_id } = body;
       if (!document_id) {
@@ -571,20 +571,23 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { data: signedData, error: signError } = await supabaseAdmin.storage
+      const { data: fileData, error: dlError } = await supabaseAdmin.storage
         .from("documents")
-        .createSignedUrl(doc.storage_path, 300);
+        .download(doc.storage_path);
 
-      if (signError || !signedData?.signedUrl) {
-        return new Response(JSON.stringify({ error: "Could not generate URL" }), {
+      if (dlError || !fileData) {
+        return new Response(JSON.stringify({ error: "Could not download file" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Return the signed URL for the client to open
-      return new Response(JSON.stringify({ url: signedData.signedUrl, file_name: doc.file_name, mime_type: doc.mime_type }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(fileData, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": doc.mime_type || "application/octet-stream",
+          "Content-Disposition": `inline; filename="${doc.file_name || "document"}"`,
+        },
       });
     }
 
