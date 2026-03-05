@@ -67,6 +67,7 @@ import CustomerPortalJobDetailPage from "./pages/cab/CustomerPortalJobDetailPage
 import GhlSettingsPage from "./pages/cab/GhlSettingsPage";
 import WebhookLogsPage from "./pages/cab/WebhookLogsPage";
 import TeamPage from "./pages/cab/TeamPage";
+import CabSuppliersPage from "./pages/cab/SuppliersPage";
 
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
@@ -121,6 +122,7 @@ const AppRoutes = () => (
               <Route path="/admin/ghl" element={<GhlSettingsPage />} />
               <Route path="/admin/webhooks" element={<WebhookLogsPage />} />
               <Route path="/admin/team" element={<TeamPage />} />
+              <Route path="/admin/suppliers" element={<CabSuppliersPage />} />
 
               {/* Open to all authenticated */}
               <Route path="/" element={<Index />} />
