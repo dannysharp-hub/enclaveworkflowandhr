@@ -200,6 +200,7 @@ export const PORTAL_MILESTONES = [
   { key: "ready_for_installation", label: "Ready for Installation" },
   { key: "install_booked", label: "Installation Booked" },
   { key: "installation_complete", label: "Installation Complete" },
+  { key: "awaiting_signoff", label: "Awaiting Sign-Off" },
   { key: "signed_off", label: "Signed Off" },
   { key: "practical_completed", label: "Practical Completion" },
   { key: "closed_paid", label: "Project Complete" },
