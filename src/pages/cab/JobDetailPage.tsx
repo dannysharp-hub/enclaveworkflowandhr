@@ -554,6 +554,18 @@ export default function JobDetailPage() {
                 )}
               </div>
 
+              {/* Workshop Job Cross-Link */}
+              {job.legacy_job_id && (
+                <div className="border-t border-border pt-3">
+                  <h4 className="text-xs font-bold text-foreground flex items-center gap-1 mb-1">
+                    <Hammer size={12} /> Workshop Job
+                  </h4>
+                  <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate(`/jobs/${job.legacy_job_id}/builder`)}>
+                    Open Workshop Job <ChevronRight size={12} />
+                  </Button>
+                </div>
+              )}
+
               {/* Assign Installer */}
               <div className="border-t border-border pt-3 space-y-2">
                 <h4 className="text-xs font-bold text-foreground flex items-center gap-1">

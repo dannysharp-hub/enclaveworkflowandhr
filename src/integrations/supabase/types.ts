@@ -910,6 +910,42 @@ export type Database = {
           },
         ]
       }
+      cab_company_tenant_map: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_company_tenant_map_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_company_tenant_map_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_customer_auth_links: {
         Row: {
           auth_user_id: string
@@ -1309,6 +1345,7 @@ export type Database = {
           install_window_start: string | null
           job_ref: string
           job_title: string
+          legacy_job_id: string | null
           production_stage_key: string
           property_address_json: Json | null
           room_type: string | null
@@ -1347,6 +1384,7 @@ export type Database = {
           install_window_start?: string | null
           job_ref: string
           job_title: string
+          legacy_job_id?: string | null
           production_stage_key?: string
           property_address_json?: Json | null
           room_type?: string | null
@@ -1385,6 +1423,7 @@ export type Database = {
           install_window_start?: string | null
           job_ref?: string
           job_title?: string
+          legacy_job_id?: string | null
           production_stage_key?: string
           property_address_json?: Json | null
           room_type?: string | null
@@ -6101,6 +6140,7 @@ export type Database = {
         Row: {
           allow_remnants: boolean
           buylist_generated_at: string | null
+          cab_job_id: string | null
           created_at: string
           created_by: string | null
           created_date: string
@@ -6129,6 +6169,7 @@ export type Database = {
         Insert: {
           allow_remnants?: boolean
           buylist_generated_at?: string | null
+          cab_job_id?: string | null
           created_at?: string
           created_by?: string | null
           created_date?: string
@@ -6157,6 +6198,7 @@ export type Database = {
         Update: {
           allow_remnants?: boolean
           buylist_generated_at?: string | null
+          cab_job_id?: string | null
           created_at?: string
           created_by?: string | null
           created_date?: string
