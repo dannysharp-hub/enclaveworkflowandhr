@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Zap, Send, RefreshCw, CalendarDays, Info } from "lucide-react";
+import { CheckCircle2, XCircle, Zap, Send, RefreshCw, CalendarDays, Info, Copy, Globe } from "lucide-react";
 
 const STAGE_KEYS = [
   "lead_captured",
@@ -40,7 +40,9 @@ export default function GhlSettingsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [selectedJobId, setSelectedJobId] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
+  const [formWebhookUrl, setFormWebhookUrl] = useState("");
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
+  const [testingWebhook, setTestingWebhook] = useState(false);
 
   // Site visit fields
   const [siteVisitCalendarId, setSiteVisitCalendarId] = useState("");
@@ -76,6 +78,7 @@ export default function GhlSettingsPage() {
 
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     setWebhookUrl(`https://${projectId}.supabase.co/functions/v1/ghl-webhook`);
+    setFormWebhookUrl(`https://${projectId}.supabase.co/functions/v1/ghl-form`);
 
     const { data: logs } = await (supabase.from("cab_ghl_sync_log") as any)
       .select("*")
@@ -172,15 +175,77 @@ export default function GhlSettingsPage() {
         </p>
       </div>
 
-      {/* Webhook URL */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-        <h3 className="font-mono text-sm font-bold text-foreground">Webhook URL (for GHL)</h3>
+      {/* Webhook URLs */}
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+          <Globe size={14} className="text-primary" /> Webhook URLs (for GHL)
+        </h3>
         <p className="text-xs text-muted-foreground">
-          Add this URL as a webhook in GHL → Settings → Webhooks for appointment events.
+          Add these URLs as webhooks in GHL workflows.
         </p>
-        <code className="block text-xs bg-muted p-2 rounded font-mono break-all select-all">
-          {webhookUrl}
-        </code>
+
+        <div className="space-y-2">
+          <div>
+            <Label className="text-xs text-muted-foreground">Form Webhook (lead intake from form submissions)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <code className="flex-1 text-[10px] bg-muted p-2 rounded font-mono break-all select-all">{formWebhookUrl}</code>
+              <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs" onClick={() => { navigator.clipboard.writeText(formWebhookUrl); toast({ title: "Copied form webhook URL" }); }}>
+                <Copy size={12} /> Copy
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs text-muted-foreground">Booking Webhook (appointment booked callbacks)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <code className="flex-1 text-[10px] bg-muted p-2 rounded font-mono break-all select-all">{webhookUrl}</code>
+              <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs" onClick={() => { navigator.clipboard.writeText(webhookUrl); toast({ title: "Copied booking webhook URL" }); }}>
+                <Copy size={12} /> Copy
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={testingWebhook}
+          onClick={async () => {
+            setTestingWebhook(true);
+            try {
+              const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+              const res = await fetch(`https://${projectId}.supabase.co/functions/v1/ghl-webhook`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: "appointment.booked",
+                  event: "AppointmentBooked",
+                  email: "test@example.com",
+                  phone: "+447000000000",
+                  startTime: new Date(Date.now() + 86400000).toISOString(),
+                  endTime: new Date(Date.now() + 90000000).toISOString(),
+                  notes: "Test webhook from admin panel",
+                  calendarId: "test-calendar-id",
+                  id: "test-appt-" + Date.now(),
+                  _test: true,
+                }),
+              });
+              const data = await res.json();
+              if (data.ok) {
+                toast({ title: "Test webhook sent — check Webhook Logs page" });
+              } else {
+                toast({ title: "Test returned error", description: data.error, variant: "destructive" });
+              }
+            } catch (err: any) {
+              toast({ title: "Test failed", description: err.message, variant: "destructive" });
+            } finally {
+              setTestingWebhook(false);
+            }
+          }}
+        >
+          <Send size={12} />
+          {testingWebhook ? "Sending…" : "Send Test Webhook"}
+        </Button>
       </div>
 
       {/* Site Visit Calendar */}

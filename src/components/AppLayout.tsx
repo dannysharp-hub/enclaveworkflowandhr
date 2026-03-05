@@ -142,6 +142,7 @@ function buildNavGroups(flags: Record<string, boolean>, userRole: string | null)
     items: [
       { to: "/admin/leads", label: "Leads & Jobs", icon: Contact },
       { to: "/admin/ghl", label: "GHL Settings", icon: Link2 },
+      { to: "/admin/webhooks", label: "Webhook Logs", icon: Activity },
       { to: "/admin/bootstrap", label: "Bootstrap", icon: FileBox },
     ],
   });
