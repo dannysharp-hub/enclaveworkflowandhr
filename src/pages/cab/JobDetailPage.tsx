@@ -236,7 +236,11 @@ export default function JobDetailPage() {
   };
 
   const handleMarkDepositPaid = async (invoiceId: string, method: string) => {
-    const inv = invoices.find(i => i.id === invoiceId);
+    if (method === "stripe") {
+      toast({ title: "Stripe integration coming soon", description: "Use bank transfer for now.", variant: "destructive" });
+      return;
+    }
+    const inv = invoices.find((i: any) => i.id === invoiceId);
     if (!inv) return;
 
     await (supabase.from("cab_invoices") as any).update({
@@ -251,10 +255,18 @@ export default function JobDetailPage() {
       amount: inv.amount,
     });
 
+    // Emit invoice.paid (triggers DB state machine) + deposit.paid for GHL
     await insertCabEvent({
       companyId: companyId!, eventType: "invoice.paid", jobId: job.id,
-      payload: { milestone: inv.milestone, method },
+      payload: { milestone: inv.milestone, method, invoice_id: invoiceId, amount: inv.amount },
     });
+
+    if (inv.milestone === "deposit") {
+      await insertCabEvent({
+        companyId: companyId!, eventType: "deposit.paid", jobId: job.id,
+        payload: { invoice_id: invoiceId, amount: inv.amount, method, job_ref: job.job_ref },
+      });
+    }
 
     toast({ title: "Payment recorded" });
     load();
@@ -312,6 +324,9 @@ export default function JobDetailPage() {
   const settings = company?.settings_json || {};
   const nextAppointment = appointments.find(a => a.status === "booked" && new Date(a.start_at) > new Date());
 
+  const CONFIRMED_STAGES = ["project_confirmed", "materials_ordered", "manufacturing_started", "cabinetry_assembled", "ready_for_installation", "install_booked", "installation_complete", "practical_completed", "closed_paid"];
+  const isProjectConfirmed = CONFIRMED_STAGES.includes(stageKey || "");
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -324,6 +339,9 @@ export default function JobDetailPage() {
             <Badge variant="secondary" className="text-[10px]">{stageKey?.replace(/_/g, " ")}</Badge>
             {job.contract_value && (
               <Badge variant="default" className="text-[10px]">£{Number(job.contract_value).toLocaleString()}</Badge>
+            )}
+            {isProjectConfirmed && (
+              <Badge className="text-[10px] bg-emerald-600 text-white">PROJECT CONFIRMED</Badge>
             )}
           </div>
           <h1 className="text-xl font-bold text-foreground">{job.job_title}</h1>
@@ -490,6 +508,30 @@ export default function JobDetailPage() {
             </div>
           </div>
 
+          {/* Production Actions — unlocked after project confirmed */}
+          {isProjectConfirmed && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+              <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-emerald-500" /> Production Actions
+              </h3>
+              <p className="text-xs text-muted-foreground">Deposit received — production pipeline is now available.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => toast({ title: "Buy list generation coming soon" })}>
+                  <Package size={12} /> Generate Buy List
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => toast({ title: "RFQ sending coming soon" })}>
+                  <Send size={12} /> Send RFQs
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => toast({ title: "Purchase orders coming soon" })}>
+                  <FileText size={12} /> Create Purchase Orders
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => toast({ title: "BOM upload coming soon" })}>
+                  <Cog size={12} /> Upload BOM
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Quote Builder */}
           <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
 
@@ -602,21 +644,22 @@ export default function JobDetailPage() {
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="font-mono text-sm font-bold text-foreground mb-2">Invoices</h3>
               <div className="space-y-2">
-                {invoices.map(inv => (
-                  <div key={inv.id} className="flex items-center justify-between p-2 rounded border border-border">
-                    <div>
+                {invoices.map((inv: any) => (
+                  <div key={inv.id} className="flex items-center justify-between p-3 rounded border border-border">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-xs">{inv.reference}</span>
-                      <span className="ml-2 text-sm">£{Number(inv.amount).toLocaleString()}</span>
-                      <Badge className="ml-2" variant={inv.status === "paid" ? "default" : "outline"}>{inv.status}</Badge>
-                      <span className="ml-2 text-xs text-muted-foreground capitalize">{inv.milestone}</span>
+                      <span className="text-sm font-mono font-medium">£{Number(inv.amount).toLocaleString()}</span>
+                      <Badge className="text-[10px]" variant={inv.status === "paid" ? "default" : "outline"}>{inv.status}</Badge>
+                      <span className="text-xs text-muted-foreground capitalize">{inv.milestone}</span>
+                      {inv.paid_at && <span className="text-[10px] text-muted-foreground">Paid {format(new Date(inv.paid_at), "dd MMM")}</span>}
                     </div>
                     {inv.status === "due" && (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="outline" onClick={() => handleMarkDepositPaid(inv.id, "bank")}>
-                          <Banknote size={12} /> Bank
+                        <Button size="sm" variant="outline" onClick={() => handleMarkDepositPaid(inv.id, "bank_transfer")}>
+                          <Banknote size={12} /> Mark Paid (Bank)
                         </Button>
-                        <Button size="sm" onClick={() => handleMarkDepositPaid(inv.id, "stripe")}>
-                          <CheckCircle2 size={12} /> Stripe
+                        <Button size="sm" variant="secondary" onClick={() => handleMarkDepositPaid(inv.id, "stripe")}>
+                          <CheckCircle2 size={12} /> Pay Online
                         </Button>
                       </div>
                     )}

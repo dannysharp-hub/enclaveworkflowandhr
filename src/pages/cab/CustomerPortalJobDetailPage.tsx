@@ -528,6 +528,28 @@ export default function CustomerPortalJobDetailPage() {
               <p className="text-xs text-muted-foreground">Please use your job reference as the payment reference.</p>
               <p className="text-xs text-muted-foreground">We'll confirm receipt and begin your project once payment clears.</p>
             </div>
+            <Button variant="secondary" disabled className="w-full opacity-60">
+              <Banknote size={14} /> Pay Online — Coming Soon
+            </Button>
+          </div>
+        )}
+
+        {/* Project Confirmed message */}
+        {invoices.some((i: any) => i.milestone === "deposit" && i.status === "paid") && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-emerald-500" />
+              <h2 className="font-mono text-sm font-bold text-foreground">Project Confirmed</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Your project has been confirmed and is now moving into production planning.
+            </p>
+            {invoices.filter((i: any) => i.milestone === "deposit" && i.status === "paid").map((inv: any) => (
+              <div key={inv.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Deposit paid: <span className="font-mono font-medium text-foreground">£{Number(inv.amount).toLocaleString()}</span></span>
+                {inv.paid_at && <span>on {format(new Date(inv.paid_at), "dd MMM yyyy")}</span>}
+              </div>
+            ))}
           </div>
         )}
       </main>
