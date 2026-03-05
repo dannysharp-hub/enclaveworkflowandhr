@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
+  CalendarDays,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
@@ -84,6 +85,10 @@ export default function JobDetailPage() {
   };
 
   const handleRequestAppointment = async () => {
+    const settings = company?.settings_json || {};
+    const repName = settings.site_visit_rep_name || "Alistair";
+    const calId = settings.site_visit_calendar_id || "";
+
     // Postcode eligibility check
     const jobPostcode = job.property_address_json?.postcode;
     if (jobPostcode && company?.base_postcode && company?.service_radius_miles) {
@@ -107,13 +112,27 @@ export default function JobDetailPage() {
 
     const nextAction = new Date();
     nextAction.setDate(nextAction.getDate() + 3);
-    await insertCabEvent({ companyId: companyId!, eventType: "appointment.requested", jobId: job.id });
+
+    // Assign rep and calendar to job
+    await updateJob({
+      assigned_rep_name: repName,
+      assigned_rep_calendar_id: calId,
+    });
+
+    await insertCabEvent({
+      companyId: companyId!,
+      eventType: "appointment.requested",
+      jobId: job.id,
+      payload: { rep_name: repName, calendar_id: calId },
+    });
+
     await updateJob({
       current_stage_key: "appointment_requested",
       state: "awaiting_appointment_booking",
       estimated_next_action_at: nextAction.toISOString(),
     });
-    toast({ title: "Appointment requested" });
+
+    toast({ title: "Appointment requested — GHL will send booking link" });
     load();
   };
 
@@ -133,7 +152,6 @@ export default function JobDetailPage() {
       amount: inv.amount,
     });
 
-    // The DB trigger on cab_events handles job state transitions
     await insertCabEvent({
       companyId: companyId!, eventType: "invoice.paid", jobId: job.id,
       payload: { milestone: inv.milestone, method },
@@ -146,10 +164,29 @@ export default function JobDetailPage() {
   const handleEmitTestEvent = async (eventType: string) => {
     setEmitting(eventType);
     try {
-      // The DB trigger handles all state transitions automatically
       await insertCabEvent({ companyId: companyId!, eventType, jobId: job.id });
       toast({ title: `Event emitted: ${eventType}` });
-      // Small delay to let trigger process
+      await new Promise(r => setTimeout(r, 300));
+      await load();
+    } finally {
+      setEmitting(null);
+    }
+  };
+
+  const handleSendBookingLink = async () => {
+    setEmitting("booking_link");
+    try {
+      await insertCabEvent({
+        companyId: companyId!,
+        eventType: "appointment.requested",
+        jobId: job.id,
+        payload: {
+          rep_name: job.assigned_rep_name || company?.settings_json?.site_visit_rep_name || "Alistair",
+          calendar_id: job.assigned_rep_calendar_id || company?.settings_json?.site_visit_calendar_id || "",
+          test: true,
+        },
+      });
+      toast({ title: "Booking link event emitted — GHL workflow will send SMS" });
       await new Promise(r => setTimeout(r, 300));
       await load();
     } finally {
@@ -162,6 +199,7 @@ export default function JobDetailPage() {
   }
 
   const stageKey = job?.current_stage_key;
+  const settings = company?.settings_json || {};
 
   return (
     <div className="space-y-6">
@@ -249,6 +287,44 @@ export default function JobDetailPage() {
                 {ghlSyncing ? "Syncing…" : "Sync to GHL"}
               </Button>
             </div>
+          </div>
+
+          {/* Site Visit Debug Panel */}
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <CalendarDays size={14} className="text-primary" /> Site Visit Booking
+            </h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Rep:</span>{" "}
+                <span className="font-mono">{job.assigned_rep_name || settings.site_visit_rep_name || "Alistair"}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Calendar ID:</span>{" "}
+                <span className="font-mono">{job.assigned_rep_calendar_id || settings.site_visit_calendar_id || "not set"}</span>
+              </div>
+              {settings.site_visit_booking_url && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Booking URL:</span>{" "}
+                  <a href={settings.site_visit_booking_url} target="_blank" rel="noopener noreferrer" className="font-mono text-primary underline">
+                    {settings.site_visit_booking_url}
+                  </a>
+                </div>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={emitting !== null}
+              onClick={handleSendBookingLink}
+              className="text-xs"
+            >
+              <Send size={12} />
+              {emitting === "booking_link" ? "Sending…" : "Send Booking Link Now (test)"}
+            </Button>
+            <p className="text-[10px] text-muted-foreground">
+              Inserts an <code className="font-mono">appointment.requested</code> event. GHL workflow sends the SMS with booking link.
+            </p>
           </div>
 
           {/* Test event emitters */}

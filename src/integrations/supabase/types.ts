@@ -1002,6 +1002,8 @@ export type Database = {
       }
       cab_jobs: {
         Row: {
+          assigned_rep_calendar_id: string | null
+          assigned_rep_name: string | null
           assigned_user_id: string | null
           company_id: string
           contract_currency: string | null
@@ -1022,6 +1024,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_rep_calendar_id?: string | null
+          assigned_rep_name?: string | null
           assigned_user_id?: string | null
           company_id: string
           contract_currency?: string | null
@@ -1042,6 +1046,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_rep_calendar_id?: string | null
+          assigned_rep_name?: string | null
           assigned_user_id?: string | null
           company_id?: string
           contract_currency?: string | null

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Zap, Send, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, Zap, Send, RefreshCw, CalendarDays, Info } from "lucide-react";
 
 const STAGE_KEYS = [
   "lead_captured",
@@ -42,6 +42,11 @@ export default function GhlSettingsPage() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
 
+  // Site visit fields
+  const [siteVisitCalendarId, setSiteVisitCalendarId] = useState("");
+  const [siteVisitBookingUrl, setSiteVisitBookingUrl] = useState("");
+  const [siteVisitRepName, setSiteVisitRepName] = useState("Alistair");
+
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
     if (!cid) return;
@@ -56,8 +61,10 @@ export default function GhlSettingsPage() {
     setPipelineId(settings.ghl_pipeline_id || "");
     setCalendarId(settings.ghl_calendar_id || "");
     setStageIds(settings.ghl_stage_ids || {});
+    setSiteVisitCalendarId(settings.site_visit_calendar_id || "");
+    setSiteVisitBookingUrl(settings.site_visit_booking_url || "");
+    setSiteVisitRepName(settings.site_visit_rep_name || "Alistair");
 
-    // Load jobs for test sync
     const { data: jobData } = await (supabase.from("cab_jobs") as any)
       .select("id, job_ref, job_title")
       .eq("company_id", cid)
@@ -65,11 +72,9 @@ export default function GhlSettingsPage() {
       .limit(20);
     setJobs(jobData || []);
 
-    // Build webhook URL
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     setWebhookUrl(`https://${projectId}.supabase.co/functions/v1/ghl-webhook`);
 
-    // Load recent sync logs
     const { data: logs } = await (supabase.from("cab_ghl_sync_log") as any)
       .select("*")
       .eq("company_id", cid)
@@ -95,6 +100,9 @@ export default function GhlSettingsPage() {
         ghl_pipeline_id: pipelineId,
         ghl_calendar_id: calendarId,
         ghl_stage_ids: stageIds,
+        site_visit_calendar_id: siteVisitCalendarId,
+        site_visit_booking_url: siteVisitBookingUrl,
+        site_visit_rep_name: siteVisitRepName,
       };
 
       await (supabase.from("cab_companies") as any)
@@ -144,7 +152,7 @@ export default function GhlSettingsPage() {
       if (res.error) throw new Error(res.error.message);
       setSyncResult(res.data as { processed: number; errors: number });
       toast({ title: `Synced: ${res.data.processed} events processed, ${res.data.errors} errors` });
-      load(); // Refresh logs
+      load();
     } catch (err: any) {
       toast({ title: "Sync failed", description: err.message, variant: "destructive" });
     } finally {
@@ -157,7 +165,7 @@ export default function GhlSettingsPage() {
       <div>
         <h1 className="text-xl font-bold font-mono text-foreground">GoHighLevel Integration</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Configure pipeline mapping, stage IDs, and test the sync worker.
+          Configure pipeline mapping, stage IDs, site visit calendars, and test the sync worker.
         </p>
       </div>
 
@@ -170,6 +178,75 @@ export default function GhlSettingsPage() {
         <code className="block text-xs bg-muted p-2 rounded font-mono break-all select-all">
           {webhookUrl}
         </code>
+      </div>
+
+      {/* Site Visit Calendar */}
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+        <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+          <CalendarDays size={14} className="text-primary" /> Site Visit Calendar
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs">Rep Name</Label>
+            <Input
+              value={siteVisitRepName}
+              onChange={(e) => setSiteVisitRepName(e.target.value)}
+              placeholder="Alistair"
+              className="font-mono text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Site Visit Calendar ID</Label>
+            <Input
+              value={siteVisitCalendarId}
+              onChange={(e) => setSiteVisitCalendarId(e.target.value)}
+              placeholder="Paste GHL calendar ID"
+              className="font-mono text-xs"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs">Booking URL (optional)</Label>
+            <Input
+              value={siteVisitBookingUrl}
+              onChange={(e) => setSiteVisitBookingUrl(e.target.value)}
+              placeholder="https://updates.physio-leads.com/widget/booking/<calendarId>"
+              className="font-mono text-xs"
+            />
+          </div>
+        </div>
+        <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
+          <Info size={12} className="mt-0.5 shrink-0" />
+          <span>
+            Booking URL format: <code className="font-mono">https://updates.physio-leads.com/widget/booking/&lt;calendarId&gt;</code>.
+            The GHL workflow triggered by <code className="font-mono">encl_appointment_requested</code> should send this link via SMS/email.
+          </span>
+        </div>
+      </div>
+
+      {/* GHL Workflow instructions */}
+      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <h3 className="font-mono text-sm font-bold text-foreground">GHL Workflows to Create</h3>
+        <div className="space-y-3 text-xs text-muted-foreground">
+          <div className="border-l-2 border-primary/30 pl-3">
+            <p className="font-bold text-foreground">1. Appointment Requested</p>
+            <p>Trigger: Tag added = <code className="font-mono text-primary">encl_appointment_requested</code></p>
+            <p>Action: Send SMS with booking link for the Site Visit calendar:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              "Hi {"{{contact.first_name}}"}, thanks for requesting a design visit.{"\n"}
+              Please choose a time that suits you here: {"{{calendar_link}}"}"
+            </p>
+          </div>
+          <div className="border-l-2 border-primary/30 pl-3">
+            <p className="font-bold text-foreground">2. Quote Follow-up</p>
+            <p>Trigger: Tag added = <code className="font-mono text-primary">encl_quote_sent</code></p>
+            <p>Actions: Day 1 SMS → Day 3 email → Day 7 call task</p>
+          </div>
+          <div className="border-l-2 border-primary/30 pl-3">
+            <p className="font-bold text-foreground">3. Quote Viewed</p>
+            <p>Trigger: Tag added = <code className="font-mono text-primary">encl_quote_viewed</code></p>
+            <p>Action: Internal notification — "Quote viewed — follow up if needed"</p>
+          </div>
+        </div>
       </div>
 
       {/* Pipeline + Calendar */}
@@ -186,7 +263,7 @@ export default function GhlSettingsPage() {
             />
           </div>
           <div>
-            <Label className="text-xs">Calendar ID (Site Visit)</Label>
+            <Label className="text-xs">Calendar ID (legacy/general)</Label>
             <Input
               value={calendarId}
               onChange={(e) => setCalendarId(e.target.value)}
