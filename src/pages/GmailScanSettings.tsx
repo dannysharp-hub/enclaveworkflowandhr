@@ -159,8 +159,6 @@ export default function GmailScanSettings() {
   };
 
   const handleViewDocument = async (docId: string) => {
-    // Open window synchronously to avoid popup blocker
-    const newWindow = window.open("about:blank", "_blank");
     try {
       const resp = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scan-gmail`,
@@ -175,24 +173,24 @@ export default function GmailScanSettings() {
         }
       );
       if (!resp.ok) {
-        newWindow?.close();
         toast({ title: "Error", description: "Could not load document", variant: "destructive" });
         return;
       }
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
-      if (newWindow) {
-        newWindow.location.href = url;
-      } else {
-        // Fallback: create a download link
-        const a = document.createElement("a");
-        a.href = url;
-        a.target = "_blank";
-        a.download = "document";
-        a.click();
-      }
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      // Use filename from content-disposition if available
+      const cd = resp.headers.get("content-disposition");
+      const match = cd?.match(/filename="?([^";\s]+)"?/);
+      a.download = match?.[1] || "document";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch {
-      newWindow?.close();
       toast({ title: "Error", description: "Failed to load document", variant: "destructive" });
     }
   };
