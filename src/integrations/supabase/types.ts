@@ -642,6 +642,604 @@ export type Database = {
           },
         ]
       }
+      cab_companies: {
+        Row: {
+          base_postcode: string | null
+          brand_phone: string | null
+          created_at: string
+          id: string
+          name: string
+          service_radius_miles: number | null
+          settings_json: Json | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          base_postcode?: string | null
+          brand_phone?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          service_radius_miles?: number | null
+          settings_json?: Json | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          base_postcode?: string | null
+          brand_phone?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          service_radius_miles?: number | null
+          settings_json?: Json | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cab_customers: {
+        Row: {
+          address_line_1: string | null
+          address_line_2: string | null
+          city: string | null
+          company_id: string
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          notes: string | null
+          phone: string | null
+          postcode: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          company_id: string
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          notes?: string | null
+          phone?: string | null
+          postcode?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          notes?: string | null
+          phone?: string | null
+          postcode?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_events: {
+        Row: {
+          attempts: number
+          company_id: string
+          created_at: string
+          customer_id: string | null
+          event_type: string
+          id: string
+          job_id: string | null
+          last_error: string | null
+          payload_json: Json | null
+          processed_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          company_id: string
+          created_at?: string
+          customer_id?: string | null
+          event_type: string
+          id?: string
+          job_id?: string | null
+          last_error?: string | null
+          payload_json?: Json | null
+          processed_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          company_id?: string
+          created_at?: string
+          customer_id?: string | null
+          event_type?: string
+          id?: string
+          job_id?: string | null
+          last_error?: string | null
+          payload_json?: Json | null
+          processed_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "cab_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_invoices: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          currency: string
+          due_at: string | null
+          id: string
+          issued_at: string | null
+          job_id: string
+          milestone: string
+          notes: string | null
+          paid_at: string | null
+          payment_link_url: string | null
+          payment_method: string | null
+          pdf_url: string | null
+          quote_id: string | null
+          reference: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          company_id: string
+          created_at?: string
+          currency?: string
+          due_at?: string | null
+          id?: string
+          issued_at?: string | null
+          job_id: string
+          milestone?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_link_url?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          quote_id?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          currency?: string
+          due_at?: string | null
+          id?: string
+          issued_at?: string | null
+          job_id?: string
+          milestone?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_link_url?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          quote_id?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_invoices_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "cab_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_jobs: {
+        Row: {
+          assigned_user_id: string | null
+          company_id: string
+          created_at: string
+          current_stage_key: string | null
+          customer_id: string
+          estimated_next_action_at: string | null
+          ghl_contact_id: string | null
+          ghl_opportunity_id: string | null
+          id: string
+          job_ref: string
+          job_title: string
+          property_address_json: Json | null
+          room_type: string | null
+          state: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          company_id: string
+          created_at?: string
+          current_stage_key?: string | null
+          customer_id: string
+          estimated_next_action_at?: string | null
+          ghl_contact_id?: string | null
+          ghl_opportunity_id?: string | null
+          id?: string
+          job_ref: string
+          job_title: string
+          property_address_json?: Json | null
+          room_type?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          company_id?: string
+          created_at?: string
+          current_stage_key?: string | null
+          customer_id?: string
+          estimated_next_action_at?: string | null
+          ghl_contact_id?: string | null
+          ghl_opportunity_id?: string | null
+          id?: string
+          job_ref?: string
+          job_title?: string
+          property_address_json?: Json | null
+          room_type?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_jobs_assigned_user_id_fkey"
+            columns: ["assigned_user_id"]
+            isOneToOne: false
+            referencedRelation: "cab_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "cab_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_payments: {
+        Row: {
+          amount: number
+          company_id: string
+          id: string
+          invoice_id: string
+          job_id: string | null
+          method: string
+          paid_at: string
+          provider_ref: string | null
+          raw_json: Json | null
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          id?: string
+          invoice_id: string
+          job_id?: string | null
+          method: string
+          paid_at?: string
+          provider_ref?: string | null
+          raw_json?: Json | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          id?: string
+          invoice_id?: string
+          job_id?: string | null
+          method?: string
+          paid_at?: string
+          provider_ref?: string | null
+          raw_json?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "cab_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_payments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_quote_acceptances: {
+        Row: {
+          accepted_at: string
+          accepted_by_name: string
+          accepted_ip: string | null
+          company_id: string
+          id: string
+          job_id: string | null
+          quote_id: string
+          terms_url: string | null
+          terms_version: string | null
+        }
+        Insert: {
+          accepted_at?: string
+          accepted_by_name: string
+          accepted_ip?: string | null
+          company_id: string
+          id?: string
+          job_id?: string | null
+          quote_id: string
+          terms_url?: string | null
+          terms_version?: string | null
+        }
+        Update: {
+          accepted_at?: string
+          accepted_by_name?: string
+          accepted_ip?: string | null
+          company_id?: string
+          id?: string
+          job_id?: string | null
+          quote_id?: string
+          terms_url?: string | null
+          terms_version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_quote_acceptances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_quote_acceptances_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_quote_acceptances_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "cab_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_quote_views: {
+        Row: {
+          company_id: string
+          id: string
+          job_id: string | null
+          quote_id: string
+          viewed_at: string
+          viewer_ip: string | null
+          viewer_type: string | null
+          viewer_user_agent: string | null
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          job_id?: string | null
+          quote_id: string
+          viewed_at?: string
+          viewer_ip?: string | null
+          viewer_type?: string | null
+          viewer_user_agent?: string | null
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          job_id?: string | null
+          quote_id?: string
+          viewed_at?: string
+          viewer_ip?: string | null
+          viewer_type?: string | null
+          viewer_user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_quote_views_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_quote_views_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_quote_views_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "cab_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_quotes: {
+        Row: {
+          accepted_at: string | null
+          company_id: string
+          created_at: string
+          currency: string
+          document_url: string | null
+          id: string
+          job_id: string
+          price_max: number | null
+          price_min: number | null
+          scope_summary: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id: string
+          created_at?: string
+          currency?: string
+          document_url?: string | null
+          id?: string
+          job_id: string
+          price_max?: number | null
+          price_min?: number | null
+          scope_summary?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string
+          created_at?: string
+          currency?: string
+          document_url?: string | null
+          id?: string
+          job_id?: string
+          price_max?: number | null
+          price_min?: number | null
+          scope_summary?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_quotes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_quotes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_user_profiles: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          name: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email: string
+          id: string
+          is_active?: boolean
+          name: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_user_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           assigned_staff_ids: string[] | null
