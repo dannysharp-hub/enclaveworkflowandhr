@@ -18,8 +18,14 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
   switch (eventType) {
     case "lead.created":
       return { stageKey: "lead_captured", tags: ["encl_lead_created"] };
-    case "ballpark.sent":
-      return { stageKey: "ballpark_sent", tags: ["encl_ballpark_sent"] };
+    case "ballpark.sent": {
+      const bMin = payload?.min as number | undefined;
+      const bMax = payload?.max as number | undefined;
+      const bCurrency = (payload?.currency as string) || "GBP";
+      let noteText = "Ballpark estimate sent";
+      if (bMin != null && bMax != null) noteText += ` — ${bCurrency} ${bMin.toLocaleString()}–${bMax.toLocaleString()}`;
+      return { stageKey: "ballpark_sent", tags: ["encl_ballpark_sent"], noteExtra: noteText };
+    }
     case "appointment.requested": {
       const calId = (payload?.calendar_id as string) || "";
       const repName = (payload?.rep_name as string) || "Alistair";

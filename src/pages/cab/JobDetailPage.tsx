@@ -17,6 +17,7 @@ import {
 
 /* ─── Testing event buttons ─── */
 const TEST_EVENTS = [
+  { eventType: "ballpark.sent", label: "Ballpark Sent (test)", icon: Send },
   { eventType: "materials.ordered", label: "Materials Ordered", icon: Package },
   { eventType: "cnc.started", label: "CNC Started", icon: Cog },
   { eventType: "job.assembled", label: "Job Assembled", icon: Hammer },
@@ -80,11 +81,95 @@ export default function JobDetailPage() {
     await (supabase.from("cab_jobs") as any).update(updates).eq("id", job.id);
   };
 
-  const handleBallparkSent = async () => {
-    await insertCabEvent({ companyId: companyId!, eventType: "ballpark.sent", jobId: job.id });
-    await updateJob({ current_stage_key: "ballpark_sent", state: "awaiting_appointment_request" });
-    toast({ title: "Ballpark marked as sent" });
-    load();
+  // Ballpark state
+  const [ballparkMin, setBallparkMin] = useState("");
+  const [ballparkMax, setBallparkMax] = useState("");
+  const [ballparkCustomerMsg, setBallparkCustomerMsg] = useState("");
+  const [ballparkInternalNotes, setBallparkInternalNotes] = useState("");
+  const [ballparkSaving, setBallparkSaving] = useState(false);
+  const [ballparkSending, setBallparkSending] = useState(false);
+
+  // Populate ballpark fields when job loads
+  useEffect(() => {
+    if (job) {
+      setBallparkMin(job.ballpark_min?.toString() || "");
+      setBallparkMax(job.ballpark_max?.toString() || "");
+      setBallparkCustomerMsg(job.ballpark_customer_message || "");
+      setBallparkInternalNotes(job.ballpark_internal_notes || "");
+    }
+  }, [job]);
+
+  const handleSaveBallpark = async () => {
+    if (!ballparkMin || !ballparkMax) {
+      toast({ title: "Enter min and max values", variant: "destructive" });
+      return;
+    }
+    setBallparkSaving(true);
+    try {
+      await updateJob({
+        ballpark_min: parseFloat(ballparkMin),
+        ballpark_max: parseFloat(ballparkMax),
+        ballpark_customer_message: ballparkCustomerMsg || null,
+        ballpark_internal_notes: ballparkInternalNotes || null,
+        ballpark_currency: "GBP",
+      });
+      await insertCabEvent({
+        companyId: companyId!,
+        eventType: "ballpark.created",
+        jobId: job.id,
+        payload: {
+          min: parseFloat(ballparkMin),
+          max: parseFloat(ballparkMax),
+          currency: "GBP",
+          customer_message: ballparkCustomerMsg || null,
+        },
+      });
+      toast({ title: "Ballpark saved" });
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBallparkSaving(false);
+    }
+  };
+
+  const handleSendBallpark = async () => {
+    if (!ballparkMin || !ballparkMax) {
+      toast({ title: "Save ballpark first", variant: "destructive" });
+      return;
+    }
+    setBallparkSending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await updateJob({
+        ballpark_min: parseFloat(ballparkMin),
+        ballpark_max: parseFloat(ballparkMax),
+        ballpark_customer_message: ballparkCustomerMsg || null,
+        ballpark_internal_notes: ballparkInternalNotes || null,
+        ballpark_currency: "GBP",
+        ballpark_sent_at: new Date().toISOString(),
+        ballpark_sent_by: user?.id || null,
+        current_stage_key: "ballpark_sent",
+        state: "awaiting_appointment_request",
+      });
+      await insertCabEvent({
+        companyId: companyId!,
+        eventType: "ballpark.sent",
+        jobId: job.id,
+        payload: {
+          min: parseFloat(ballparkMin),
+          max: parseFloat(ballparkMax),
+          currency: "GBP",
+          customer_message: ballparkCustomerMsg || null,
+        },
+      });
+      toast({ title: "Ballpark sent to customer", description: "Job moved to awaiting_appointment_request" });
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBallparkSending(false);
+    }
   };
 
   const APPOINTMENT_ALLOWED_STAGES = ["ballpark_sent", "appointment_requested", "appointment_booked"];
@@ -309,13 +394,67 @@ export default function JobDetailPage() {
             )}
           </div>
 
+          {/* Ballpark Card */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                <Banknote size={14} className="text-primary" /> Ballpark Estimate
+              </h3>
+              {job.ballpark_sent_at && (
+                <Badge variant="default" className="text-[10px] gap-1">
+                  <CheckCircle2 size={10} /> Sent {format(new Date(job.ballpark_sent_at), "dd MMM HH:mm")}
+                </Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Min (£) *</Label>
+                <Input type="number" step="0.01" value={ballparkMin} onChange={e => setBallparkMin(e.target.value)} placeholder="8000" className="font-mono text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs">Max (£) *</Label>
+                <Input type="number" step="0.01" value={ballparkMax} onChange={e => setBallparkMax(e.target.value)} placeholder="12000" className="font-mono text-xs" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Customer Message (shown on portal)</Label>
+              <textarea
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                rows={2}
+                value={ballparkCustomerMsg}
+                onChange={e => setBallparkCustomerMsg(e.target.value)}
+                placeholder="Based on the details provided, we estimate your project at…"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Internal Notes (admin only)</Label>
+              <textarea
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                rows={2}
+                value={ballparkInternalNotes}
+                onChange={e => setBallparkInternalNotes(e.target.value)}
+                placeholder="Complexity notes, risk flags…"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleSaveBallpark} disabled={ballparkSaving}>
+                {ballparkSaving ? "Saving…" : "Save Ballpark"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSendBallpark}
+                disabled={ballparkSending || !ballparkMin || !ballparkMax || !!job.ballpark_sent_at}
+              >
+                <Send size={12} />
+                {ballparkSending ? "Sending…" : job.ballpark_sent_at ? "Already Sent" : "Send Ballpark to Customer"}
+              </Button>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h3 className="font-mono text-sm font-bold text-foreground">Actions</h3>
             <div className="flex flex-wrap gap-2">
-              {stageKey === "lead_captured" && (
-                <Button size="sm" onClick={handleBallparkSent}><Send size={14} /> Mark Ballpark Sent</Button>
-              )}
               {stageKey === "ballpark_sent" && (
                 <Button size="sm" onClick={handleRequestAppointment}><CalendarPlus size={14} /> Request Appointment</Button>
               )}

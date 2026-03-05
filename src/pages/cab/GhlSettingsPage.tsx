@@ -311,7 +311,27 @@ export default function GhlSettingsPage() {
         <h3 className="font-mono text-sm font-bold text-foreground">GHL Workflows to Create</h3>
         <div className="space-y-3 text-xs text-muted-foreground">
           <div className="border-l-2 border-primary/30 pl-3">
-            <p className="font-bold text-foreground">1. Appointment Requested</p>
+            <p className="font-bold text-foreground">1. Ballpark Follow-Up</p>
+            <p>Trigger: Tag added = <code className="font-mono text-primary">encl_ballpark_sent</code></p>
+            <p className="mt-1 font-medium text-foreground">Day 1 — SMS:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              "Hi {"{{contact.first_name}}"}, we've sent your ballpark estimate for your kitchen project. Happy to answer any questions — just reply to this message."
+            </p>
+            <p className="mt-2 font-medium text-foreground">Day 3 — Email:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              Subject: Your kitchen estimate from {"{{company.name}}"}{"\n\n"}
+              Hi {"{{contact.first_name}}"},\n\n
+              Just checking in — we sent your ballpark estimate a few days ago. You can view it anytime on your project portal.\n\n
+              If you'd like to move forward, the next step is booking a free design visit so we can take measurements and refine the price.\n\n
+              Reply to this email or call us on {"{{company.phone}}"} to arrange it.
+            </p>
+            <p className="mt-2 font-medium text-foreground">Day 7 — Call task:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              "Follow up on ballpark sent to {"{{contact.first_name}} {{contact.last_name}}"} — check if ready to book design visit."
+            </p>
+          </div>
+          <div className="border-l-2 border-primary/30 pl-3">
+            <p className="font-bold text-foreground">2. Appointment Requested</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_appointment_requested</code></p>
             <p>Action: Send SMS with booking link for the Site Visit calendar:</p>
             <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
@@ -320,17 +340,17 @@ export default function GhlSettingsPage() {
             </p>
           </div>
           <div className="border-l-2 border-primary/30 pl-3">
-            <p className="font-bold text-foreground">2. Quote Follow-up</p>
+            <p className="font-bold text-foreground">3. Quote Follow-up</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_quote_sent</code></p>
             <p>Actions: Day 1 SMS → Day 3 email → Day 7 call task</p>
           </div>
           <div className="border-l-2 border-primary/30 pl-3">
-            <p className="font-bold text-foreground">3. Quote Viewed</p>
+            <p className="font-bold text-foreground">4. Quote Viewed</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_quote_viewed</code></p>
             <p>Action: Internal notification — "Quote viewed — follow up if needed"</p>
           </div>
           <div className="border-l-2 border-primary/30 pl-3">
-            <p className="font-bold text-foreground">4. Appointment Booked Confirmation</p>
+            <p className="font-bold text-foreground">5. Appointment Booked Confirmation</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_appointment_booked</code></p>
             <p>Action: Send SMS using the <strong>Appointment Window</strong> custom field:</p>
             <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
@@ -340,7 +360,6 @@ export default function GhlSettingsPage() {
               The custom field is auto-populated by the sync worker with e.g. <code className="font-mono">"Tue 11:00–13:00"</code> (Europe/London).
             </p>
             <p className="mt-1 text-destructive font-medium">⚠ Never include travel time, buffers, rep names or internal details in customer messages.</p>
-            <p className="mt-1">Optional: Send email confirmation using the same custom field token.</p>
           </div>
         </div>
       </div>
