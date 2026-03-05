@@ -12,6 +12,27 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+async function getPortalCustomer(userId: string, email: string) {
+  const { data: link } = await (supabase.from("cab_customer_auth_links" as any) as any)
+    .select("customer_id")
+    .eq("auth_user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (link) {
+    const { data } = await (supabase.from("cab_customers") as any)
+      .select("id, company_id, first_name, last_name")
+      .eq("id", link.customer_id)
+      .single();
+    return data;
+  }
+  const { data } = await (supabase.from("cab_customers") as any)
+    .select("id, company_id, first_name, last_name")
+    .eq("email", email)
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
 export default function CustomerPortalJobDetailPage() {
   const { jobRef } = useParams();
   const navigate = useNavigate();
@@ -26,29 +47,7 @@ export default function CustomerPortalJobDetailPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { navigate("/portal/login"); return; }
 
-    // Find customer by auth link first, fallback to email
-    let customer: any = null;
-    const { data: profileLink } = await (supabase.from("cab_customer_auth_links" as any) as any)
-      .select("customer_id")
-      .eq("auth_user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (profileLink) {
-      const { data: c } = await (supabase.from("cab_customers") as any)
-        .select("id, company_id")
-        .eq("id", profileLink.customer_id)
-        .single();
-      customer = c;
-    } else {
-      const { data: c } = await (supabase.from("cab_customers") as any)
-        .select("id, company_id")
-        .eq("email", user.email)
-        .limit(1)
-        .maybeSingle();
-      customer = c;
-    }
-
+    const customer = await getPortalCustomer(user.id, user.email!);
     if (!customer) { navigate("/portal/login"); return; }
 
     const { data: jobData } = await (supabase.from("cab_jobs") as any)
@@ -90,7 +89,6 @@ export default function CustomerPortalJobDetailPage() {
           eventType: "quote.viewed",
           jobId: jobData.id,
         });
-        // Update stage
         if (jobData.current_stage_key === "quote_sent") {
           await (supabase.from("cab_jobs") as any)
             .update({ current_stage_key: "quote_viewed" })
@@ -112,27 +110,8 @@ export default function CustomerPortalJobDetailPage() {
     setAccepting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      // Use auth link first, fallback to email
-      let customer: any = null;
-      const { data: link } = await (supabase.from("cab_customer_auth_links" as any) as any)
-        .select("customer_id")
-        .eq("auth_user_id", user!.id)
-        .limit(1)
-        .maybeSingle();
-      if (link) {
-        const { data: c } = await (supabase.from("cab_customers") as any)
-          .select("id, company_id, first_name, last_name")
-          .eq("id", link.customer_id)
-          .single();
-        customer = c;
-      } else {
-        const { data: c } = await (supabase.from("cab_customers") as any)
-          .select("id, company_id, first_name, last_name")
-          .eq("email", user!.email)
-          .limit(1)
-          .single();
-        customer = c;
-      }
+      const customer = await getPortalCustomer(user!.id, user!.email!);
+      if (!customer) throw new Error("Customer not found");
 
       // Accept quote
       await (supabase.from("cab_quote_acceptances") as any).insert({
@@ -147,10 +126,18 @@ export default function CustomerPortalJobDetailPage() {
         accepted_at: new Date().toISOString(),
       }).eq("id", latestQuote.id);
 
+      // Set contract_value from quote max if not already set
+      const contractValue = job.contract_value ?? latestQuote.price_max;
+      await (supabase.from("cab_jobs") as any).update({
+        contract_value: contractValue,
+        contract_currency: latestQuote.currency || "GBP",
+      }).eq("id", job.id);
+
+      // Insert quote.accepted event
       await insertCabEvent({ companyId: customer.company_id, eventType: "quote.accepted", jobId: job.id });
 
-      // Create deposit invoice (50% of max price)
-      const depositAmount = Math.round((latestQuote.price_max || 0) * 0.5 * 100) / 100;
+      // Create deposit invoice (50% of contract_value)
+      const depositAmount = Math.round(contractValue * 0.5 * 100) / 100;
       await (supabase.from("cab_invoices") as any).insert({
         company_id: customer.company_id,
         job_id: job.id,
@@ -170,7 +157,7 @@ export default function CustomerPortalJobDetailPage() {
         payload: { milestone: "deposit", amount: depositAmount },
       });
 
-      // Update job
+      // Update job state
       const nextAction = new Date();
       nextAction.setDate(nextAction.getDate() + 3);
       await (supabase.from("cab_jobs") as any).update({
@@ -208,6 +195,18 @@ export default function CustomerPortalJobDetailPage() {
   }
 
   const milestoneIdx = getMilestoneIndex(job.current_stage_key);
+  const contractVal = job.contract_value;
+
+  // Determine payment unlock logic
+  const depositUnlocked = ["deposit_due", "awaiting_deposit_payment"].includes(job.current_stage_key) || milestoneIdx >= 0;
+  const preinstallUnlocked = milestoneIdx >= PORTAL_MILESTONES.findIndex(m => m.key === "cabinetry_assembled");
+  const finalUnlocked = milestoneIdx >= PORTAL_MILESTONES.findIndex(m => m.key === "practical_completed");
+
+  const paymentMilestones = [
+    { key: "deposit", label: "Deposit (50%)", unlocked: depositUnlocked },
+    { key: "preinstall", label: "Pre-Install (30%)", unlocked: preinstallUnlocked },
+    { key: "final", label: "Final (20%)", unlocked: finalUnlocked },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -229,19 +228,42 @@ export default function CustomerPortalJobDetailPage() {
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-6">
+        {/* Contract summary */}
+        {(contractVal || latestQuote) && (
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h2 className="font-mono text-sm font-bold text-foreground mb-2">Project Value</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {contractVal && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Agreed Contract</p>
+                  <p className="text-lg font-mono font-bold text-foreground">£{Number(contractVal).toLocaleString()}</p>
+                </div>
+              )}
+              {latestQuote && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Quote Range</p>
+                  <p className="text-sm font-mono text-muted-foreground">
+                    £{latestQuote.price_min?.toLocaleString()} – £{latestQuote.price_max?.toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Timeline */}
         <div className="rounded-lg border border-border bg-card p-4">
           <h2 className="font-mono text-sm font-bold text-foreground mb-4">Project Timeline</h2>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {PORTAL_MILESTONES.map((m, idx) => {
-              const isDone = idx <= milestoneIdx;
+              const isDone = idx < milestoneIdx;
               const isCurrent = idx === milestoneIdx;
               return (
                 <div key={m.key} className={cn(
-                  "flex items-center gap-3 rounded-lg border p-3",
+                  "flex items-center gap-3 rounded-lg border p-3 transition-all",
                   isDone ? "border-primary/30 bg-primary/5" :
-                  isCurrent ? "border-primary/50 bg-primary/10" :
-                  "border-border bg-card opacity-60"
+                  isCurrent ? "border-primary bg-primary/10 shadow-sm" :
+                  "border-border bg-card opacity-50"
                 )}>
                   {isDone ? <CheckCircle2 size={18} className="text-primary shrink-0" /> :
                    isCurrent ? <Clock size={18} className="text-primary shrink-0 animate-pulse" /> :
@@ -249,6 +271,7 @@ export default function CustomerPortalJobDetailPage() {
                   <span className={cn("text-sm font-medium", isDone || isCurrent ? "text-foreground" : "text-muted-foreground")}>
                     {m.label}
                   </span>
+                  {isCurrent && <Badge variant="default" className="ml-auto text-[10px]">Current</Badge>}
                 </div>
               );
             })}
@@ -257,7 +280,7 @@ export default function CustomerPortalJobDetailPage() {
             <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-2">
               <Clock size={14} className="text-primary" />
               <span className="text-sm text-foreground">
-                Estimated next action: <strong>{formatDistanceToNow(new Date(job.estimated_next_action_at), { addSuffix: true })}</strong>
+                Next action expected: <strong>{formatDistanceToNow(new Date(job.estimated_next_action_at), { addSuffix: true })}</strong>
               </span>
             </div>
           )}
@@ -266,39 +289,35 @@ export default function CustomerPortalJobDetailPage() {
         {/* Payments */}
         <div className="rounded-lg border border-border bg-card p-4">
           <h2 className="font-mono text-sm font-bold text-foreground mb-3">Payments</h2>
-          {invoices.length === 0 && !latestQuote ? (
-            <p className="text-muted-foreground text-sm">No invoices yet</p>
-          ) : (
-            <div className="space-y-2">
-              {["deposit", "preinstall", "final"].map(milestone => {
-                const inv = invoices.find(i => i.milestone === milestone);
-                const isPaid = inv?.status === "paid";
-                const isDue = inv?.status === "due";
-                const isLocked = !inv;
-                return (
-                  <div key={milestone} className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border",
-                    isPaid ? "border-primary/30 bg-primary/5" :
-                    isDue ? "border-warning/30 bg-warning/5" :
-                    "border-border bg-muted/30 opacity-50"
-                  )}>
-                    <div className="flex items-center gap-2">
-                      {isPaid ? <CheckCircle2 size={16} className="text-primary" /> :
-                       isDue ? <Banknote size={16} className="text-warning" /> :
-                       <Lock size={16} className="text-muted-foreground" />}
-                      <span className="text-sm font-medium capitalize">{milestone}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {inv && <span className="text-sm font-mono">£{inv.amount?.toLocaleString()}</span>}
-                      <Badge variant={isPaid ? "default" : isDue ? "outline" : "secondary"}>
-                        {isPaid ? "Paid" : isDue ? "Due" : "Locked"}
-                      </Badge>
-                    </div>
+          <div className="space-y-2">
+            {paymentMilestones.map(({ key, label, unlocked }) => {
+              const inv = invoices.find(i => i.milestone === key);
+              const isPaid = inv?.status === "paid";
+              const isDue = inv?.status === "due";
+              const isLocked = !inv && !unlocked;
+              return (
+                <div key={key} className={cn(
+                  "flex items-center justify-between p-3 rounded-lg border",
+                  isPaid ? "border-primary/30 bg-primary/5" :
+                  isDue ? "border-amber-500/30 bg-amber-500/5" :
+                  "border-border bg-muted/30 opacity-50"
+                )}>
+                  <div className="flex items-center gap-2">
+                    {isPaid ? <CheckCircle2 size={16} className="text-primary" /> :
+                     isDue ? <Banknote size={16} className="text-amber-500" /> :
+                     <Lock size={16} className="text-muted-foreground" />}
+                    <span className="text-sm font-medium">{label}</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <div className="flex items-center gap-2">
+                    {inv && <span className="text-sm font-mono">£{Number(inv.amount).toLocaleString()}</span>}
+                    <Badge variant={isPaid ? "default" : isDue ? "outline" : "secondary"}>
+                      {isPaid ? "Paid" : isDue ? "Due" : "Locked"}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Quote + Accept */}
