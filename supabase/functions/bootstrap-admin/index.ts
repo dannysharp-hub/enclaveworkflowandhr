@@ -101,6 +101,22 @@ Deno.serve(async (req) => {
 
     if (profErr) throw profErr;
 
+    // Auto-populate cab_company_tenant_map if user has a tenant
+    const { data: profileRow } = await supabaseAdmin
+      .from("profiles")
+      .select("tenant_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (profileRow?.tenant_id) {
+      await supabaseAdmin
+        .from("cab_company_tenant_map")
+        .upsert(
+          { company_id: companyId, tenant_id: profileRow.tenant_id },
+          { onConflict: "company_id" }
+        );
+    }
+
     return new Response(
       JSON.stringify({ success: true, company_id: companyId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

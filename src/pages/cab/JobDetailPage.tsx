@@ -555,13 +555,45 @@ export default function JobDetailPage() {
               </div>
 
               {/* Workshop Job Cross-Link */}
-              {job.legacy_job_id && (
+              {job.legacy_job_id ? (
                 <div className="border-t border-border pt-3">
                   <h4 className="text-xs font-bold text-foreground flex items-center gap-1 mb-1">
                     <Hammer size={12} /> Workshop Job
                   </h4>
                   <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate(`/jobs/${job.legacy_job_id}/builder`)}>
                     Open Workshop Job <ChevronRight size={12} />
+                  </Button>
+                </div>
+              ) : job.production_stage_key === "ready_for_production" && (
+                <div className="border-t border-border pt-3">
+                  <h4 className="text-xs font-bold text-foreground flex items-center gap-1 mb-1">
+                    <Hammer size={12} /> Workshop Handoff
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground mb-1">No workshop job linked yet. Create one manually:</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    disabled={emitting !== null}
+                    onClick={async () => {
+                      setEmitting("handoff");
+                      try {
+                        await insertCabEvent({
+                          companyId: companyId!,
+                          eventType: "job.ready_for_production",
+                          jobId: job.id,
+                          payload: { manual: true },
+                        });
+                        toast({ title: "Workshop job creation triggered" });
+                        // Wait a moment for the trigger to fire
+                        setTimeout(() => { load(); setEmitting(null); }, 1500);
+                      } catch (err: any) {
+                        toast({ title: "Error", description: err.message, variant: "destructive" });
+                        setEmitting(null);
+                      }
+                    }}
+                  >
+                    <Factory size={12} /> {emitting === "handoff" ? "Creating…" : "Create Workshop Job"}
                   </Button>
                 </div>
               )}
