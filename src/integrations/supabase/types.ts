@@ -1245,6 +1245,79 @@ export type Database = {
           },
         ]
       }
+      cab_job_cost_lines: {
+        Row: {
+          company_id: string
+          cost_type: string
+          created_at: string
+          description: string
+          external_ref: string | null
+          id: string
+          incurred_at: string | null
+          job_id: string
+          line_total: number | null
+          qty: number
+          source: string
+          supplier_id: string | null
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          cost_type: string
+          created_at?: string
+          description: string
+          external_ref?: string | null
+          id?: string
+          incurred_at?: string | null
+          job_id: string
+          line_total?: number | null
+          qty?: number
+          source?: string
+          supplier_id?: string | null
+          unit_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          cost_type?: string
+          created_at?: string
+          description?: string
+          external_ref?: string | null
+          id?: string
+          incurred_at?: string | null
+          job_id?: string
+          line_total?: number | null
+          qty?: number
+          source?: string
+          supplier_id?: string | null
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_job_cost_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_job_cost_lines_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_job_cost_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "cab_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_job_files: {
         Row: {
           company_id: string
@@ -1315,6 +1388,7 @@ export type Database = {
       }
       cab_jobs: {
         Row: {
+          actual_labour_hours: number | null
           appointment_requested_at: string | null
           appointment_requested_by: string | null
           assigned_rep_calendar_id: string | null
@@ -1335,6 +1409,7 @@ export type Database = {
           current_stage_key: string | null
           customer_id: string
           customer_signoff_at: string | null
+          estimated_labour_hours: number | null
           estimated_next_action_at: string | null
           ghl_contact_id: string | null
           ghl_opportunity_id: string | null
@@ -1351,9 +1426,11 @@ export type Database = {
           room_type: string | null
           state: string | null
           status: string
+          target_margin_pct: number | null
           updated_at: string
         }
         Insert: {
+          actual_labour_hours?: number | null
           appointment_requested_at?: string | null
           appointment_requested_by?: string | null
           assigned_rep_calendar_id?: string | null
@@ -1374,6 +1451,7 @@ export type Database = {
           current_stage_key?: string | null
           customer_id: string
           customer_signoff_at?: string | null
+          estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
@@ -1390,9 +1468,11 @@ export type Database = {
           room_type?: string | null
           state?: string | null
           status?: string
+          target_margin_pct?: number | null
           updated_at?: string
         }
         Update: {
+          actual_labour_hours?: number | null
           appointment_requested_at?: string | null
           appointment_requested_by?: string | null
           assigned_rep_calendar_id?: string | null
@@ -1413,6 +1493,7 @@ export type Database = {
           current_stage_key?: string | null
           customer_id?: string
           customer_signoff_at?: string | null
+          estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
@@ -1429,6 +1510,7 @@ export type Database = {
           room_type?: string | null
           state?: string | null
           status?: string
+          target_margin_pct?: number | null
           updated_at?: string
         }
         Relationships: [
