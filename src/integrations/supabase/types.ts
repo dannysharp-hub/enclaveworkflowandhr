@@ -9276,6 +9276,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_cab_company_admin: { Args: { _company_id: string }; Returns: boolean }
+      is_cab_company_member: { Args: { _company_id: string }; Returns: boolean }
       is_user_tenant: { Args: { _tenant_id: string }; Returns: boolean }
     }
     Enums: {
