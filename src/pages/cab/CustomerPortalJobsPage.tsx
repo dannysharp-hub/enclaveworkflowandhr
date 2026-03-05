@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { useCompanyBySlug } from "@/hooks/useCompanyBySlug";
 import { getMilestoneIndex, PORTAL_MILESTONES } from "@/lib/cabHelpers";
 import { format, formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -8,16 +9,18 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowRight, LogOut, ShieldCheck, Clock } from "lucide-react";
 
 export default function CustomerPortalJobsPage() {
+  const { companySlug } = useParams();
   const navigate = useNavigate();
+  const { company, loading: companyLoading, error: companyError } = useCompanyBySlug(companySlug);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState("");
 
   const load = useCallback(async () => {
+    if (!company) return;
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { navigate("/portal/login"); return; }
+    if (!user) { navigate(`/portal/${companySlug}/login`); return; }
 
-    // Find customer by auth user id first, fallback to email
     let customer: any = null;
     const { data: profileLink } = await (supabase.from("cab_customer_auth_links" as any) as any)
       .select("customer_id")
@@ -29,13 +32,14 @@ export default function CustomerPortalJobsPage() {
       const { data: c } = await (supabase.from("cab_customers") as any)
         .select("id, first_name, last_name, company_id")
         .eq("id", profileLink.customer_id)
+        .eq("company_id", company.id)
         .single();
       customer = c;
     } else {
-      // Fallback: match by email (v1 compat)
       const { data: c } = await (supabase.from("cab_customers") as any)
         .select("id, first_name, last_name, company_id")
         .eq("email", user.email)
+        .eq("company_id", company.id)
         .limit(1)
         .maybeSingle();
       customer = c;
@@ -47,20 +51,21 @@ export default function CustomerPortalJobsPage() {
     const { data: jobsData } = await (supabase.from("cab_jobs") as any)
       .select("*")
       .eq("customer_id", customer.id)
+      .eq("company_id", company.id)
       .order("created_at", { ascending: false });
 
     setJobs(jobsData ?? []);
     setLoading(false);
-  }, [navigate]);
+  }, [company, companySlug, navigate]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (company) load(); }, [company, load]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/portal/login");
+    navigate(`/portal/${companySlug}/login`);
   };
 
-  if (loading) {
+  if (companyLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center animate-pulse">
@@ -70,13 +75,17 @@ export default function CustomerPortalJobsPage() {
     );
   }
 
+  if (companyError) {
+    return <div className="min-h-screen flex items-center justify-center text-destructive">{companyError}</div>;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck size={20} className="text-primary" />
-            <h1 className="font-mono font-bold text-foreground">Your Projects</h1>
+            <h1 className="font-mono font-bold text-foreground">{company?.name || "Your Projects"}</h1>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">{customerName}</span>
@@ -100,7 +109,7 @@ export default function CustomerPortalJobsPage() {
             return (
               <div
                 key={job.id}
-                onClick={() => navigate(`/portal/cab-job/${job.job_ref}`)}
+                onClick={() => navigate(`/portal/${companySlug}/job/${job.job_ref}`)}
                 className="rounded-lg border border-border bg-card p-4 hover:border-primary/30 transition-colors cursor-pointer group"
               >
                 <div className="flex items-center justify-between mb-2">

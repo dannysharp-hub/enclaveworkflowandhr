@@ -719,8 +719,10 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          primary_domain: string | null
           service_radius_miles: number | null
           settings_json: Json | null
+          slug: string
           timezone: string
           updated_at: string
         }
@@ -730,8 +732,10 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          primary_domain?: string | null
           service_radius_miles?: number | null
           settings_json?: Json | null
+          slug: string
           timezone?: string
           updated_at?: string
         }
@@ -741,12 +745,87 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          primary_domain?: string | null
           service_radius_miles?: number | null
           settings_json?: Json | null
+          slug?: string
           timezone?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      cab_company_invites: {
+        Row: {
+          accepted_at: string | null
+          company_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          role: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          role?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          role?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_company_invites_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_company_memberships: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_company_memberships_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cab_customer_auth_links: {
         Row: {
