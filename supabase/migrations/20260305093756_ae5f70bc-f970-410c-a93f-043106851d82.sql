@@ -1,0 +1,2 @@
+ALTER TABLE public.file_assets DROP CONSTRAINT file_assets_category_check;
+ALTER TABLE public.file_assets ADD CONSTRAINT file_assets_category_check CHECK (category = ANY (ARRAY['SOP','Safety','Machine','HR','JobPack','Template','Finance','Purchasing','Sales','Other']));

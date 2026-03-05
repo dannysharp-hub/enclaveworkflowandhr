@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DocumentDialog from "@/components/DocumentDialog";
-import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen } from "lucide-react";
+import { Upload, Search, FileText, Shield, AlertTriangle, BookOpen, Receipt, ShoppingCart, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DbFile {
@@ -21,6 +21,9 @@ const categoryIcons: Record<string, React.ReactNode> = {
   SOP: <BookOpen size={16} />,
   Machine: <FileText size={16} />,
   HR: <FileText size={16} />,
+  Finance: <DollarSign size={16} />,
+  Purchasing: <ShoppingCart size={16} />,
+  Sales: <Receipt size={16} />,
   Other: <FileText size={16} />,
 };
 
