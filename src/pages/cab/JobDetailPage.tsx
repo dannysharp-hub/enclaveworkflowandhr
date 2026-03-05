@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import QuoteBuilder from "@/components/QuoteBuilder";
 import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
@@ -38,7 +39,7 @@ export default function JobDetailPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+  
   const [emitting, setEmitting] = useState<string | null>(null);
   const [ghlSyncing, setGhlSyncing] = useState(false);
 
@@ -463,9 +464,6 @@ export default function JobDetailPage() {
               {stageKey === "ballpark_sent" && (
                 <Button size="sm" onClick={handleRequestAppointment}><CalendarPlus size={14} /> Request Appointment</Button>
               )}
-              {["appointment_requested", "ballpark_sent", "lead_captured", "quote_viewed"].includes(stageKey) && (
-                <Button size="sm" variant="outline" onClick={() => setQuoteDialogOpen(true)}><FileText size={14} /> Create/Send Quote</Button>
-              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -491,6 +489,9 @@ export default function JobDetailPage() {
               </Button>
             </div>
           </div>
+
+          {/* Quote Builder */}
+          <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
 
           {/* Site Visit Debug Panel */}
           {(() => {
@@ -650,78 +651,6 @@ export default function JobDetailPage() {
         </div>
       </div>
 
-      <CreateQuoteDialog
-        open={quoteDialogOpen}
-        onOpenChange={setQuoteDialogOpen}
-        companyId={companyId!}
-        job={job}
-        currentVersion={quotes.length}
-        onSuccess={load}
-      />
     </div>
-  );
-}
-
-function CreateQuoteDialog({ open, onOpenChange, companyId, job, currentVersion, onSuccess }: {
-  open: boolean; onOpenChange: (o: boolean) => void; companyId: string; job: any; currentVersion: number; onSuccess: () => void;
-}) {
-  const [priceMin, setPriceMin] = useState("");
-  const [priceMax, setPriceMax] = useState("");
-  const [scope, setScope] = useState("");
-  const [docUrl, setDocUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await (supabase.from("cab_quotes") as any).insert({
-        company_id: companyId,
-        job_id: job.id,
-        version: currentVersion + 1,
-        status: "sent",
-        price_min: parseFloat(priceMin),
-        price_max: parseFloat(priceMax),
-        scope_summary: scope || null,
-        document_url: docUrl || null,
-        sent_at: new Date().toISOString(),
-      });
-
-      await insertCabEvent({ companyId, eventType: "quote.sent", jobId: job.id });
-
-      const nextAction = new Date();
-      nextAction.setDate(nextAction.getDate() + 7);
-      await (supabase.from("cab_jobs") as any).update({
-        status: "quoted",
-        state: "awaiting_acceptance",
-        current_stage_key: "quote_sent",
-        estimated_next_action_at: nextAction.toISOString(),
-      }).eq("id", job.id);
-
-      toast({ title: "Quote sent" });
-      onOpenChange(false);
-      onSuccess();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle className="font-mono">Send Quote</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Price Min (£) *</Label><Input required type="number" step="0.01" value={priceMin} onChange={e => setPriceMin(e.target.value)} /></div>
-            <div><Label>Price Max (£) *</Label><Input required type="number" step="0.01" value={priceMax} onChange={e => setPriceMax(e.target.value)} /></div>
-          </div>
-          <div><Label>Scope Summary</Label><textarea className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" rows={3} value={scope} onChange={e => setScope(e.target.value)} /></div>
-          <div><Label>Document URL</Label><Input value={docUrl} onChange={e => setDocUrl(e.target.value)} placeholder="https://..." /></div>
-          <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Sending…" : "Send Quote"}</Button>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

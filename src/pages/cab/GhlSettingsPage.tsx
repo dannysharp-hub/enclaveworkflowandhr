@@ -340,14 +340,45 @@ export default function GhlSettingsPage() {
             </p>
           </div>
           <div className="border-l-2 border-primary/30 pl-3">
-            <p className="font-bold text-foreground">3. Quote Follow-up</p>
+            <p className="font-bold text-foreground">3. Quote Sent Follow-Up</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_quote_sent</code></p>
-            <p>Actions: Day 1 SMS → Day 3 email → Day 7 call task</p>
+            <p className="mt-1 font-medium text-foreground">Day 1 — SMS:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              "Hi {"{{contact.first_name}}"}, your detailed quote is ready to view on your project portal. Take a look and let us know if you have any questions."
+            </p>
+            <p className="mt-2 font-medium text-foreground">Day 3 — Email:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              Subject: Your quote from {"{{company.name}}"} is ready{"\n\n"}
+              Hi {"{{contact.first_name}}"},\n\n
+              Your detailed quote is available on your project portal. You can review the breakdown, scope of works, and accept online when you're ready.\n\n
+              Once accepted, we'll issue your deposit invoice and get your project scheduled.\n\n
+              Any questions? Just reply or call us on {"{{company.phone}}"}.
+            </p>
+            <p className="mt-2 font-medium text-foreground">Day 7 — Call task:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              "Follow up on quote sent to {"{{contact.first_name}} {{contact.last_name}}"} — check if ready to proceed."
+            </p>
           </div>
           <div className="border-l-2 border-primary/30 pl-3">
             <p className="font-bold text-foreground">4. Quote Viewed</p>
             <p>Trigger: Tag added = <code className="font-mono text-primary">encl_quote_viewed</code></p>
-            <p>Action: Internal notification — "Quote viewed — follow up if needed"</p>
+            <p>Action: Internal notification — "Customer has viewed their quote — consider following up"</p>
+          </div>
+          <div className="border-l-2 border-primary/30 pl-3">
+            <p className="font-bold text-foreground">5. Quote Accepted</p>
+            <p>Trigger: Tag added = <code className="font-mono text-primary">encl_quote_accepted</code></p>
+            <p className="mt-1 font-medium text-foreground">Immediate — SMS:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              "Hi {"{{contact.first_name}}"}, thank you for accepting your quote! Your deposit invoice is now ready. We'll confirm your project start date once payment clears."
+            </p>
+            <p className="mt-2 font-medium text-foreground">Immediate — Email:</p>
+            <p className="bg-muted p-2 rounded mt-1 font-mono text-[10px]">
+              Subject: Quote accepted — next steps{"\n\n"}
+              Hi {"{{contact.first_name}}"},\n\n
+              Great news — your quote has been accepted! Your 50% deposit invoice has been generated.\n\n
+              Please make payment using the bank details on your portal, referencing your job number.\n\n
+              Once we receive your deposit, we'll schedule your project and begin ordering materials.
+            </p>
           </div>
           <div className="border-l-2 border-primary/30 pl-3">
             <p className="font-bold text-foreground">5. Appointment Booked Confirmation</p>

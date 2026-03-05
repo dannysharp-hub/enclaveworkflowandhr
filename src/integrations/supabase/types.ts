@@ -1386,6 +1386,57 @@ export type Database = {
           },
         ]
       }
+      cab_quote_items: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          qty: number
+          quote_id: string
+          sort_order: number
+          unit_price: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          qty?: number
+          quote_id: string
+          sort_order?: number
+          unit_price?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          qty?: number
+          quote_id?: string
+          sort_order?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_quote_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "cab_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_quote_views: {
         Row: {
           company_id: string
@@ -1452,9 +1503,11 @@ export type Database = {
           job_id: string
           price_max: number | null
           price_min: number | null
+          scope_markdown: string | null
           scope_summary: string | null
           sent_at: string | null
           status: string
+          terms_markdown: string | null
           updated_at: string
           version: number
         }
@@ -1468,9 +1521,11 @@ export type Database = {
           job_id: string
           price_max?: number | null
           price_min?: number | null
+          scope_markdown?: string | null
           scope_summary?: string | null
           sent_at?: string | null
           status?: string
+          terms_markdown?: string | null
           updated_at?: string
           version?: number
         }
@@ -1484,9 +1539,11 @@ export type Database = {
           job_id?: string
           price_max?: number | null
           price_min?: number | null
+          scope_markdown?: string | null
           scope_summary?: string | null
           sent_at?: string | null
           status?: string
+          terms_markdown?: string | null
           updated_at?: string
           version?: number
         }
