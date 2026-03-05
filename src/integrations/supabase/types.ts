@@ -678,6 +678,45 @@ export type Database = {
         }
         Relationships: []
       }
+      cab_customer_auth_links: {
+        Row: {
+          auth_user_id: string
+          company_id: string
+          created_at: string
+          customer_id: string
+          id: string
+        }
+        Insert: {
+          auth_user_id: string
+          company_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+        }
+        Update: {
+          auth_user_id?: string
+          company_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_customer_auth_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_customer_auth_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "cab_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_customers: {
         Row: {
           address_line_1: string | null
@@ -879,6 +918,29 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "cab_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_job_sequences: {
+        Row: {
+          company_id: string
+          next_number: number
+        }
+        Insert: {
+          company_id: string
+          next_number?: number
+        }
+        Update: {
+          company_id?: string
+          next_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_job_sequences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "cab_companies"
             referencedColumns: ["id"]
           },
         ]
@@ -8927,6 +8989,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cab_next_job_number: { Args: { _company_id: string }; Returns: number }
       check_staff_stage_authorisation: {
         Args: { _staff_id: string; _stage_name: string }
         Returns: {

@@ -11,12 +11,11 @@ export async function getCabCompanyId(): Promise<string | null> {
   return data?.company_id ?? null;
 }
 
-/** Generate next sequential job_ref for a company: "001_firstname" */
+/** Generate next sequential job_ref for a company (race-safe via DB function) */
 export async function generateJobRef(companyId: string, firstName: string, lastName: string): Promise<string> {
-  const { count } = await (supabase.from("cab_jobs") as any)
-    .select("id", { count: "exact", head: true })
-    .eq("company_id", companyId);
-  const seq = ((count ?? 0) + 1).toString().padStart(3, "0");
+  const { data, error } = await supabase.rpc("cab_next_job_number", { _company_id: companyId } as any);
+  if (error) throw error;
+  const seq = (data as number).toString().padStart(3, "0");
   const namePart = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, "");
   return `${seq}_${namePart}`;
 }
