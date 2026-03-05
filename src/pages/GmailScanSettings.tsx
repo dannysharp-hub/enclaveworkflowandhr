@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -27,6 +27,7 @@ interface ExtractedDocument {
   ai_matched_job_id: string | null;
   ai_match_reason: string | null;
   ai_extracted_data: Record<string, any>;
+  storage_path: string | null;
   status: string;
   created_at: string;
   gmail_scanned_emails: {
@@ -61,6 +62,9 @@ export default function GmailScanSettings() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [hasGmailScope, setHasGmailScope] = useState(false);
+  const reviewPanelRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) node.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const fetchStatus = useCallback(async () => {
     if (!session?.access_token) return;
@@ -313,7 +317,7 @@ export default function GmailScanSettings() {
 
           {/* Document Review Panel */}
           {showDocuments && (
-            <div className="glass-panel rounded-lg p-5 space-y-4 max-w-3xl">
+            <div ref={reviewPanelRef} className="glass-panel rounded-lg p-5 space-y-4 max-w-3xl">
               <div className="flex items-center justify-between">
                 <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">
                   Documents Pending Review
@@ -359,6 +363,15 @@ export default function GmailScanSettings() {
                       )}
 
                       <div className="flex items-center gap-2 pl-8">
+                        <button
+                          onClick={() => {
+                            const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/authenticated/documents/${doc.storage_path}`;
+                            window.open(url, "_blank");
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
+                        >
+                          <Eye size={12} /> View
+                        </button>
                         <button
                           onClick={() => handleReview(doc.id, "approve", doc.ai_matched_job_id || undefined)}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-success/10 text-success text-xs font-medium hover:bg-success/20"
