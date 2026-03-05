@@ -70,6 +70,7 @@ import TeamPage from "./pages/cab/TeamPage";
 import CabSuppliersPage from "./pages/cab/SuppliersPage";
 import ProductionBoardPage from "./pages/cab/ProductionBoardPage";
 import InstallerJobsPage from "./pages/cab/InstallerJobsPage";
+import ProfitWatchPage from "./pages/cab/ProfitWatchPage";
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
 const queryClient = new QueryClient();
@@ -120,6 +121,7 @@ const AppRoutes = () => (
               <Route path="/admin/bootstrap" element={<BootstrapPage />} />
               <Route path="/admin/leads" element={<LeadsPage />} />
               <Route path="/admin/jobs/:jobRef" element={<JobDetailPage />} />
+              <Route path="/admin/profit-watch" element={<ProfitWatchPage />} />
               <Route path="/admin/ghl" element={<GhlSettingsPage />} />
               <Route path="/admin/webhooks" element={<WebhookLogsPage />} />
               <Route path="/admin/team" element={<TeamPage />} />

@@ -1245,6 +1245,63 @@ export type Database = {
           },
         ]
       }
+      cab_job_alerts: {
+        Row: {
+          alert_key: string
+          alert_type: string
+          company_id: string
+          created_at: string | null
+          id: string
+          is_resolved: boolean | null
+          job_id: string
+          message: string
+          resolved_at: string | null
+          severity: string
+          updated_at: string | null
+        }
+        Insert: {
+          alert_key: string
+          alert_type: string
+          company_id: string
+          created_at?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          job_id: string
+          message: string
+          resolved_at?: string | null
+          severity: string
+          updated_at?: string | null
+        }
+        Update: {
+          alert_key?: string
+          alert_type?: string
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          job_id?: string
+          message?: string
+          resolved_at?: string | null
+          severity?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_job_alerts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_job_alerts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_job_cost_lines: {
         Row: {
           company_id: string
@@ -1388,6 +1445,7 @@ export type Database = {
       }
       cab_jobs: {
         Row: {
+          actual_cost_total: number | null
           actual_labour_hours: number | null
           appointment_requested_at: string | null
           appointment_requested_by: string | null
@@ -1402,6 +1460,12 @@ export type Database = {
           ballpark_sent_at: string | null
           ballpark_sent_by: string | null
           booking_url: string | null
+          budget_delivery: number | null
+          budget_labour: number | null
+          budget_materials: number | null
+          budget_misc: number | null
+          budget_overheads: number | null
+          budget_subcontract: number | null
           company_id: string
           contract_currency: string | null
           contract_value: number | null
@@ -1411,6 +1475,9 @@ export type Database = {
           customer_signoff_at: string | null
           estimated_labour_hours: number | null
           estimated_next_action_at: string | null
+          estimated_remaining_cost: number | null
+          forecast_cost_total: number | null
+          forecast_margin_pct: number | null
           ghl_contact_id: string | null
           ghl_opportunity_id: string | null
           id: string
@@ -1422,6 +1489,7 @@ export type Database = {
           job_title: string
           legacy_job_id: string | null
           production_stage_key: string
+          profit_last_calculated_at: string | null
           property_address_json: Json | null
           room_type: string | null
           state: string | null
@@ -1430,6 +1498,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_cost_total?: number | null
           actual_labour_hours?: number | null
           appointment_requested_at?: string | null
           appointment_requested_by?: string | null
@@ -1444,6 +1513,12 @@ export type Database = {
           ballpark_sent_at?: string | null
           ballpark_sent_by?: string | null
           booking_url?: string | null
+          budget_delivery?: number | null
+          budget_labour?: number | null
+          budget_materials?: number | null
+          budget_misc?: number | null
+          budget_overheads?: number | null
+          budget_subcontract?: number | null
           company_id: string
           contract_currency?: string | null
           contract_value?: number | null
@@ -1453,6 +1528,9 @@ export type Database = {
           customer_signoff_at?: string | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
+          estimated_remaining_cost?: number | null
+          forecast_cost_total?: number | null
+          forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
           id?: string
@@ -1464,6 +1542,7 @@ export type Database = {
           job_title: string
           legacy_job_id?: string | null
           production_stage_key?: string
+          profit_last_calculated_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
           state?: string | null
@@ -1472,6 +1551,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_cost_total?: number | null
           actual_labour_hours?: number | null
           appointment_requested_at?: string | null
           appointment_requested_by?: string | null
@@ -1486,6 +1566,12 @@ export type Database = {
           ballpark_sent_at?: string | null
           ballpark_sent_by?: string | null
           booking_url?: string | null
+          budget_delivery?: number | null
+          budget_labour?: number | null
+          budget_materials?: number | null
+          budget_misc?: number | null
+          budget_overheads?: number | null
+          budget_subcontract?: number | null
           company_id?: string
           contract_currency?: string | null
           contract_value?: number | null
@@ -1495,6 +1581,9 @@ export type Database = {
           customer_signoff_at?: string | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
+          estimated_remaining_cost?: number | null
+          forecast_cost_total?: number | null
+          forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
           id?: string
@@ -1506,6 +1595,7 @@ export type Database = {
           job_title?: string
           legacy_job_id?: string | null
           production_stage_key?: string
+          profit_last_calculated_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
           state?: string | null
@@ -9967,6 +10057,7 @@ export type Database = {
       cab_next_job_number: { Args: { _company_id: string }; Returns: number }
       cab_next_po_ref: { Args: { _company_id: string }; Returns: string }
       cab_next_rfq_ref: { Args: { _company_id: string }; Returns: string }
+      cab_recalc_job_profit: { Args: { _job_id: string }; Returns: undefined }
       check_staff_stage_authorisation: {
         Args: { _staff_id: string; _stage_name: string }
         Returns: {
