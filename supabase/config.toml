@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.ghl-form]
 verify_jwt = false
+
+[functions.ghl-webhook]
+verify_jwt = false
