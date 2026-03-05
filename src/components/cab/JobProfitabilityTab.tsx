@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Package, Wrench,
-  Truck, Building2, HelpCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Target,
+  Truck, Building2, HelpCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Target, RefreshCw,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -62,7 +62,7 @@ export default function JobProfitabilityTab({ companyId, job, onRefresh }: Props
   const [remainingCost, setRemainingCost] = useState("");
   const [targetMargin, setTargetMargin] = useState("");
   const [savingBudgets, setSavingBudgets] = useState(false);
-
+  const [recalcing, setRecalcing] = useState(false);
   // Form state
   const [formType, setFormType] = useState("materials");
   const [formDesc, setFormDesc] = useState("");
@@ -186,6 +186,26 @@ export default function JobProfitabilityTab({ companyId, job, onRefresh }: Props
     load();
   };
 
+  const handleRecalcNow = async () => {
+    setRecalcing(true);
+    try {
+      const { error } = await (supabase.from("cab_events") as any).insert({
+        company_id: companyId,
+        event_type: "profit.recalc_requested",
+        job_id: job.id,
+        payload_json: { job_id: job.id },
+        status: "pending",
+      });
+      if (error) throw error;
+      toast({ title: "Recalc queued", description: "Profit recalculation will run shortly." });
+      // Poll for update after short delay
+      setTimeout(() => { load(); onRefresh(); }, 1500);
+      setTimeout(() => { load(); onRefresh(); }, 4000);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setRecalcing(false); }
+  };
+
   if (loading) {
     return <div className="h-20 flex items-center justify-center"><div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
@@ -219,11 +239,16 @@ export default function JobProfitabilityTab({ companyId, job, onRefresh }: Props
         </div>
       )}
 
-      {/* Summary Cards */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-        <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
-          <TrendingUp size={14} className="text-primary" /> Profitability
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+            <TrendingUp size={14} className="text-primary" /> Profitability
+          </h3>
+          <Button size="sm" variant="outline" className="text-[10px] h-7 gap-1" onClick={handleRecalcNow} disabled={recalcing}>
+            <RefreshCw size={10} className={recalcing ? "animate-spin" : ""} />
+            {recalcing ? "Queued…" : "Recalculate Profit Now"}
+          </Button>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-md border border-border p-3 space-y-1">
