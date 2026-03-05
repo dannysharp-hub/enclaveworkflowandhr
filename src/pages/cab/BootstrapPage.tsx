@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Rocket, Link2 } from "lucide-react";
 import { getCabCompanyId } from "@/lib/cabHelpers";
+import LabourRateSettings from "@/components/cab/LabourRateSettings";
 
 export default function BootstrapPage() {
   const { user, tenantId } = useAuth();
@@ -110,6 +111,13 @@ export default function BootstrapPage() {
             ) : (
               <p className="text-xs text-muted-foreground">No tenant detected in your profile. Log into the workshop side first.</p>
             )}
+          </div>
+        )}
+
+        {/* Labour rate settings */}
+        {companyId && (
+          <div className="text-left">
+            <LabourRateSettings companyId={companyId} />
           </div>
         )}
       </div>

@@ -1627,6 +1627,47 @@ export type Database = {
           },
         ]
       }
+      cab_labour_rates: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          currency: string
+          effective_from: string
+          hourly_rate: number
+          id: string
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          currency?: string
+          effective_from?: string
+          hourly_rate?: number
+          id?: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          currency?: string
+          effective_from?: string
+          hourly_rate?: number
+          id?: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_labour_rates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_payments: {
         Row: {
           amount: number
