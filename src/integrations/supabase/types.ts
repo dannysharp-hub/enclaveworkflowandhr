@@ -949,6 +949,8 @@ export type Database = {
         Row: {
           assigned_user_id: string | null
           company_id: string
+          contract_currency: string | null
+          contract_value: number | null
           created_at: string
           current_stage_key: string | null
           customer_id: string
@@ -967,6 +969,8 @@ export type Database = {
         Insert: {
           assigned_user_id?: string | null
           company_id: string
+          contract_currency?: string | null
+          contract_value?: number | null
           created_at?: string
           current_stage_key?: string | null
           customer_id: string
@@ -985,6 +989,8 @@ export type Database = {
         Update: {
           assigned_user_id?: string | null
           company_id?: string
+          contract_currency?: string | null
+          contract_value?: number | null
           created_at?: string
           current_stage_key?: string | null
           customer_id?: string

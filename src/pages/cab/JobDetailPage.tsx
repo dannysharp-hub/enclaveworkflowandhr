@@ -1,23 +1,34 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useParams } from "react-router-dom";
-import { getCabCompanyId, insertCabEvent } from "@/lib/cabHelpers";
+import { getCabCompanyId, getCabCompany, insertCabEvent, estimatePostcodeDistance } from "@/lib/cabHelpers";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
+  Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle,
 } from "lucide-react";
+
+/* ─── Testing event buttons ─── */
+const TEST_EVENTS = [
+  { eventType: "materials.ordered", label: "Materials Ordered", icon: Package },
+  { eventType: "cnc.started", label: "CNC Started", icon: Cog },
+  { eventType: "job.assembled", label: "Job Assembled", icon: Hammer },
+  { eventType: "install.booked", label: "Install Booked", icon: Truck },
+  { eventType: "install.completed", label: "Install Completed", icon: ClipboardCheck },
+  { eventType: "job.practical_completed", label: "Practical Complete", icon: Star },
+] as const;
 
 export default function JobDetailPage() {
   const { jobRef } = useParams();
   const navigate = useNavigate();
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [company, setCompany] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
   const [customer, setCustomer] = useState<any>(null);
   const [quotes, setQuotes] = useState<any[]>([]);
@@ -25,11 +36,15 @@ export default function JobDetailPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+  const [emitting, setEmitting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
     if (!cid) return;
     setCompanyId(cid);
+
+    const companyData = await getCabCompany(cid);
+    setCompany(companyData);
 
     const { data: jobData } = await (supabase.from("cab_jobs") as any)
       .select("*")
@@ -68,6 +83,27 @@ export default function JobDetailPage() {
   };
 
   const handleRequestAppointment = async () => {
+    // Postcode eligibility check
+    const jobPostcode = job.property_address_json?.postcode;
+    if (jobPostcode && company?.base_postcode && company?.service_radius_miles) {
+      const dist = estimatePostcodeDistance(company.base_postcode, jobPostcode);
+      if (dist !== null && dist > company.service_radius_miles) {
+        await insertCabEvent({
+          companyId: companyId!,
+          eventType: "appointment.requested_out_of_area",
+          jobId: job.id,
+          payload: { distance_miles: Math.round(dist), postcode: jobPostcode },
+        });
+        toast({
+          title: "Outside service area",
+          description: `${jobPostcode} is ~${Math.round(dist)} miles away (limit: ${company.service_radius_miles}mi). Manual review required.`,
+          variant: "destructive",
+        });
+        load();
+        return;
+      }
+    }
+
     const nextAction = new Date();
     nextAction.setDate(nextAction.getDate() + 3);
     await insertCabEvent({ companyId: companyId!, eventType: "appointment.requested", jobId: job.id });
@@ -96,21 +132,28 @@ export default function JobDetailPage() {
       amount: inv.amount,
     });
 
+    // The DB trigger on cab_events handles job state transitions
     await insertCabEvent({
       companyId: companyId!, eventType: "invoice.paid", jobId: job.id,
       payload: { milestone: inv.milestone, method },
     });
 
-    if (inv.milestone === "deposit") {
-      await updateJob({
-        current_stage_key: "project_confirmed",
-        state: "active_production",
-        status: "active",
-      });
-    }
-
     toast({ title: "Payment recorded" });
     load();
+  };
+
+  const handleEmitTestEvent = async (eventType: string) => {
+    setEmitting(eventType);
+    try {
+      // The DB trigger handles all state transitions automatically
+      await insertCabEvent({ companyId: companyId!, eventType, jobId: job.id });
+      toast({ title: `Event emitted: ${eventType}` });
+      // Small delay to let trigger process
+      await new Promise(r => setTimeout(r, 300));
+      await load();
+    } finally {
+      setEmitting(null);
+    }
   };
 
   if (loading) {
@@ -125,17 +168,20 @@ export default function JobDetailPage() {
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/admin/leads")}><ArrowLeft size={16} /></Button>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-xs text-muted-foreground">{job.job_ref}</span>
             <Badge variant="outline">{job.status}</Badge>
             <Badge variant="secondary" className="text-[10px]">{stageKey?.replace(/_/g, " ")}</Badge>
+            {job.contract_value && (
+              <Badge variant="default" className="text-[10px]">£{Number(job.contract_value).toLocaleString()}</Badge>
+            )}
           </div>
           <h1 className="text-xl font-bold text-foreground">{job.job_title}</h1>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column — Details + actions */}
+        {/* Left column */}
         <div className="lg:col-span-2 space-y-4">
           {/* Customer */}
           <div className="rounded-lg border border-border bg-card p-4">
@@ -169,11 +215,35 @@ export default function JobDetailPage() {
               {stageKey === "ballpark_sent" && (
                 <Button size="sm" onClick={handleRequestAppointment}><CalendarPlus size={14} /> Request Appointment</Button>
               )}
-              {["appointment_requested", "ballpark_sent", "lead_captured"].includes(stageKey) || stageKey === "quote_viewed" ? (
+              {["appointment_requested", "ballpark_sent", "lead_captured", "quote_viewed"].includes(stageKey) && (
                 <Button size="sm" variant="outline" onClick={() => setQuoteDialogOpen(true)}><FileText size={14} /> Create/Send Quote</Button>
-              ) : null}
+              )}
             </div>
           </div>
+
+          {/* Test event emitters */}
+          {job.status !== "closed" && (
+            <div className="rounded-lg border border-dashed border-amber-500/50 bg-amber-500/5 p-4 space-y-3">
+              <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                <AlertTriangle size={14} className="text-amber-500" /> Testing: Emit Events
+              </h3>
+              <p className="text-xs text-muted-foreground">These trigger the event-driven state machine via the DB trigger.</p>
+              <div className="flex flex-wrap gap-2">
+                {TEST_EVENTS.map(({ eventType, label, icon: Icon }) => (
+                  <Button
+                    key={eventType}
+                    size="sm"
+                    variant="outline"
+                    disabled={emitting !== null}
+                    onClick={() => handleEmitTestEvent(eventType)}
+                    className="text-xs"
+                  >
+                    <Icon size={12} /> {emitting === eventType ? "…" : label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quotes */}
           {quotes.length > 0 && (
@@ -202,8 +272,9 @@ export default function JobDetailPage() {
                   <div key={inv.id} className="flex items-center justify-between p-2 rounded border border-border">
                     <div>
                       <span className="font-mono text-xs">{inv.reference}</span>
-                      <span className="ml-2 text-sm">£{inv.amount?.toLocaleString()}</span>
+                      <span className="ml-2 text-sm">£{Number(inv.amount).toLocaleString()}</span>
                       <Badge className="ml-2" variant={inv.status === "paid" ? "default" : "outline"}>{inv.status}</Badge>
+                      <span className="ml-2 text-xs text-muted-foreground capitalize">{inv.milestone}</span>
                     </div>
                     {inv.status === "due" && (
                       <div className="flex gap-1">
