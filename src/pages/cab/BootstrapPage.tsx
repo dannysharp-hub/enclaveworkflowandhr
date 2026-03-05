@@ -27,25 +27,36 @@ export default function BootstrapPage() {
         return;
       }
 
-      // Create company
-      const { data: company, error: compErr } = await (supabase.from("cab_companies") as any)
-        .insert({
-          name: "Enclave Cabinetry",
-          base_postcode: "PE20 3QF",
-          service_radius_miles: 50,
-          brand_phone: "07944608098",
-          timezone: "Europe/London",
-        })
+      // Check if company already exists
+      const { data: existingCompany } = await (supabase.from("cab_companies") as any)
         .select("id")
-        .single();
+        .eq("name", "Enclave Cabinetry")
+        .maybeSingle();
 
-      if (compErr) throw compErr;
+      let companyId: string;
 
-      // Create user profile
+      if (existingCompany?.id) {
+        companyId = existingCompany.id;
+      } else {
+        const { data: company, error: compErr } = await (supabase.from("cab_companies") as any)
+          .insert({
+            name: "Enclave Cabinetry",
+            base_postcode: "PE20 3QF",
+            service_radius_miles: 50,
+            brand_phone: "07944608098",
+            timezone: "Europe/London",
+          })
+          .select("id")
+          .single();
+        if (compErr) throw compErr;
+        companyId = company.id;
+      }
+
+      // Link user profile
       const { error: profErr } = await (supabase.from("cab_user_profiles") as any)
         .upsert({
           id: user.id,
-          company_id: company.id,
+          company_id: companyId,
           name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin",
           email: user.email!,
           role: "admin",
@@ -54,7 +65,7 @@ export default function BootstrapPage() {
 
       if (profErr) throw profErr;
 
-      toast({ title: "Company created", description: "Enclave Cabinetry is live." });
+      toast({ title: "Linked", description: existingCompany ? "Linked to existing Enclave Cabinetry." : "Enclave Cabinetry created and linked." });
       navigate("/admin/leads");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
