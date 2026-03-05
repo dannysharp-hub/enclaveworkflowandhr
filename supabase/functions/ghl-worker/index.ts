@@ -23,10 +23,14 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
     case "appointment.requested": {
       const calId = (payload?.calendar_id as string) || "";
       const repName = (payload?.rep_name as string) || "Alistair";
+      const bookingUrl = (payload?.booking_url as string) || "";
+      const jobRefVal = (payload?.job_ref as string) || "";
+      let noteText = `Booking calendar: ${calId} (${repName})`;
+      if (bookingUrl) noteText += `\nBooking link for job ${jobRefVal}: ${bookingUrl}`;
       return {
         stageKey: "appointment_requested",
         tags: ["encl_appointment_requested"],
-        noteExtra: `Booking calendar: ${calId} (${repName})`,
+        noteExtra: noteText,
       };
     }
     case "appointment.booked": {

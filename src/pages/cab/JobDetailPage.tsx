@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
-  CalendarDays, Calendar,
+  CalendarDays, Calendar, Copy,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
@@ -117,11 +117,15 @@ export default function JobDetailPage() {
 
     await updateJob({ assigned_rep_name: repName, assigned_rep_calendar_id: calId });
 
+    const bookingUrl = calId
+      ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
+      : "";
+
     await insertCabEvent({
       companyId: companyId!,
       eventType: "appointment.requested",
       jobId: job.id,
-      payload: { rep_name: repName, calendar_id: calId },
+      payload: { rep_name: repName, calendar_id: calId, booking_url: bookingUrl, job_ref: job.job_ref },
     });
 
     await updateJob({
@@ -174,13 +178,20 @@ export default function JobDetailPage() {
   const handleSendBookingLink = async () => {
     setEmitting("booking_link");
     try {
+      const calId = job.assigned_rep_calendar_id || company?.settings_json?.site_visit_calendar_id || "";
+      const bookingUrl = calId
+        ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
+        : "";
+
       await insertCabEvent({
         companyId: companyId!,
         eventType: "appointment.requested",
         jobId: job.id,
         payload: {
           rep_name: job.assigned_rep_name || company?.settings_json?.site_visit_rep_name || "Alistair",
-          calendar_id: job.assigned_rep_calendar_id || company?.settings_json?.site_visit_calendar_id || "",
+          calendar_id: calId,
+          booking_url: bookingUrl,
+          job_ref: job.job_ref,
           test: true,
         },
       });
@@ -328,42 +339,63 @@ export default function JobDetailPage() {
           </div>
 
           {/* Site Visit Debug Panel */}
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
-            <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
-              <CalendarDays size={14} className="text-primary" /> Site Visit Booking
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-muted-foreground">Rep:</span>{" "}
-                <span className="font-mono">{job.assigned_rep_name || settings.site_visit_rep_name || "Alistair"}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Calendar ID:</span>{" "}
-                <span className="font-mono">{job.assigned_rep_calendar_id || settings.site_visit_calendar_id || "not set"}</span>
-              </div>
-              {settings.site_visit_booking_url && (
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Booking URL:</span>{" "}
-                  <a href={settings.site_visit_booking_url} target="_blank" rel="noopener noreferrer" className="font-mono text-primary underline">
-                    {settings.site_visit_booking_url}
-                  </a>
+          {(() => {
+            const siteCalId = job.assigned_rep_calendar_id || settings.site_visit_calendar_id || "";
+            const jobBookingUrl = siteCalId
+              ? `https://updates.physio-leads.com/widget/booking/${siteCalId}?job_ref=${encodeURIComponent(job.job_ref)}`
+              : "";
+            return (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+                <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                  <CalendarDays size={14} className="text-primary" /> Site Visit Booking
+                </h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Rep:</span>{" "}
+                    <span className="font-mono">{job.assigned_rep_name || settings.site_visit_rep_name || "Alistair"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Calendar ID:</span>{" "}
+                    <span className="font-mono">{siteCalId || "not set"}</span>
+                  </div>
                 </div>
-              )}
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={emitting !== null}
-              onClick={handleSendBookingLink}
-              className="text-xs"
-            >
-              <Send size={12} />
-              {emitting === "booking_link" ? "Sending…" : "Send Booking Link Now (test)"}
-            </Button>
-            <p className="text-[10px] text-muted-foreground">
-              Inserts an <code className="font-mono">appointment.requested</code> event. GHL workflow sends the SMS with booking link.
-            </p>
-          </div>
+                {jobBookingUrl && (
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Booking Link (includes job_ref):</span>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-[10px] bg-muted p-2 rounded font-mono break-all select-all">
+                        {jobBookingUrl}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 h-7 text-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText(jobBookingUrl);
+                          toast({ title: "Booking link copied" });
+                        }}
+                      >
+                        <Copy size={12} /> Copy
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={emitting !== null}
+                  onClick={handleSendBookingLink}
+                  className="text-xs"
+                >
+                  <Send size={12} />
+                  {emitting === "booking_link" ? "Sending…" : "Send Booking Link Now (test)"}
+                </Button>
+                <p className="text-[10px] text-muted-foreground">
+                  Inserts an <code className="font-mono">appointment.requested</code> event with booking URL. GHL workflow sends the SMS.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Test event emitters */}
           {job.status !== "closed" && (
