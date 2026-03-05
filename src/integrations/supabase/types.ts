@@ -837,6 +837,61 @@ export type Database = {
           },
         ]
       }
+      cab_ghl_sync_log: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          error: string | null
+          event_id: string | null
+          id: string
+          job_id: string | null
+          success: boolean
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          error?: string | null
+          event_id?: string | null
+          id?: string
+          job_id?: string | null
+          success?: boolean
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          error?: string | null
+          event_id?: string | null
+          id?: string
+          job_id?: string | null
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_ghl_sync_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_ghl_sync_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "cab_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_ghl_sync_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_invoices: {
         Row: {
           amount: number
