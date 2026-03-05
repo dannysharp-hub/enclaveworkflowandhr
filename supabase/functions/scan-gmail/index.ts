@@ -448,6 +448,7 @@ Deno.serve(async (req) => {
               });
 
             // Insert document record
+            const autoFile = classification.confidence >= 0.85;
             await supabaseAdmin.from("gmail_extracted_documents").insert({
               tenant_id: tenantId,
               scanned_email_id: emailRecord.id,
@@ -460,8 +461,46 @@ Deno.serve(async (req) => {
               ai_match_reason: classification.reason,
               ai_extracted_data: classification.extracted_data,
               storage_path: storagePath,
-              status: classification.confidence >= 0.85 ? "auto_filed" : "pending",
+              status: autoFile ? "auto_filed" : "pending",
             });
+
+            // Auto-filed docs: also create file_assets record and link to job
+            if (autoFile) {
+              const docTypeLabel: Record<string, string> = {
+                invoice: "Invoice", bill: "Bill", statement: "Statement",
+                remittance: "Remittance", quote: "Quote", purchase_order: "Purchase Order",
+                credit_note: "Credit Note", receipt: "Receipt", unknown: "Document",
+              };
+              const category = ["invoice", "bill", "credit_note", "receipt", "statement", "remittance"].includes(classification.document_type)
+                ? "Finance"
+                : classification.document_type === "purchase_order" ? "Purchasing"
+                : classification.document_type === "quote" ? "Sales"
+                : "Other";
+              const title = `${docTypeLabel[classification.document_type] || "Document"} — ${att.filename}`;
+
+              const { data: fileAsset } = await supabaseAdmin
+                .from("file_assets")
+                .insert({
+                  tenant_id: tenantId,
+                  title,
+                  category,
+                  file_reference: storagePath,
+                  status: "active",
+                })
+                .select("id")
+                .single();
+
+              if (fileAsset && classification.matched_job_id) {
+                await supabaseAdmin
+                  .from("client_job_documents")
+                  .insert({
+                    tenant_id: tenantId,
+                    job_id: classification.matched_job_id,
+                    file_asset_id: fileAsset.id,
+                    visible_to_client: false,
+                  });
+              }
+            }
 
             newDocuments++;
           } catch (attErr) {
@@ -528,19 +567,71 @@ Deno.serve(async (req) => {
         });
       }
 
+      const finalJobId = job_id || undefined;
+
       const updates: Record<string, any> = {
         status: decision === "approve" ? "filed" : "rejected",
         reviewed_by: userId,
         reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      if (job_id) updates.ai_matched_job_id = job_id;
+      if (finalJobId) updates.ai_matched_job_id = finalJobId;
+
+      // Get the document details before updating
+      const { data: docDetail } = await supabaseAdmin
+        .from("gmail_extracted_documents")
+        .select("file_name, mime_type, storage_path, document_type, ai_extracted_data")
+        .eq("id", document_id)
+        .eq("tenant_id", tenantId)
+        .single();
 
       await supabaseAdmin
         .from("gmail_extracted_documents")
         .update(updates)
         .eq("id", document_id)
         .eq("tenant_id", tenantId);
+
+      // If approved, create a file_assets record so it appears in Documents page
+      if (decision === "approve" && docDetail) {
+        const docTypeLabel: Record<string, string> = {
+          invoice: "Invoice", bill: "Bill", statement: "Statement",
+          remittance: "Remittance", quote: "Quote", purchase_order: "Purchase Order",
+          credit_note: "Credit Note", receipt: "Receipt", unknown: "Document",
+        };
+        const category = ["invoice", "bill", "credit_note", "receipt", "statement", "remittance"].includes(docDetail.document_type)
+          ? "Finance"
+          : docDetail.document_type === "purchase_order" ? "Purchasing"
+          : docDetail.document_type === "quote" ? "Sales"
+          : "Other";
+
+        const title = `${docTypeLabel[docDetail.document_type] || "Document"} — ${docDetail.file_name}`;
+
+        const { data: fileAsset } = await supabaseAdmin
+          .from("file_assets")
+          .insert({
+            tenant_id: tenantId,
+            title,
+            category,
+            file_reference: docDetail.storage_path,
+            status: "active",
+            uploaded_by: userId,
+          })
+          .select("id")
+          .single();
+
+        // If matched to a job, link the file_asset to the job
+        if (fileAsset && finalJobId) {
+          await supabaseAdmin
+            .from("client_job_documents")
+            .insert({
+              tenant_id: tenantId,
+              job_id: finalJobId,
+              file_asset_id: fileAsset.id,
+              shared_by: userId,
+              visible_to_client: false,
+            });
+        }
+      }
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
