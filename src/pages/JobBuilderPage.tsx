@@ -38,6 +38,7 @@ interface JobInfo {
   job_id: string;
   job_name: string;
   status: string;
+  cab_job_id?: string | null;
 }
 
 export default function JobBuilderPage() {
@@ -65,7 +66,7 @@ export default function JobBuilderPage() {
     setLoading(true);
 
     const [jobRes, partsRes, matsRes] = await Promise.all([
-      supabase.from("jobs").select("id, job_id, job_name, status").eq("id", jobId).single(),
+      supabase.from("jobs").select("id, job_id, job_name, status, cab_job_id").eq("id", jobId).single(),
       supabase.from("parts").select("*").eq("job_id", jobId).order("part_id"),
       supabase.from("material_products").select("*").eq("active", true).order("material_code"),
     ]);
@@ -375,6 +376,19 @@ export default function JobBuilderPage() {
           <div>
             <h2 className="font-mono text-xl font-bold text-foreground">{job.job_id}</h2>
             <p className="text-sm text-muted-foreground">{job.job_name} · Job Builder</p>
+            {(job as any).cab_job_id && (
+              <button
+                onClick={() => {
+                  // Need to look up job_ref from cab_jobs by id
+                  (supabase.from("cab_jobs") as any).select("job_ref").eq("id", (job as any).cab_job_id).single().then(({ data }: any) => {
+                    if (data?.job_ref) navigate(`/admin/jobs/${data.job_ref}`);
+                  });
+                }}
+                className="text-xs text-primary hover:underline mt-0.5 inline-flex items-center gap-1"
+              >
+                Open Cabinetry Job →
+              </button>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
