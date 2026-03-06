@@ -246,7 +246,7 @@ export default function TestCleanupPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 {result.dryRun ? (
-                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">DRY RUN</Badge>
+                  <Badge variant="outline" className="bg-accent text-accent-foreground">DRY RUN</Badge>
                 ) : (
                   <Badge variant="destructive">EXECUTED</Badge>
                 )}
