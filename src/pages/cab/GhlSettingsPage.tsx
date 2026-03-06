@@ -45,6 +45,7 @@ export default function GhlSettingsPage() {
   const [testingWebhook, setTestingWebhook] = useState(false);
   const [fetchingPipelines, setFetchingPipelines] = useState(false);
   const [pipelines, setPipelines] = useState<any[]>([]);
+  const [pipelineDebug, setPipelineDebug] = useState<any>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [fetchingDebug, setFetchingDebug] = useState(false);
   const [testingOpp, setTestingOpp] = useState(false);
@@ -488,9 +489,10 @@ export default function GhlSettingsPage() {
               });
               if (res.error) throw new Error(res.error.message);
               setPipelines(res.data?.pipelines || []);
+              setPipelineDebug(res.data?._debug || null);
               if (res.data?.ghl_location_id) setGhlLocationId(res.data.ghl_location_id);
               if (!res.data?.pipelines?.length) {
-                toast({ title: "No pipelines found", description: "Check your GHL API key and location ID", variant: "destructive" });
+                toast({ title: "No pipelines found", description: `HTTP ${res.data?._debug?.http_status || "?"} — check debug below`, variant: "destructive" });
               }
             } catch (err: any) {
               toast({ title: "Failed to fetch pipelines", description: err.message, variant: "destructive" });
@@ -502,6 +504,15 @@ export default function GhlSettingsPage() {
           <RefreshCw size={12} className={fetchingPipelines ? "animate-spin" : ""} />
           {fetchingPipelines ? "Fetching…" : "Fetch Pipelines from GHL"}
         </Button>
+
+        {pipelineDebug && (
+          <div className="rounded border border-border bg-muted/50 p-3 space-y-1">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase">Raw Pipeline Fetch Debug</p>
+            <pre className="text-[10px] font-mono overflow-x-auto max-h-48 whitespace-pre-wrap">
+              {JSON.stringify(pipelineDebug, null, 2)}
+            </pre>
+          </div>
+        )}
 
         {pipelines.length > 0 && (
           <div className="space-y-3">
