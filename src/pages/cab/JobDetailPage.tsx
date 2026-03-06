@@ -16,6 +16,7 @@ import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
   CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
+  Users, ExternalLink,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
@@ -864,12 +865,26 @@ export default function JobDetailPage() {
             <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
               <Link size={14} className="text-primary" /> GHL Admin
             </h3>
-            {job.ghl_opportunity_id ? (
-              <p className="text-xs text-muted-foreground">Opp linked: <span className="font-mono">{job.ghl_opportunity_id}</span></p>
-            ) : (
-              <p className="text-xs text-amber-600 font-medium">No GHL opportunity linked</p>
-            )}
+            <div className="space-y-1 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Contact:</span>
+                {job.ghl_contact_id ? (
+                  <span className="font-mono text-foreground">{job.ghl_contact_id}</span>
+                ) : (
+                  <span className="text-amber-600 font-medium">Not synced</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Opportunity:</span>
+                {job.ghl_opportunity_id ? (
+                  <span className="font-mono text-foreground">{job.ghl_opportunity_id}</span>
+                ) : (
+                  <span className="text-amber-600 font-medium">Not linked</span>
+                )}
+              </div>
+            </div>
             <div className="flex flex-col gap-2">
+              {/* Sync Contact */}
               <Button
                 size="sm"
                 variant="outline"
@@ -878,7 +893,30 @@ export default function JobDetailPage() {
                 onClick={async () => {
                   setGhlSyncing(true);
                   try {
-                    const { data: { session } } = await supabase.auth.getSession();
+                    const res = await supabase.functions.invoke("ghl-worker", {
+                      body: { company_id: companyId, job_id: job.id, action: "sync_contact" },
+                    });
+                    const result = res.data;
+                    toast({ title: "Contact synced to GHL", description: `${result?.contact_action}: ${result?.ghl_contact_id}` });
+                    await load();
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  } finally {
+                    setGhlSyncing(false);
+                  }
+                }}
+              >
+                <Users size={12} /> {ghlSyncing ? "Syncing…" : "Sync Contact to GHL"}
+              </Button>
+              {/* Link Opportunity */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs justify-start"
+                disabled={ghlSyncing}
+                onClick={async () => {
+                  setGhlSyncing(true);
+                  try {
                     const res = await supabase.functions.invoke("ghl-worker", {
                       body: { company_id: companyId, job_id: job.id, action: "link_opportunity" },
                     });
@@ -898,6 +936,31 @@ export default function JobDetailPage() {
               >
                 <Link size={12} /> {ghlSyncing ? "Searching…" : "Link Existing GHL Opportunity"}
               </Button>
+              {/* Repair Contact */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs justify-start"
+                disabled={ghlSyncing}
+                onClick={async () => {
+                  setGhlSyncing(true);
+                  try {
+                    const res = await supabase.functions.invoke("ghl-worker", {
+                      body: { company_id: companyId, job_id: job.id, action: "repair_contacts" },
+                    });
+                    const result = res.data;
+                    toast({ title: "Contact repair complete", description: `${result?.repaired || 0} job(s) repaired` });
+                    await load();
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  } finally {
+                    setGhlSyncing(false);
+                  }
+                }}
+              >
+                <RotateCcw size={12} /> {ghlSyncing ? "Repairing…" : "Repair Contact + Relink Opp"}
+              </Button>
+              {/* Requeue Events */}
               <Button
                 size="sm"
                 variant="outline"
@@ -921,6 +984,27 @@ export default function JobDetailPage() {
               >
                 <RotateCcw size={12} /> {ghlSyncing ? "Requeuing…" : "Requeue Latest Events"}
               </Button>
+              {/* Open GHL links */}
+              {job.ghl_contact_id && (
+                <a
+                  href={`https://app.gohighlevel.com/contacts/detail/${job.ghl_contact_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                >
+                  <ExternalLink size={12} /> Open GHL Contact
+                </a>
+              )}
+              {job.ghl_opportunity_id && (
+                <a
+                  href={`https://app.gohighlevel.com/opportunities/${job.ghl_opportunity_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                >
+                  <ExternalLink size={12} /> Open GHL Opportunity
+                </a>
+              )}
             </div>
           </div>
 
