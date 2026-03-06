@@ -148,28 +148,30 @@ async function upsertOpportunity(
   apiKey: string,
   locationId: string,
   pipelineId: string,
-  stageId: string,
+  pipelineStageId: string,
   contactId: string,
   job: { job_ref: string; job_title: string; contract_value?: number },
   existingOppId?: string
 ) {
   if (existingOppId) {
-    const updated = await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", {
-      stageId,
+    const payload = {
+      pipelineStageId,
       name: `${job.job_ref} — ${job.job_title}`,
       monetaryValue: job.contract_value || 0,
-    });
+    };
+    const updated = await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", payload);
     return updated.opportunity || { id: existingOppId };
   }
-  const created = await ghlFetch("/opportunities/", apiKey, "POST", {
+  const payload = {
     pipelineId,
-    stageId,
+    pipelineStageId,
     locationId,
     contactId,
     name: `${job.job_ref} — ${job.job_title}`,
     monetaryValue: job.contract_value || 0,
     status: "open",
-  });
+  };
+  const created = await ghlFetch("/opportunities/", apiKey, "POST", payload);
   return created.opportunity;
 }
 
@@ -379,11 +381,13 @@ Deno.serve(async (req) => {
         const newStatus = attempts >= 10 ? "failed" : "pending";
         await supabase.from("cab_events").update({ status: newStatus, attempts, last_error: errMsg }).eq("id", event.id);
 
+        const payload = (event.payload_json as Record<string, unknown>) || {};
+        const actions = resolveActions(event.event_type, payload.milestone as string | undefined, payload);
         await supabase.from("cab_ghl_sync_log").insert({
           company_id: companyId!,
           event_id: event.id,
           job_id: event.job_id,
-          action: event.event_type,
+          action: `${event.event_type} | payload: ${JSON.stringify({ stageKey: actions?.stageKey, tags: actions?.tags })}`,
           success: false,
           error: errMsg,
         });
