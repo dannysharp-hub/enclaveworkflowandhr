@@ -258,6 +258,15 @@ Deno.serve(async (req) => {
     const pipelineId = settings.ghl_pipeline_id as string;
     const stageIds = (settings.ghl_stage_ids as Record<string, string>) || {};
 
+    // Debug info action
+    if (action === "debug_info") {
+      return new Response(JSON.stringify({
+        saved_pipeline_id: pipelineId || null,
+        ghl_location_id: ghlLocationId,
+        stage_ids: stageIds,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // List pipelines action — fetch from GHL API
     if (action === "list_pipelines") {
       try {
@@ -267,13 +276,57 @@ Deno.serve(async (req) => {
           name: p.name,
           stages: (p.stages || []).map((s: any) => ({ id: s.id, name: s.name })),
         }));
-        return new Response(JSON.stringify({ pipelines }), {
+        return new Response(JSON.stringify({ pipelines, ghl_location_id: ghlLocationId }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        return new Response(JSON.stringify({ error: errMsg, pipelines: [] }), {
+        return new Response(JSON.stringify({ error: errMsg, pipelines: [], ghl_location_id: ghlLocationId }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Test opportunity create action
+    if (action === "test_opportunity_create") {
+      let testStageId: string | undefined;
+      try {
+        const body = await req.clone().json().catch(() => ({}));
+        testStageId = body.test_stage_id;
+      } catch {}
+
+      const targetStageId = testStageId || stageIds["lead_captured"] || Object.values(stageIds)[0] || "";
+      const testPayload = {
+        pipelineId,
+        pipelineStageId: targetStageId,
+        locationId: ghlLocationId,
+        contactId: "test-contact-placeholder",
+        name: "TEST — Pipeline Validation",
+        monetaryValue: 0,
+        status: "open",
+      };
+
+      try {
+        const result = await ghlFetch("/opportunities/", ghlApiKey, "POST", testPayload);
+        // Clean up test opportunity
+        if (result.opportunity?.id) {
+          try { await ghlFetch(`/opportunities/${result.opportunity.id}`, ghlApiKey, "DELETE"); } catch {}
+        }
+        return new Response(JSON.stringify({
+          success: true,
+          request_payload: testPayload,
+          response: result,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (err: unknown) {
+        const errData: Record<string, unknown> = { success: false, request_payload: testPayload };
+        if (err instanceof GhlError) {
+          errData.ghl_response = err.responseBody;
+          errData.error = err.message;
+        } else {
+          errData.error = err instanceof Error ? err.message : String(err);
+        }
+        return new Response(JSON.stringify(errData), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
