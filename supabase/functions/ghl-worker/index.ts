@@ -267,21 +267,46 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // List pipelines action — fetch from GHL API
+    // List pipelines action — fetch from GHL API with raw debug
     if (action === "list_pipelines") {
+      const reqUrl = `${GHL_BASE}/opportunities/pipelines?locationId=${ghlLocationId}`;
       try {
-        const data = await ghlFetch(`/opportunities/pipelines?locationId=${ghlLocationId}`, ghlApiKey);
-        const pipelines = (data.pipelines || []).map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          stages: (p.stages || []).map((s: any) => ({ id: s.id, name: s.name })),
-        }));
-        return new Response(JSON.stringify({ pipelines, ghl_location_id: ghlLocationId }), {
+        const rawRes = await fetch(reqUrl, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${ghlApiKey}`,
+            "Content-Type": "application/json",
+            Version: "2021-07-28",
+          },
+        });
+        const rawBody = await rawRes.json();
+        const pipelines = rawRes.ok
+          ? (rawBody.pipelines || []).map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              stages: (p.stages || []).map((s: any) => ({ id: s.id, name: s.name })),
+            }))
+          : [];
+        return new Response(JSON.stringify({
+          pipelines,
+          ghl_location_id: ghlLocationId,
+          _debug: {
+            request_url: reqUrl,
+            http_status: rawRes.status,
+            raw_response: rawBody,
+            api_key_prefix: ghlApiKey.slice(0, 8) + "…",
+          },
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        return new Response(JSON.stringify({ error: errMsg, pipelines: [], ghl_location_id: ghlLocationId }), {
+        return new Response(JSON.stringify({
+          error: errMsg,
+          pipelines: [],
+          ghl_location_id: ghlLocationId,
+          _debug: { request_url: reqUrl, error: errMsg },
+        }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
