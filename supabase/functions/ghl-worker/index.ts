@@ -450,20 +450,24 @@ Deno.serve(async (req) => {
         // 2) Determine target stage
         const targetStageId = actions.stageKey ? stageIds[actions.stageKey] : undefined;
 
-        // 3) Upsert opportunity
+        // 3) Upsert opportunity (idempotent: one job = one opportunity)
         let ghlOppId = job.ghl_opportunity_id;
+        let oppAction = "skipped";
+        const targetStageForOpp = targetStageId || stageIds["lead_captured"] || "";
+        
         if (!ghlOppId || targetStageId) {
-          const opp = await upsertOpportunity(
+          const result = await upsertOpportunity(
             ghlApiKey,
             ghlLocationId,
             pipelineId,
-            targetStageId || stageIds["lead_captured"] || "",
+            targetStageForOpp,
             ghlContactId!,
             job,
             ghlOppId || undefined
           );
-          if (!ghlOppId) {
-            ghlOppId = opp.id;
+          oppAction = result.action;
+          if (!ghlOppId || result.action === "found_and_updated") {
+            ghlOppId = result.id;
             await supabase.from("cab_jobs").update({ ghl_opportunity_id: ghlOppId }).eq("id", job.id);
           }
         }
