@@ -402,6 +402,56 @@ export default function GhlSettingsPage() {
         </div>
       </div>
 
+      {/* Debug Section */}
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+        <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+          🔍 Debug: Current Configuration
+        </h3>
+        <div className="grid grid-cols-1 gap-2 text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground w-40 shrink-0">Saved ghl_pipeline_id:</span>
+            <code className="bg-muted p-1 rounded break-all">{pipelineId || "(empty)"}</code>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground w-40 shrink-0">GHL_LOCATION_ID (env):</span>
+            <code className="bg-muted p-1 rounded break-all">{ghlLocationId || "(not fetched)"}</code>
+          </div>
+          {pipelineId && ghlLocationId && pipelineId === ghlLocationId && (
+            <div className="text-destructive font-bold bg-destructive/10 p-2 rounded">
+              ⚠ WARNING: Pipeline ID matches Location ID — they are the same value! The pipeline ID is wrong.
+            </div>
+          )}
+          {debugInfo && (
+            <pre className="bg-muted p-2 rounded text-[10px] overflow-x-auto max-h-40">
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={fetchingDebug}
+          onClick={async () => {
+            setFetchingDebug(true);
+            try {
+              const res = await supabase.functions.invoke("ghl-worker", {
+                body: { company_id: companyId, action: "debug_info" },
+              });
+              if (res.error) throw new Error(res.error.message);
+              setDebugInfo(res.data);
+              if (res.data?.ghl_location_id) setGhlLocationId(res.data.ghl_location_id);
+            } catch (err: any) {
+              toast({ title: "Failed", description: err.message, variant: "destructive" });
+            } finally {
+              setFetchingDebug(false);
+            }
+          }}
+        >
+          <RefreshCw size={12} className={fetchingDebug ? "animate-spin" : ""} />
+          Fetch Debug Info from Worker
+        </Button>
+      </div>
+
       {/* Pipeline + Calendar */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
         <h3 className="font-mono text-sm font-bold text-foreground">Pipeline Configuration</h3>
@@ -438,6 +488,7 @@ export default function GhlSettingsPage() {
               });
               if (res.error) throw new Error(res.error.message);
               setPipelines(res.data?.pipelines || []);
+              if (res.data?.ghl_location_id) setGhlLocationId(res.data.ghl_location_id);
               if (!res.data?.pipelines?.length) {
                 toast({ title: "No pipelines found", description: "Check your GHL API key and location ID", variant: "destructive" });
               }
@@ -453,43 +504,48 @@ export default function GhlSettingsPage() {
         </Button>
 
         {pipelines.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Available Pipelines:</p>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground font-medium">Available Pipelines from GHL:</p>
             {pipelines.map((p: any) => (
-              <div key={p.id} className="border border-border rounded p-3 space-y-2">
+              <div key={p.id} className={`border rounded p-3 space-y-2 ${pipelineId === p.id ? "border-primary bg-primary/5" : "border-border"}`}>
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold">{p.name}</span>
+                  <div>
+                    <span className="font-mono text-sm font-bold">{p.name}</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <code className="text-[10px] text-muted-foreground font-mono">ID: {p.id}</code>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 text-[9px] px-1"
+                        onClick={() => { navigator.clipboard.writeText(p.id); toast({ title: "Pipeline ID copied" }); }}
+                      >
+                        <Copy size={10} />
+                      </Button>
+                    </div>
+                  </div>
                   <Button
                     size="sm"
                     variant={pipelineId === p.id ? "default" : "outline"}
-                    className="h-6 text-[10px]"
                     onClick={() => {
                       setPipelineId(p.id);
-                      // Auto-map stages if stage names match
-                      if (p.stages?.length) {
-                        toast({ title: `Pipeline "${p.name}" selected`, description: `ID: ${p.id}` });
-                      }
+                      toast({ title: `Pipeline "${p.name}" selected`, description: `ID: ${p.id} — click Save Settings to persist` });
                     }}
                   >
-                    {pipelineId === p.id ? "Selected ✓" : "Select"}
+                    {pipelineId === p.id ? "✓ Using this Pipeline" : "Use this Pipeline"}
                   </Button>
                 </div>
-                <code className="text-[9px] text-muted-foreground font-mono">{p.id}</code>
                 {p.stages?.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground">Stages:</p>
+                  <div className="space-y-1 border-t border-border pt-2 mt-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Stages ({p.stages.length}):</p>
                     {p.stages.map((s: any) => (
-                      <div key={s.id} className="flex items-center gap-2 text-[10px]">
-                        <span className="font-mono text-muted-foreground w-48 truncate">{s.name}</span>
-                        <code className="text-[9px] text-muted-foreground">{s.id}</code>
+                      <div key={s.id} className="flex items-center gap-2 text-[11px] py-0.5">
+                        <span className="font-mono text-foreground w-48 truncate">{s.name}</span>
+                        <code className="text-[9px] text-muted-foreground flex-1 truncate">{s.id}</code>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-5 text-[9px] px-1"
-                          onClick={() => {
-                            navigator.clipboard.writeText(s.id);
-                            toast({ title: `Copied: ${s.name}` });
-                          }}
+                          onClick={() => { navigator.clipboard.writeText(s.id); toast({ title: `Copied: ${s.name}` }); }}
                         >
                           <Copy size={10} />
                         </Button>
@@ -498,6 +554,59 @@ export default function GhlSettingsPage() {
                   </div>
                 )}
               </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Test Opportunity Create */}
+      <div className="rounded-lg border border-dashed border-primary/50 bg-primary/5 p-4 space-y-3">
+        <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+          🧪 Test Opportunity Create
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Sends a test POST to GHL /opportunities/ using the saved pipelineId + lead_captured stage.
+          Shows the full request payload and GHL response.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={testingOpp || !pipelineId}
+          onClick={async () => {
+            setTestingOpp(true);
+            setTestOppResult(null);
+            try {
+              const res = await supabase.functions.invoke("ghl-worker", {
+                body: { company_id: companyId, action: "test_opportunity_create" },
+              });
+              if (res.error) throw new Error(res.error.message);
+              setTestOppResult(res.data);
+              if (res.data?.success) {
+                toast({ title: "✅ Test opportunity created successfully!" });
+              } else {
+                toast({ title: "❌ Test failed", description: res.data?.error, variant: "destructive" });
+              }
+            } catch (err: any) {
+              setTestOppResult({ error: err.message });
+              toast({ title: "Test failed", description: err.message, variant: "destructive" });
+            } finally {
+              setTestingOpp(false);
+            }
+          }}
+        >
+          <Zap size={12} />
+          {testingOpp ? "Testing…" : "Test Opportunity Create"}
+        </Button>
+        {!pipelineId && <p className="text-xs text-destructive">Save a pipeline ID first.</p>}
+        {testOppResult && (
+          <div className={`rounded border p-3 ${testOppResult.success ? "border-green-500/30 bg-green-500/5" : "border-destructive/30 bg-destructive/5"}`}>
+            <p className="text-xs font-bold mb-1">{testOppResult.success ? "✅ Success" : "❌ Failed"}</p>
+            <pre className="text-[10px] font-mono overflow-x-auto max-h-60 whitespace-pre-wrap">
+              {JSON.stringify(testOppResult, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
             ))}
           </div>
         )}
