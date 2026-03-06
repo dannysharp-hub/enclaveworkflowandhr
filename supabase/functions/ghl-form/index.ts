@@ -8,6 +8,11 @@ const corsHeaders = {
 
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
+const ACTIVE_STAGES = [
+  "lead_captured", "ballpark_sent", "appointment_requested",
+  "appointment_booked", "quote_sent", "quote_viewed", "awaiting_deposit",
+];
+
 async function ghlFetchContact(apiKey: string, contactId: string) {
   const res = await fetch(`${GHL_BASE}/contacts/${contactId}`, {
     headers: {
@@ -32,34 +37,28 @@ function parseFormUrlEncoded(raw: string): Record<string, string> {
 
 function parsePayload(raw: string, contentType: string): { payload: Record<string, unknown>; parsed: boolean } {
   if (!raw || raw.trim() === "") return { payload: {}, parsed: true };
-
-  // Try JSON first
-  try {
-    return { payload: JSON.parse(raw), parsed: true };
-  } catch { /* not JSON */ }
-
-  // Try form-urlencoded
+  try { return { payload: JSON.parse(raw), parsed: true }; } catch { /* not JSON */ }
   if (contentType.includes("application/x-www-form-urlencoded") || raw.includes("=")) {
     try {
       const formData = parseFormUrlEncoded(raw);
-      if (Object.keys(formData).length > 0) {
-        return { payload: formData, parsed: true };
-      }
+      if (Object.keys(formData).length > 0) return { payload: formData, parsed: true };
     } catch { /* not form data */ }
   }
-
-  // Unparseable — store raw snippet
   return { payload: { payload_raw: raw.slice(0, 2000) }, parsed: false };
+}
+
+function norm(s: string | null | undefined): string {
+  return (s || "").trim().toLowerCase();
 }
 
 function extractFields(payload: Record<string, unknown>) {
   const contact = (payload.contact || {}) as Record<string, unknown>;
   return {
-    firstName: (payload.first_name || payload.firstName || contact.first_name || contact.firstName || "Unknown") as string,
-    lastName: (payload.last_name || payload.lastName || contact.last_name || contact.lastName || "") as string,
-    email: (payload.email || contact.email || null) as string | null,
-    phone: (payload.phone || contact.phone || null) as string | null,
-    postcode: (payload.postcode || payload.postal_code || contact.postalCode || contact.postal_code || null) as string | null,
+    firstName: ((payload.first_name || payload.firstName || contact.first_name || contact.firstName || "Unknown") as string).trim(),
+    lastName: ((payload.last_name || payload.lastName || contact.last_name || contact.lastName || "") as string).trim(),
+    email: norm(payload.email as string || contact.email as string) || null,
+    phone: ((payload.phone || contact.phone || null) as string | null)?.trim() || null,
+    postcode: ((payload.postcode || payload.postal_code || contact.postalCode || contact.postal_code || null) as string | null)?.trim() || null,
     formName: (payload.form_name || payload.formName || (payload.page as Record<string, unknown>)?.name || "unknown") as string,
     contactId: (payload.contact_id || payload.contactId || contact.id || null) as string | null,
     addressLine1: (payload.address1 || contact.address1 || null) as string | null,
@@ -83,7 +82,6 @@ Deno.serve(async (req) => {
     const raw = await req.text();
     console.log("ghl-form content-type:", contentType, "body length:", raw.length);
 
-    // Log every webhook hit to cab_webhook_logs
     const { payload, parsed } = parsePayload(raw, contentType);
 
     await supabase.from("cab_webhook_logs").insert({
@@ -96,7 +94,6 @@ Deno.serve(async (req) => {
       status: parsed ? "received" : "unparsed",
     });
 
-    // If we couldn't parse at all, log and return success to prevent GHL retries
     if (!parsed) {
       console.warn("ghl-form: unparseable body, logging for inspection");
       await supabase.from("cab_ghl_sync_log").insert({
@@ -105,18 +102,14 @@ Deno.serve(async (req) => {
         success: false,
         error: `content_type=${contentType} raw_snippet=${raw.slice(0, 200)}`,
       });
-      // Still try to extract a contact_id from the raw string
       const contactIdMatch = raw.match(/contact_id[=:]?\s*["']?([a-zA-Z0-9]+)/);
-      if (!contactIdMatch) {
-        return ok({ success: true, note: "unparsed_logged" });
-      }
-      // If we found a contact_id, put it in payload and continue
+      if (!contactIdMatch) return ok({ success: true, note: "unparsed_logged" });
       payload.contact_id = contactIdMatch[1];
     }
 
     let fields = extractFields(payload);
 
-    // If we have a contact_id but missing key fields, fetch from GHL API
+    // Enrich from GHL if missing key fields
     const missingKeyFields = !fields.email && !fields.phone && fields.firstName === "Unknown";
     if (fields.contactId && missingKeyFields) {
       const ghlApiKey = Deno.env.get("GHL_API_KEY");
@@ -124,9 +117,7 @@ Deno.serve(async (req) => {
         try {
           console.log("ghl-form: fetching contact from GHL:", fields.contactId);
           const ghlContact = await ghlFetchContact(ghlApiKey, fields.contactId);
-          // Merge GHL contact data into payload and re-extract
-          const enriched = { ...payload, contact: ghlContact };
-          fields = extractFields(enriched);
+          fields = extractFields({ ...payload, contact: ghlContact });
           console.log("ghl-form: enriched from GHL:", fields.firstName, fields.email);
         } catch (ghlErr) {
           console.error("ghl-form: GHL contact fetch failed:", ghlErr);
@@ -156,7 +147,7 @@ Deno.serve(async (req) => {
 
     const companyId = company.id;
 
-    // Upsert customer by email, fallback phone
+    // ── 1) Upsert customer by email (normalized), fallback phone ──
     let customer: any = null;
 
     if (email) {
@@ -164,7 +155,8 @@ Deno.serve(async (req) => {
         .from("cab_customers")
         .select("*")
         .eq("company_id", companyId)
-        .eq("email", email)
+        .ilike("email", email)
+        .limit(1)
         .maybeSingle();
       customer = data;
     }
@@ -175,11 +167,13 @@ Deno.serve(async (req) => {
         .select("*")
         .eq("company_id", companyId)
         .eq("phone", phone)
+        .limit(1)
         .maybeSingle();
       customer = data;
     }
 
     if (customer) {
+      // Update any changed fields
       await supabase.from("cab_customers").update({
         first_name: firstName,
         last_name: lastName,
@@ -188,8 +182,10 @@ Deno.serve(async (req) => {
         postcode: postcode || customer.postcode,
         address_line_1: addressLine1 || customer.address_line_1,
         city: city || customer.city,
+        ghl_contact_id: contactId || customer.ghl_contact_id,
         updated_at: new Date().toISOString(),
       }).eq("id", customer.id);
+      console.log("ghl-form: reused existing customer", customer.id);
     } else {
       const { data: newCust, error: custErr } = await supabase
         .from("cab_customers")
@@ -202,6 +198,7 @@ Deno.serve(async (req) => {
           postcode,
           address_line_1: addressLine1,
           city,
+          ghl_contact_id: contactId,
         })
         .select("*")
         .single();
@@ -217,7 +214,21 @@ Deno.serve(async (req) => {
         return ok({ success: false, error: "customer_insert_failed" });
       }
       customer = newCust;
+      console.log("ghl-form: created new customer", customer.id);
     }
+
+    // ── 2) Check for existing active job for this customer ──
+    const { data: existingJob } = await supabase
+      .from("cab_jobs")
+      .select("id, job_ref, current_stage_key, room_type")
+      .eq("company_id", companyId)
+      .eq("customer_id", customer.id)
+      .in("current_stage_key", ACTIVE_STAGES)
+      .neq("status", "closed")
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     // Map room_type from form_name
     let roomType = "general";
@@ -225,7 +236,54 @@ Deno.serve(async (req) => {
     if (fnLower.includes("media wall")) roomType = "media_wall";
     else if (fnLower.includes("wardrobe")) roomType = "wardrobes";
 
-    // Generate job_ref
+    // ── 3) If active job exists → reuse it ──
+    if (existingJob) {
+      console.log(`ghl-form: REUSING existing active job ${existingJob.job_ref} (stage: ${existingJob.current_stage_key}) for customer ${customer.id}`);
+
+      // Update any changed fields on the job
+      const jobUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (contactId && !existingJob.ghl_contact_id) jobUpdates.ghl_contact_id = contactId;
+      if (roomType !== "general" && existingJob.room_type !== roomType) jobUpdates.room_type = roomType;
+      if (postcode) {
+        jobUpdates.property_address_json = {
+          postcode: postcode || null,
+          address_line_1: addressLine1 || null,
+          city: city || null,
+        };
+      }
+      await supabase.from("cab_jobs").update(jobUpdates).eq("id", existingJob.id);
+
+      // Insert lead.resubmitted event
+      await supabase.from("cab_events").insert({
+        company_id: companyId,
+        event_type: "lead.resubmitted",
+        job_id: existingJob.id,
+        customer_id: customer.id,
+        payload_json: {
+          form_name: formName,
+          room_type: roomType,
+          postcode,
+          ghl_contact_id: contactId,
+          source: "ghl_form",
+          note: "Duplicate enquiry merged into existing active job",
+          original_stage: existingJob.current_stage_key,
+        },
+        status: "pending",
+      });
+
+      await supabase.from("cab_ghl_sync_log").insert({
+        company_id: companyId,
+        action: "form.resubmitted_merged",
+        job_id: existingJob.id,
+        success: true,
+        error: null,
+      });
+
+      console.log(`ghl-form: lead.resubmitted → reused ${existingJob.job_ref}`);
+      return ok({ success: true, job_ref: existingJob.job_ref, reused: true, note: "reused_existing_active_job" });
+    }
+
+    // ── 4) No active job → create new one ──
     const { data: seqNum, error: seqErr } = await supabase.rpc("cab_next_job_number", { _company_id: companyId });
     if (seqErr) {
       console.error("ghl-form: job number generation failed", seqErr);
@@ -242,7 +300,6 @@ Deno.serve(async (req) => {
     const namePart = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, "");
     const jobRef = `${seq}_${namePart}`;
 
-    // Create job
     const { data: job, error: jobErr } = await supabase
       .from("cab_jobs")
       .insert({
@@ -277,7 +334,6 @@ Deno.serve(async (req) => {
       return ok({ success: false, error: "job_insert_failed" });
     }
 
-    // Insert cab_events — triggers state machine
     await supabase.from("cab_events").insert({
       company_id: companyId,
       event_type: "lead.created",
@@ -291,20 +347,20 @@ Deno.serve(async (req) => {
         source: "ghl_form",
         content_type: contentType,
         body_parsed: parsed,
+        note: "New job created — no existing active job found for this customer",
       },
       status: "pending",
     });
 
-    // Success log
     await supabase.from("cab_ghl_sync_log").insert({
       company_id: companyId,
-      action: "form.submitted",
+      action: "form.submitted_new",
       job_id: job.id,
       success: true,
     });
 
-    console.log(`ghl-form: lead created ${job.job_ref}`);
-    return ok({ success: true, job_ref: job.job_ref });
+    console.log(`ghl-form: NEW lead created ${job.job_ref}`);
+    return ok({ success: true, job_ref: job.job_ref, reused: false, note: "new_job_created" });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("ghl-form error:", errMsg);

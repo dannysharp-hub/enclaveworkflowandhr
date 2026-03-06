@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { getCabCompanyId, generateJobRef, insertCabEvent } from "@/lib/cabHelpers";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ArrowRight } from "lucide-react";
+import { Plus, ArrowRight, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 
 interface LeadJob {
@@ -21,12 +21,19 @@ interface LeadJob {
   current_stage_key: string | null;
   created_at: string;
   customer_id: string;
+  status: string;
   cab_customers?: { first_name: string; last_name: string; phone: string | null; email: string | null };
 }
+
+const ACTIVE_STAGES = [
+  "lead_captured", "ballpark_sent", "appointment_requested",
+  "appointment_booked", "quote_sent", "quote_viewed", "awaiting_deposit", "project_confirmed",
+];
 
 export default function LeadsPage() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState<LeadJob[]>([]);
+  const [allActiveJobs, setAllActiveJobs] = useState<LeadJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -36,17 +43,51 @@ export default function LeadsPage() {
     if (!cid) { navigate("/admin/bootstrap"); return; }
     setCompanyId(cid);
 
-    const { data } = await (supabase.from("cab_jobs") as any)
-      .select("*, cab_customers(first_name, last_name, phone, email)")
-      .eq("company_id", cid)
-      .eq("status", "lead")
-      .order("created_at", { ascending: false });
+    const [leadsRes, activeRes] = await Promise.all([
+      (supabase.from("cab_jobs") as any)
+        .select("*, cab_customers(first_name, last_name, phone, email)")
+        .eq("company_id", cid)
+        .eq("status", "lead")
+        .order("created_at", { ascending: false }),
+      (supabase.from("cab_jobs") as any)
+        .select("id, customer_id, job_ref, current_stage_key, status")
+        .eq("company_id", cid)
+        .in("current_stage_key", ACTIVE_STAGES)
+        .neq("status", "closed")
+        .neq("status", "cancelled"),
+    ]);
 
-    setLeads(data ?? []);
+    setLeads(leadsRes.data ?? []);
+    setAllActiveJobs(activeRes.data ?? []);
     setLoading(false);
   }, [navigate]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Build a set of customer_ids that have >1 active job (duplicates)
+  const duplicateCustomerIds = useMemo(() => {
+    const countMap = new Map<string, number>();
+    for (const j of allActiveJobs) {
+      countMap.set(j.customer_id, (countMap.get(j.customer_id) || 0) + 1);
+    }
+    const dupes = new Set<string>();
+    for (const [cid, count] of countMap) {
+      if (count > 1) dupes.add(cid);
+    }
+    return dupes;
+  }, [allActiveJobs]);
+
+  const dupJobRefs = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const j of allActiveJobs) {
+      if (duplicateCustomerIds.has(j.customer_id)) {
+        const existing = map.get(j.customer_id) || [];
+        existing.push(j.job_ref);
+        map.set(j.customer_id, existing);
+      }
+    }
+    return map;
+  }, [allActiveJobs, duplicateCustomerIds]);
 
   return (
     <div className="space-y-6">
@@ -80,16 +121,34 @@ export default function LeadsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads.map(lead => (
-                <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/admin/jobs/${lead.job_ref}`)}>
-                  <TableCell className="font-mono text-xs">{lead.job_ref}</TableCell>
-                  <TableCell>{lead.cab_customers?.first_name} {lead.cab_customers?.last_name}</TableCell>
-                  <TableCell>{lead.room_type || "—"}</TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{lead.current_stage_key?.replace(/_/g, " ")}</Badge></TableCell>
-                  <TableCell className="text-muted-foreground text-xs">{format(new Date(lead.created_at), "dd MMM HH:mm")}</TableCell>
-                  <TableCell><ArrowRight size={14} className="text-muted-foreground" /></TableCell>
-                </TableRow>
-              ))}
+              {leads.map(lead => {
+                const isDuplicate = duplicateCustomerIds.has(lead.customer_id);
+                const otherRefs = (dupJobRefs.get(lead.customer_id) || []).filter(r => r !== lead.job_ref);
+                return (
+                  <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/admin/jobs/${lead.job_ref}`)}>
+                    <TableCell className="font-mono text-xs">
+                      {lead.job_ref}
+                      {isDuplicate && (
+                        <Badge variant="destructive" className="ml-1.5 text-[9px] px-1.5 py-0">
+                          <AlertTriangle size={10} className="mr-0.5" /> DUP
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {lead.cab_customers?.first_name} {lead.cab_customers?.last_name}
+                      {isDuplicate && otherRefs.length > 0 && (
+                        <span className="block text-[10px] text-destructive mt-0.5">
+                          Also: {otherRefs.join(", ")}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{lead.room_type || "—"}</TableCell>
+                    <TableCell><Badge variant="outline" className="text-[10px]">{lead.current_stage_key?.replace(/_/g, " ")}</Badge></TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{format(new Date(lead.created_at), "dd MMM HH:mm")}</TableCell>
+                    <TableCell><ArrowRight size={14} className="text-muted-foreground" /></TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -113,8 +172,11 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
     if (!companyId) return;
     setSubmitting(true);
     try {
-      await submitLead(companyId, form);
-      toast({ title: "Lead created" });
+      const result = await submitLead(companyId, form);
+      toast({
+        title: result.reused ? "Lead merged into existing job" : "Lead created",
+        description: result.reused ? `Reused ${result.jobRef} — duplicate enquiry merged` : `New job ${result.jobRef}`,
+      });
       setForm({ firstName: "", lastName: "", phone: "", email: "", address: "", postcode: "", roomType: "", dimensions: "", notes: "" });
       onOpenChange(false);
       onSuccess();
@@ -152,28 +214,36 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
   );
 }
 
-/** Shared lead submission logic (used by admin form + public enquiry) */
+const ACTIVE_STAGES_CLIENT = [
+  "lead_captured", "ballpark_sent", "appointment_requested",
+  "appointment_booked", "quote_sent", "quote_viewed", "awaiting_deposit",
+];
+
+/** Shared lead submission logic (used by admin form + public enquiry) — now idempotent */
 export async function submitLead(companyId: string, form: {
   firstName: string; lastName: string; phone: string; email: string;
   address: string; postcode: string; roomType: string; dimensions: string; notes: string;
-}) {
+}): Promise<{ jobId: string; jobRef: string; reused: boolean }> {
+  const normEmail = form.email?.trim().toLowerCase() || "";
+  const normPhone = form.phone?.trim() || "";
+
   // Upsert customer (match by email or phone)
   let customerId: string | null = null;
 
-  if (form.email) {
+  if (normEmail) {
     const { data: existing } = await (supabase.from("cab_customers") as any)
       .select("id")
       .eq("company_id", companyId)
-      .eq("email", form.email)
+      .ilike("email", normEmail)
       .maybeSingle();
     if (existing) customerId = existing.id;
   }
 
-  if (!customerId && form.phone) {
+  if (!customerId && normPhone) {
     const { data: existing } = await (supabase.from("cab_customers") as any)
       .select("id")
       .eq("company_id", companyId)
-      .eq("phone", form.phone)
+      .eq("phone", normPhone)
       .maybeSingle();
     if (existing) customerId = existing.id;
   }
@@ -182,8 +252,8 @@ export async function submitLead(companyId: string, form: {
     await (supabase.from("cab_customers") as any).update({
       first_name: form.firstName,
       last_name: form.lastName,
-      phone: form.phone || null,
-      email: form.email || null,
+      phone: normPhone || null,
+      email: normEmail || null,
       address_line_1: form.address || null,
       postcode: form.postcode || null,
     }).eq("id", customerId);
@@ -193,8 +263,8 @@ export async function submitLead(companyId: string, form: {
         company_id: companyId,
         first_name: form.firstName,
         last_name: form.lastName,
-        phone: form.phone || null,
-        email: form.email || null,
+        phone: normPhone || null,
+        email: normEmail || null,
         address_line_1: form.address || null,
         postcode: form.postcode || null,
       })
@@ -204,10 +274,46 @@ export async function submitLead(companyId: string, form: {
     customerId = newCust.id;
   }
 
-  // Generate job ref
+  // Check for existing active job
+  const { data: existingJob } = await (supabase.from("cab_jobs") as any)
+    .select("id, job_ref, current_stage_key")
+    .eq("company_id", companyId)
+    .eq("customer_id", customerId)
+    .in("current_stage_key", ACTIVE_STAGES_CLIENT)
+    .neq("status", "closed")
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingJob) {
+    // Reuse — update fields + emit resubmitted event
+    await (supabase.from("cab_jobs") as any).update({
+      room_type: form.roomType || existingJob.room_type,
+      property_address_json: form.address || form.postcode ? { address: form.address, postcode: form.postcode } : undefined,
+      updated_at: new Date().toISOString(),
+    }).eq("id", existingJob.id);
+
+    await insertCabEvent({
+      companyId,
+      eventType: "lead.resubmitted",
+      jobId: existingJob.id,
+      customerId: customerId!,
+      payload: {
+        room_type: form.roomType,
+        rough_dimensions: form.dimensions,
+        notes: form.notes,
+        note: "Duplicate enquiry merged via admin form",
+        original_stage: existingJob.current_stage_key,
+      },
+    });
+
+    return { jobId: existingJob.id, jobRef: existingJob.job_ref, reused: true };
+  }
+
+  // No active job → create new
   const jobRef = await generateJobRef(companyId, form.firstName, form.lastName);
 
-  // Create job
   const { data: job, error: jobErr } = await (supabase.from("cab_jobs") as any)
     .insert({
       company_id: companyId,
@@ -228,7 +334,6 @@ export async function submitLead(companyId: string, form: {
 
   if (jobErr) throw jobErr;
 
-  // Event
   await insertCabEvent({
     companyId,
     eventType: "lead.created",
@@ -241,5 +346,5 @@ export async function submitLead(companyId: string, form: {
     },
   });
 
-  return { jobId: job.id, jobRef };
+  return { jobId: job.id, jobRef, reused: false };
 }
