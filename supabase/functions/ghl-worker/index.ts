@@ -155,18 +155,26 @@ async function upsertContact(
   return created.contact;
 }
 
-async function findContactOpportunity(apiKey: string, contactId: string, pipelineId: string): Promise<string | null> {
+interface ContactOppSearchResult { id: string | null; totalFound: number }
+
+async function findContactOpportunity(apiKey: string, contactId: string, pipelineId: string): Promise<ContactOppSearchResult> {
   try {
     const data = await ghlFetch(`/contacts/${contactId}/opportunities`, apiKey);
-    const opps = data.opportunities || [];
-    for (const opp of opps) {
-      if (opp.pipelineId === pipelineId && opp.status === "open") return opp.id;
-    }
-  } catch { /* not found */ }
-  return null;
+    const opps = (data.opportunities || []) as any[];
+    // Filter to this pipeline (any status), prefer open, then most recent
+    const pipelineOpps = opps
+      .filter((o: any) => o.pipelineId === pipelineId)
+      .sort((a: any, b: any) => {
+        if (a.status === "open" && b.status !== "open") return -1;
+        if (b.status === "open" && a.status !== "open") return 1;
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+    if (pipelineOpps.length) return { id: pipelineOpps[0].id, totalFound: pipelineOpps.length };
+    return { id: null, totalFound: 0 };
+  } catch { return { id: null, totalFound: 0 }; }
 }
 
-interface UpsertResult { id: string; action: "created" | "updated" | "found_and_updated" }
+interface UpsertResult { id: string; action: "created" | "updated" | "found_and_updated"; searchCount: number }
 
 async function upsertOpportunity(
   apiKey: string,
@@ -180,22 +188,22 @@ async function upsertOpportunity(
   const name = `${job.job_ref} — ${job.job_title}`;
   const monetaryValue = job.contract_value || 0;
 
-  // 1) Already have an opp id → PUT update
+  // 1) Already have an opp id → always PUT, never POST
   if (existingOppId) {
     const payload: Record<string, unknown> = { pipelineStageId, name, monetaryValue };
     await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", payload);
-    return { id: existingOppId, action: "updated" };
+    return { id: existingOppId, action: "updated", searchCount: 0 };
   }
 
-  // 2) Search for existing open opportunity for this contact in the pipeline
-  const foundId = await findContactOpportunity(apiKey, contactId, pipelineId);
-  if (foundId) {
+  // 2) Search for ANY existing opportunity for this contact in the pipeline (open or not)
+  const search = await findContactOpportunity(apiKey, contactId, pipelineId);
+  if (search.id) {
     const payload: Record<string, unknown> = { pipelineStageId, name, monetaryValue };
-    await ghlFetch(`/opportunities/${foundId}`, apiKey, "PUT", payload);
-    return { id: foundId, action: "found_and_updated" };
+    await ghlFetch(`/opportunities/${search.id}`, apiKey, "PUT", payload);
+    return { id: search.id, action: "found_and_updated", searchCount: search.totalFound };
   }
 
-  // 3) Create new
+  // 3) Only create if absolutely nothing found
   const payload = {
     pipelineId,
     pipelineStageId,
@@ -206,7 +214,7 @@ async function upsertOpportunity(
     status: "open",
   };
   const created = await ghlFetch("/opportunities/", apiKey, "POST", payload);
-  return { id: created.opportunity?.id || created.id, action: "created" };
+  return { id: created.opportunity?.id || created.id, action: "created", searchCount: 0 };
 }
 
 async function addTags(apiKey: string, contactId: string, tags: string[]) {
