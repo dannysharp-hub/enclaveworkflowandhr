@@ -513,6 +513,13 @@ Deno.serve(async (req) => {
         const milestone = payload.milestone as string | undefined;
         const actions = resolveActions(event.event_type, milestone, payload);
 
+        console.log(`[ghl-worker] Processing event: ${event.event_type} (id: ${event.id})`, {
+          hasActions: !!actions,
+          stageKey: actions?.stageKey,
+          tags: actions?.tags,
+          payload: JSON.stringify(payload).slice(0, 500),
+        });
+
         if (!actions) {
           await supabase.from("cab_events").update({ status: "success", processed_at: new Date().toISOString() }).eq("id", event.id);
           processed++;
@@ -569,6 +576,7 @@ Deno.serve(async (req) => {
         // 4) Add tags
         if (actions.tags.length && ghlContactId) {
           await addTags(ghlApiKey, ghlContactId, actions.tags);
+          console.log(`[ghl-worker] Tags applied: ${actions.tags.join(", ")} for contact ${ghlContactId}`);
         }
 
         // 4b) Update appointment window custom field if configured
