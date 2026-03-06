@@ -251,10 +251,20 @@ Deno.serve(async (req) => {
     if (fnLower.includes("media wall")) roomType = "media_wall";
     else if (fnLower.includes("wardrobe")) roomType = "wardrobes";
 
-    // ── 3a) Multiple active jobs → flag possible duplicate, do NOT create another ──
+    // Helper: detect clearly different project (different room AND different postcode)
+    function isDifferentProject(existingJob: any): boolean {
+      if (roomType === "general") return false;
+      const diffRoom = existingJob.room_type && existingJob.room_type !== roomType;
+      const existingPc = norm((existingJob.property_address_json as any)?.postcode);
+      const newPc = norm(postcode);
+      const diffAddr = newPc && existingPc && newPc !== existingPc;
+      return !!(diffRoom && diffAddr);
+    }
+
+    // ── 3a) Multiple active jobs → flag possible duplicate ──
     if (activeCount > 1) {
       const latestJob = activeJobs![0];
-      console.log(`ghl-form: DUPLICATE FLAG — customer ${customer.id} has ${activeCount} active jobs: ${activeJobs!.map(j => j.job_ref).join(", ")}`);
+      console.log(`ghl-form: DUPLICATE FLAG — customer ${customer.id} has ${activeCount} active jobs: ${activeJobs!.map((j: any) => j.job_ref).join(", ")}`);
 
       await supabase.from("cab_events").insert({
         company_id: companyId,
@@ -262,73 +272,61 @@ Deno.serve(async (req) => {
         job_id: latestJob.id,
         customer_id: customer.id,
         payload_json: {
-          form_name: formName,
-          room_type: roomType,
-          postcode,
-          ghl_contact_id: contactId,
-          source: "ghl_form",
-          active_job_count: activeCount,
-          active_job_refs: activeJobs!.map(j => j.job_ref),
+          form_name: formName, room_type: roomType, postcode, ghl_contact_id: contactId,
+          source: "ghl_form", active_job_count: activeCount,
+          active_job_refs: activeJobs!.map((j: any) => j.job_ref),
           note: `Customer has ${activeCount} active jobs — not creating another. Manual review required.`,
         },
         status: "pending",
       });
 
       await supabase.from("cab_ghl_sync_log").insert({
-        company_id: companyId,
-        action: "form.possible_duplicate_flagged",
-        job_id: latestJob.id,
-        success: true,
-        error: `${activeCount} active jobs found: ${activeJobs!.map(j => j.job_ref).join(", ")}`,
+        company_id: companyId, action: "form.possible_duplicate_flagged",
+        job_id: latestJob.id, success: true,
+        error: `${activeCount} active jobs found: ${activeJobs!.map((j: any) => j.job_ref).join(", ")}`,
       });
 
       return ok({ success: true, job_ref: latestJob.job_ref, reused: true, duplicate_flagged: true, note: "possible_duplicate_flagged" });
     }
 
-    // ── 3b) Exactly one active job → reuse it ──
+    // ── 3b) Exactly one active job ──
     if (activeCount === 1) {
       const existingJob = activeJobs![0];
-      console.log(`ghl-form: REUSING existing active job ${existingJob.job_ref} (stage: ${existingJob.current_stage_key}) for customer ${customer.id}`);
 
-      const jobUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (contactId && !existingJob.ghl_contact_id) jobUpdates.ghl_contact_id = contactId;
-      if (roomType !== "general" && existingJob.room_type !== roomType) jobUpdates.room_type = roomType;
-      if (postcode) {
-        jobUpdates.property_address_json = {
-          postcode: postcode || null,
-          address_line_1: addressLine1 || null,
-          city: city || null,
-        };
+      // If clearly a different project, fall through to create new job
+      if (isDifferentProject(existingJob)) {
+        console.log(`ghl-form: Different project detected (room: ${roomType} vs ${existingJob.room_type}, postcode: ${postcode} vs ${(existingJob as any).property_address_json?.postcode}). Creating new job.`);
+      } else {
+        // Reuse existing job
+        console.log(`ghl-form: REUSING existing active job ${existingJob.job_ref} (stage: ${existingJob.current_stage_key}) for customer ${customer.id}`);
+
+        const jobUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (contactId && !existingJob.ghl_contact_id) jobUpdates.ghl_contact_id = contactId;
+        if (roomType !== "general" && existingJob.room_type !== roomType) jobUpdates.room_type = roomType;
+        if (postcode) {
+          jobUpdates.property_address_json = { postcode: postcode || null, address_line_1: addressLine1 || null, city: city || null };
+        }
+        await supabase.from("cab_jobs").update(jobUpdates).eq("id", existingJob.id);
+
+        await supabase.from("cab_events").insert({
+          company_id: companyId, event_type: "lead.resubmitted",
+          job_id: existingJob.id, customer_id: customer.id,
+          payload_json: {
+            form_name: formName, room_type: roomType, postcode, ghl_contact_id: contactId,
+            source: "ghl_form", note: "Duplicate enquiry merged into existing active job",
+            original_stage: existingJob.current_stage_key,
+          },
+          status: "pending",
+        });
+
+        await supabase.from("cab_ghl_sync_log").insert({
+          company_id: companyId, action: "form.resubmitted_merged",
+          job_id: existingJob.id, success: true, error: null,
+        });
+
+        console.log(`ghl-form: lead.resubmitted → reused ${existingJob.job_ref}`);
+        return ok({ success: true, job_ref: existingJob.job_ref, reused: true, note: "reused_existing_active_job" });
       }
-      await supabase.from("cab_jobs").update(jobUpdates).eq("id", existingJob.id);
-
-      await supabase.from("cab_events").insert({
-        company_id: companyId,
-        event_type: "lead.resubmitted",
-        job_id: existingJob.id,
-        customer_id: customer.id,
-        payload_json: {
-          form_name: formName,
-          room_type: roomType,
-          postcode,
-          ghl_contact_id: contactId,
-          source: "ghl_form",
-          note: "Duplicate enquiry merged into existing active job",
-          original_stage: existingJob.current_stage_key,
-        },
-        status: "pending",
-      });
-
-      await supabase.from("cab_ghl_sync_log").insert({
-        company_id: companyId,
-        action: "form.resubmitted_merged",
-        job_id: existingJob.id,
-        success: true,
-        error: null,
-      });
-
-      console.log(`ghl-form: lead.resubmitted → reused ${existingJob.job_ref}`);
-      return ok({ success: true, job_ref: existingJob.job_ref, reused: true, note: "reused_existing_active_job" });
     }
 
     // ── 4) No active job → create new one ──
