@@ -11,7 +11,7 @@ interface SyncAction {
   stageKey?: string;
   tags: string[];
   noteExtra?: string;
-  customerWindow?: string; // e.g. "Tue 11:00–13:00" for GHL custom field
+  customerWindow?: string;
 }
 
 function resolveActions(eventType: string, milestone?: string, payload?: Record<string, unknown>): SyncAction | null {
@@ -53,9 +53,7 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
           const datePart = ds.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" });
           const timePart = ds.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
           const endPart = de ? `–${de.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}` : "";
-          // Customer-facing window: e.g. "Tue 11:00–13:00"
           customerWindow = `${ds.toLocaleDateString("en-GB", { weekday: "short", timeZone: "Europe/London" })} ${timePart}${endPart}`;
-          // Internal note with full operational detail
           noteExtra = `Booked: ${datePart} ${timePart}${endPart}`;
           if (repName) noteExtra += ` | Rep: ${repName}`;
           if (calId) noteExtra += ` | Cal: ${calId}`;
@@ -130,21 +128,54 @@ async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unk
   return data;
 }
 
-async function upsertContact(
+/* ─── Contact ensure: search by email, fallback phone, create if not found ─── */
+interface EnsureContactResult {
+  ghlContactId: string;
+  action: "found_by_email" | "found_by_phone" | "created";
+  searchDetails: string;
+}
+
+async function ensureGhlContact(
   apiKey: string,
   locationId: string,
-  customer: { email?: string; phone?: string; first_name: string; last_name: string }
-) {
-  const searchField = customer.email || customer.phone;
-  if (searchField) {
+  customer: { email?: string | null; phone?: string | null; first_name: string; last_name: string },
+): Promise<EnsureContactResult> {
+  // 1) Search by email
+  if (customer.email) {
     try {
       const search = await ghlFetch(
-        `/contacts/search/duplicate?locationId=${locationId}&${customer.email ? "email" : "phone"}=${encodeURIComponent(searchField)}`,
+        `/contacts/search/duplicate?locationId=${locationId}&email=${encodeURIComponent(customer.email)}`,
         apiKey
       );
-      if (search.contacts?.length) return search.contacts[0];
-    } catch { /* not found, create */ }
+      if (search.contacts?.length) {
+        const c = search.contacts[0];
+        console.log(`[ghl-worker] Contact found by email: ${c.id} (${customer.email})`);
+        return { ghlContactId: c.id, action: "found_by_email", searchDetails: `email=${customer.email} → ${c.id}` };
+      }
+    } catch (err) {
+      console.log(`[ghl-worker] Email search error (continuing): ${err}`);
+    }
   }
+
+  // 2) Fallback: search by phone
+  if (customer.phone) {
+    try {
+      const search = await ghlFetch(
+        `/contacts/search/duplicate?locationId=${locationId}&phone=${encodeURIComponent(customer.phone)}`,
+        apiKey
+      );
+      if (search.contacts?.length) {
+        const c = search.contacts[0];
+        console.log(`[ghl-worker] Contact found by phone: ${c.id} (${customer.phone})`);
+        return { ghlContactId: c.id, action: "found_by_phone", searchDetails: `phone=${customer.phone} → ${c.id}` };
+      }
+    } catch (err) {
+      console.log(`[ghl-worker] Phone search error (continuing): ${err}`);
+    }
+  }
+
+  // 3) Not found → create
+  console.log(`[ghl-worker] Creating new GHL contact: ${customer.first_name} ${customer.last_name}`);
   const created = await ghlFetch("/contacts/", apiKey, "POST", {
     locationId,
     firstName: customer.first_name,
@@ -152,7 +183,17 @@ async function upsertContact(
     email: customer.email || undefined,
     phone: customer.phone || undefined,
   });
-  return created.contact;
+  const newId = created.contact?.id || created.id;
+  console.log(`[ghl-worker] Contact created: ${newId}`);
+  return { ghlContactId: newId, action: "created", searchDetails: `created new → ${newId}` };
+}
+
+/* Save ghl_contact_id to both cab_jobs and cab_customers */
+async function saveGhlContactId(supabase: any, jobId: string, customerId: string, ghlContactId: string) {
+  await Promise.all([
+    supabase.from("cab_jobs").update({ ghl_contact_id: ghlContactId }).eq("id", jobId),
+    supabase.from("cab_customers").update({ ghl_contact_id: ghlContactId }).eq("id", customerId),
+  ]);
 }
 
 interface ContactOppSearchResult { id: string | null; totalFound: number }
@@ -161,7 +202,6 @@ async function findContactOpportunity(apiKey: string, contactId: string, pipelin
   try {
     const data = await ghlFetch(`/contacts/${contactId}/opportunities`, apiKey);
     const opps = (data.opportunities || []) as any[];
-    // Filter to this pipeline (any status), prefer open, then most recent
     const pipelineOpps = opps
       .filter((o: any) => o.pipelineId === pipelineId)
       .sort((a: any, b: any) => {
@@ -188,14 +228,12 @@ async function upsertOpportunity(
   const name = `${job.job_ref} — ${job.job_title}`;
   const monetaryValue = job.contract_value || 0;
 
-  // 1) Already have an opp id → always PUT, never POST
   if (existingOppId) {
     const payload: Record<string, unknown> = { pipelineStageId, name, monetaryValue };
     await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", payload);
     return { id: existingOppId, action: "updated", searchCount: 0 };
   }
 
-  // 2) Search for ANY existing opportunity for this contact in the pipeline (open or not)
   const search = await findContactOpportunity(apiKey, contactId, pipelineId);
   if (search.id) {
     const payload: Record<string, unknown> = { pipelineStageId, name, monetaryValue };
@@ -203,7 +241,6 @@ async function upsertOpportunity(
     return { id: search.id, action: "found_and_updated", searchCount: search.totalFound };
   }
 
-  // 3) Only create if absolutely nothing found
   const payload = {
     pipelineId,
     pipelineStageId,
@@ -298,7 +335,7 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // List pipelines action — fetch from GHL API with raw debug
+    // List pipelines action
     if (action === "list_pipelines") {
       const reqUrl = `${GHL_BASE}/opportunities/pipelines?locationId=${ghlLocationId}`;
       try {
@@ -364,7 +401,6 @@ Deno.serve(async (req) => {
 
       try {
         const result = await ghlFetch("/opportunities/", ghlApiKey, "POST", testPayload);
-        // Clean up test opportunity
         if (result.opportunity?.id) {
           try { await ghlFetch(`/opportunities/${result.opportunity.id}`, ghlApiKey, "DELETE"); } catch {}
         }
@@ -387,6 +423,33 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ─── Sync Contact to GHL (standalone) ───
+    if (action === "sync_contact") {
+      if (!jobId) return new Response(JSON.stringify({ error: "job_id required" }), { status: 400, headers: corsHeaders });
+
+      const { data: job } = await supabase.from("cab_jobs").select("*").eq("id", jobId).single();
+      if (!job) return new Response(JSON.stringify({ error: "Job not found" }), { status: 404, headers: corsHeaders });
+
+      const { data: customer } = await supabase.from("cab_customers").select("*").eq("id", job.customer_id).single();
+      if (!customer) return new Response(JSON.stringify({ error: "Customer not found" }), { status: 404, headers: corsHeaders });
+
+      const result = await ensureGhlContact(ghlApiKey, ghlLocationId, customer);
+      await saveGhlContactId(supabase, job.id, customer.id, result.ghlContactId);
+
+      await supabase.from("cab_ghl_sync_log").insert({
+        company_id: companyId,
+        job_id: job.id,
+        action: `contact.sync → ${result.action} | ${result.searchDetails}`,
+        success: true,
+      });
+
+      return new Response(JSON.stringify({
+        ghl_contact_id: result.ghlContactId,
+        contact_action: result.action,
+        search_details: result.searchDetails,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Link existing GHL opportunity to a job
     if (action === "link_opportunity") {
       if (!jobId) return new Response(JSON.stringify({ error: "job_id required" }), { status: 400, headers: corsHeaders });
@@ -397,12 +460,12 @@ Deno.serve(async (req) => {
       const { data: customer } = await supabase.from("cab_customers").select("*").eq("id", job.customer_id).single();
       if (!customer) return new Response(JSON.stringify({ error: "Customer not found" }), { status: 404, headers: corsHeaders });
 
-      // Upsert contact first
+      // Ensure contact exists first
       let ghlContactId = job.ghl_contact_id;
       if (!ghlContactId) {
-        const contact = await upsertContact(ghlApiKey, ghlLocationId, customer);
-        ghlContactId = contact.id;
-        await supabase.from("cab_jobs").update({ ghl_contact_id: ghlContactId }).eq("id", job.id);
+        const contactResult = await ensureGhlContact(ghlApiKey, ghlLocationId, customer);
+        ghlContactId = contactResult.ghlContactId;
+        await saveGhlContactId(supabase, job.id, customer.id, ghlContactId);
       }
 
       const search = await findContactOpportunity(ghlApiKey, ghlContactId, pipelineId);
@@ -423,18 +486,68 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Requeue latest events for a job (ignore old failed ones)
+    // ─── Repair contacts: find/create GHL contacts for jobs that have opps but no visible contact ───
+    if (action === "repair_contacts") {
+      // Find jobs with ghl_opportunity_id but missing or stale ghl_contact_id
+      let jobQuery = supabase.from("cab_jobs")
+        .select("id, job_ref, customer_id, ghl_contact_id, ghl_opportunity_id")
+        .eq("company_id", companyId)
+        .not("ghl_opportunity_id", "is", null);
+
+      if (jobId) jobQuery = jobQuery.eq("id", jobId);
+
+      const { data: jobs } = await jobQuery;
+      const results: any[] = [];
+
+      for (const j of (jobs || [])) {
+        const { data: customer } = await supabase.from("cab_customers").select("*").eq("id", j.customer_id).single();
+        if (!customer) { results.push({ job_ref: j.job_ref, error: "customer_not_found" }); continue; }
+
+        // Always re-ensure contact to make sure it's visible in GHL
+        const contactResult = await ensureGhlContact(ghlApiKey, ghlLocationId, customer);
+        await saveGhlContactId(supabase, j.id, customer.id, contactResult.ghlContactId);
+
+        // If the opportunity was created with a different/phantom contact, update it
+        if (j.ghl_opportunity_id) {
+          try {
+            await ghlFetch(`/opportunities/${j.ghl_opportunity_id}`, ghlApiKey, "PUT", {
+              contactId: contactResult.ghlContactId,
+            });
+          } catch (err) {
+            console.error(`[ghl-worker] Failed to relink opportunity ${j.ghl_opportunity_id}:`, err);
+          }
+        }
+
+        await supabase.from("cab_ghl_sync_log").insert({
+          company_id: companyId,
+          job_id: j.id,
+          action: `contact.repair → ${contactResult.action} | ${contactResult.searchDetails} | opp: ${j.ghl_opportunity_id}`,
+          success: true,
+        });
+
+        results.push({
+          job_ref: j.job_ref,
+          ghl_contact_id: contactResult.ghlContactId,
+          contact_action: contactResult.action,
+          opp_relinked: !!j.ghl_opportunity_id,
+        });
+      }
+
+      return new Response(JSON.stringify({ repaired: results.length, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Requeue latest events for a job
     if (action === "requeue_latest") {
       if (!jobId) return new Response(JSON.stringify({ error: "job_id required" }), { status: 400, headers: corsHeaders });
 
-      // Mark all old failed/pending events as skipped
       await supabase.from("cab_events")
         .update({ status: "skipped" })
         .eq("job_id", jobId)
         .eq("company_id", companyId)
         .in("status", ["failed", "pending"]);
 
-      // Get the latest event for each event_type and re-insert as fresh pending
       const { data: latestEvents } = await supabase.from("cab_events")
         .select("*")
         .eq("job_id", jobId)
@@ -478,7 +591,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // If limit is 0, just test connection
     if (limit === 0) {
       return new Response(JSON.stringify({ processed: 0, errors: 0, message: "Connection OK" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -538,18 +650,25 @@ Deno.serve(async (req) => {
         const { data: customer } = await supabase.from("cab_customers").select("*").eq("id", job.customer_id).single();
         if (!customer) throw new Error(`Customer not found: ${job.customer_id}`);
 
-        // 1) Upsert contact
+        // 1) ENSURE GHL contact exists (search email → phone → create)
         let ghlContactId = job.ghl_contact_id;
+        let contactAction = "existing";
+        let contactSearchDetails = `cached: ${ghlContactId}`;
+
         if (!ghlContactId) {
-          const contact = await upsertContact(ghlApiKey, ghlLocationId, customer);
-          ghlContactId = contact.id;
-          await supabase.from("cab_jobs").update({ ghl_contact_id: ghlContactId }).eq("id", job.id);
+          const contactResult = await ensureGhlContact(ghlApiKey, ghlLocationId, customer);
+          ghlContactId = contactResult.ghlContactId;
+          contactAction = contactResult.action;
+          contactSearchDetails = contactResult.searchDetails;
+          await saveGhlContactId(supabase, job.id, customer.id, ghlContactId);
         }
+
+        console.log(`[ghl-worker] Contact: ${contactAction} → ${ghlContactId} (${contactSearchDetails})`);
 
         // 2) Determine target stage
         const targetStageId = actions.stageKey ? stageIds[actions.stageKey] : undefined;
 
-        // 3) Upsert opportunity (idempotent: one job = one opportunity)
+        // 3) Upsert opportunity using confirmed ghl_contact_id
         let ghlOppId = job.ghl_opportunity_id;
         let oppAction = "skipped";
         let oppSearchCount = 0;
@@ -579,7 +698,7 @@ Deno.serve(async (req) => {
           console.log(`[ghl-worker] Tags applied: ${actions.tags.join(", ")} for contact ${ghlContactId}`);
         }
 
-        // 4b) Update appointment window custom field if configured
+        // 4b) Update appointment window custom field
         if (actions.customerWindow && ghlContactId) {
           const apptFieldId = settings.ghl_custom_field_appointment_window_id as string;
           if (apptFieldId) {
@@ -605,12 +724,12 @@ Deno.serve(async (req) => {
         // Mark success
         await supabase.from("cab_events").update({ status: "success", processed_at: new Date().toISOString() }).eq("id", event.id);
 
-        // Log
+        // Log with contact details
         await supabase.from("cab_ghl_sync_log").insert({
           company_id: companyId,
           event_id: event.id,
           job_id: event.job_id,
-          action: `${event.event_type} → stage:${actions.stageKey || "none"} tags:${actions.tags.join(",")} opp:${oppAction}(searched:${oppSearchCount}) opp_id:${ghlOppId || "none"}`,
+          action: `${event.event_type} → stage:${actions.stageKey || "none"} tags:${actions.tags.join(",")} opp:${oppAction}(searched:${oppSearchCount}) opp_id:${ghlOppId || "none"} contact:${contactAction} contact_id:${ghlContactId}`,
           success: true,
         });
 
@@ -623,7 +742,6 @@ Deno.serve(async (req) => {
 
         const evPayload = (event.payload_json as Record<string, unknown>) || {};
         const actions = resolveActions(event.event_type, evPayload.milestone as string | undefined, evPayload);
-        // Include request payload and GHL response for debugging
         const debugInfo: Record<string, unknown> = {
           stageKey: actions?.stageKey,
           tags: actions?.tags,
