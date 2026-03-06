@@ -155,6 +155,19 @@ async function upsertContact(
   return created.contact;
 }
 
+async function findContactOpportunity(apiKey: string, contactId: string, pipelineId: string): Promise<string | null> {
+  try {
+    const data = await ghlFetch(`/contacts/${contactId}/opportunities`, apiKey);
+    const opps = data.opportunities || [];
+    for (const opp of opps) {
+      if (opp.pipelineId === pipelineId && opp.status === "open") return opp.id;
+    }
+  } catch { /* not found */ }
+  return null;
+}
+
+interface UpsertResult { id: string; action: "created" | "updated" | "found_and_updated" }
+
 async function upsertOpportunity(
   apiKey: string,
   locationId: string,
@@ -163,27 +176,37 @@ async function upsertOpportunity(
   contactId: string,
   job: { job_ref: string; job_title: string; contract_value?: number },
   existingOppId?: string
-) {
+): Promise<UpsertResult> {
+  const name = `${job.job_ref} — ${job.job_title}`;
+  const monetaryValue = job.contract_value || 0;
+
+  // 1) Already have an opp id → PUT update
   if (existingOppId) {
-    const payload = {
-      pipelineStageId,
-      name: `${job.job_ref} — ${job.job_title}`,
-      monetaryValue: job.contract_value || 0,
-    };
-    const updated = await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", payload);
-    return updated.opportunity || { id: existingOppId };
+    const payload: Record<string, unknown> = { pipelineStageId, name, monetaryValue };
+    await ghlFetch(`/opportunities/${existingOppId}`, apiKey, "PUT", payload);
+    return { id: existingOppId, action: "updated" };
   }
+
+  // 2) Search for existing open opportunity for this contact in the pipeline
+  const foundId = await findContactOpportunity(apiKey, contactId, pipelineId);
+  if (foundId) {
+    const payload: Record<string, unknown> = { pipelineStageId, name, monetaryValue };
+    await ghlFetch(`/opportunities/${foundId}`, apiKey, "PUT", payload);
+    return { id: foundId, action: "found_and_updated" };
+  }
+
+  // 3) Create new
   const payload = {
     pipelineId,
     pipelineStageId,
     locationId,
     contactId,
-    name: `${job.job_ref} — ${job.job_title}`,
-    monetaryValue: job.contract_value || 0,
+    name,
+    monetaryValue,
     status: "open",
   };
   const created = await ghlFetch("/opportunities/", apiKey, "POST", payload);
-  return created.opportunity;
+  return { id: created.opportunity?.id || created.id, action: "created" };
 }
 
 async function addTags(apiKey: string, contactId: string, tags: string[]) {
