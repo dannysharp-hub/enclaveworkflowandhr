@@ -607,10 +607,6 @@ export default function GhlSettingsPage() {
           </div>
         )}
       </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Stage ID mapping */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">
