@@ -41,6 +41,7 @@ export default function JobDetailPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [lastSyncLogs, setLastSyncLogs] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -65,13 +66,14 @@ export default function JobDetailPage() {
     if (!jobData) { navigate("/admin/leads"); return; }
     setJob(jobData);
 
-    const [custRes, quotesRes, invRes, eventsRes, apptRes, teamRes] = await Promise.all([
+    const [custRes, quotesRes, invRes, eventsRes, apptRes, teamRes, syncLogRes] = await Promise.all([
       (supabase.from("cab_customers") as any).select("*").eq("id", jobData.customer_id).single(),
       (supabase.from("cab_quotes") as any).select("*").eq("job_id", jobData.id).order("version", { ascending: false }),
       (supabase.from("cab_invoices") as any).select("*").eq("job_id", jobData.id).order("created_at"),
       (supabase.from("cab_events") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }).limit(20),
       (supabase.from("cab_appointments") as any).select("*").eq("job_id", jobData.id).order("start_at", { ascending: true }),
       (supabase.from("cab_company_memberships") as any).select("user_id, role").eq("company_id", cid),
+      (supabase.from("cab_ghl_sync_log") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }).limit(3),
     ]);
 
     setCustomer(custRes.data);
@@ -80,6 +82,7 @@ export default function JobDetailPage() {
     setEvents(eventsRes.data ?? []);
     setAppointments(apptRes.data ?? []);
     setTeamMembers(teamRes.data ?? []);
+    setLastSyncLogs(syncLogRes.data ?? []);
     setLoading(false);
   }, [jobRef, navigate]);
 
@@ -883,6 +886,22 @@ export default function JobDetailPage() {
                 )}
               </div>
             </div>
+            {/* Last sync results */}
+            {lastSyncLogs.length > 0 && (
+              <div className="space-y-1.5 pt-1 border-t border-border">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Last Sync</span>
+                {lastSyncLogs.map((log: any) => (
+                  <div key={log.id} className="text-[11px] rounded bg-muted/50 px-2 py-1.5 space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${log.success ? "bg-emerald-500" : "bg-destructive"}`} />
+                      <span className="font-mono font-medium text-foreground">{log.action}</span>
+                      <span className="text-muted-foreground ml-auto">{format(new Date(log.created_at), "dd MMM HH:mm")}</span>
+                    </div>
+                    {log.error && <p className="text-destructive text-[10px] truncate" title={log.error}>{log.error}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               {/* Sync Contact */}
               <Button
