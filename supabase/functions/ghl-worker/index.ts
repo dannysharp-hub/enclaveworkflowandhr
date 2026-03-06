@@ -508,7 +508,7 @@ Deno.serve(async (req) => {
           company_id: companyId,
           event_id: event.id,
           job_id: event.job_id,
-          action: `${event.event_type} → stage:${actions.stageKey || "none"} tags:${actions.tags.join(",")}`,
+          action: `${event.event_type} → stage:${actions.stageKey || "none"} tags:${actions.tags.join(",")} opp:${oppAction} opp_id:${ghlOppId || "none"}`,
           success: true,
         });
 
