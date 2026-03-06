@@ -124,6 +124,9 @@ export default function LeadsPage() {
               {leads.map(lead => {
                 const isDuplicate = duplicateCustomerIds.has(lead.customer_id);
                 const otherRefs = (dupJobRefs.get(lead.customer_id) || []).filter(r => r !== lead.job_ref);
+                // Check events for resubmitted/duplicate flags
+                const hasResubmitted = (lead as any)._resubmitted;
+                const hasDuplicateFlag = (lead as any)._duplicateFlag;
                 return (
                   <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/admin/jobs/${lead.job_ref}`)}>
                     <TableCell className="font-mono text-xs">
@@ -143,7 +146,9 @@ export default function LeadsPage() {
                       )}
                     </TableCell>
                     <TableCell>{lead.room_type || "—"}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{lead.current_stage_key?.replace(/_/g, " ")}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px]">{lead.current_stage_key?.replace(/_/g, " ")}</Badge>
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-xs">{format(new Date(lead.created_at), "dd MMM HH:mm")}</TableCell>
                     <TableCell><ArrowRight size={14} className="text-muted-foreground" /></TableCell>
                   </TableRow>

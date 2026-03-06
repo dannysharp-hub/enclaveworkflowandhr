@@ -381,6 +381,12 @@ export default function JobDetailPage() {
             {isProjectConfirmed && (
               <Badge className="text-[10px] bg-emerald-600 text-white">PROJECT CONFIRMED</Badge>
             )}
+            {events.some((e: any) => e.event_type === "lead.resubmitted") && (
+              <Badge className="text-[10px] bg-amber-500 text-white">REUSED LEAD</Badge>
+            )}
+            {events.some((e: any) => e.event_type === "lead.possible_duplicate") && (
+              <Badge variant="destructive" className="text-[10px]">⚠ POSSIBLE DUPLICATE</Badge>
+            )}
           </div>
           <h1 className="text-xl font-bold text-foreground">{job.job_title}</h1>
           {(job.ghl_contact_id || job.ghl_opportunity_id) && (
