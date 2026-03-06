@@ -217,18 +217,22 @@ Deno.serve(async (req) => {
       console.log("ghl-form: created new customer", customer.id);
     }
 
-    // ── 2) Check for existing active job for this customer ──
-    const { data: existingJob } = await supabase
+    // ── 2) Check for existing active jobs for this customer (within 90 days) ──
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const { data: activeJobs } = await supabase
       .from("cab_jobs")
-      .select("id, job_ref, current_stage_key, room_type")
+      .select("id, job_ref, current_stage_key, room_type, ghl_contact_id, created_at")
       .eq("company_id", companyId)
       .eq("customer_id", customer.id)
       .in("current_stage_key", ACTIVE_STAGES)
       .neq("status", "closed")
       .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .gte("created_at", ninetyDaysAgo.toISOString())
+      .order("created_at", { ascending: false });
+
+    const activeCount = activeJobs?.length || 0;
 
     // Map room_type from form_name
     let roomType = "general";
@@ -236,11 +240,45 @@ Deno.serve(async (req) => {
     if (fnLower.includes("media wall")) roomType = "media_wall";
     else if (fnLower.includes("wardrobe")) roomType = "wardrobes";
 
-    // ── 3) If active job exists → reuse it ──
-    if (existingJob) {
+    // ── 3a) Multiple active jobs → flag possible duplicate, do NOT create another ──
+    if (activeCount > 1) {
+      const latestJob = activeJobs![0];
+      console.log(`ghl-form: DUPLICATE FLAG — customer ${customer.id} has ${activeCount} active jobs: ${activeJobs!.map(j => j.job_ref).join(", ")}`);
+
+      await supabase.from("cab_events").insert({
+        company_id: companyId,
+        event_type: "lead.possible_duplicate",
+        job_id: latestJob.id,
+        customer_id: customer.id,
+        payload_json: {
+          form_name: formName,
+          room_type: roomType,
+          postcode,
+          ghl_contact_id: contactId,
+          source: "ghl_form",
+          active_job_count: activeCount,
+          active_job_refs: activeJobs!.map(j => j.job_ref),
+          note: `Customer has ${activeCount} active jobs — not creating another. Manual review required.`,
+        },
+        status: "pending",
+      });
+
+      await supabase.from("cab_ghl_sync_log").insert({
+        company_id: companyId,
+        action: "form.possible_duplicate_flagged",
+        job_id: latestJob.id,
+        success: true,
+        error: `${activeCount} active jobs found: ${activeJobs!.map(j => j.job_ref).join(", ")}`,
+      });
+
+      return ok({ success: true, job_ref: latestJob.job_ref, reused: true, duplicate_flagged: true, note: "possible_duplicate_flagged" });
+    }
+
+    // ── 3b) Exactly one active job → reuse it ──
+    if (activeCount === 1) {
+      const existingJob = activeJobs![0];
       console.log(`ghl-form: REUSING existing active job ${existingJob.job_ref} (stage: ${existingJob.current_stage_key}) for customer ${customer.id}`);
 
-      // Update any changed fields on the job
       const jobUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (contactId && !existingJob.ghl_contact_id) jobUpdates.ghl_contact_id = contactId;
       if (roomType !== "general" && existingJob.room_type !== roomType) jobUpdates.room_type = roomType;
@@ -253,7 +291,6 @@ Deno.serve(async (req) => {
       }
       await supabase.from("cab_jobs").update(jobUpdates).eq("id", existingJob.id);
 
-      // Insert lead.resubmitted event
       await supabase.from("cab_events").insert({
         company_id: companyId,
         event_type: "lead.resubmitted",
