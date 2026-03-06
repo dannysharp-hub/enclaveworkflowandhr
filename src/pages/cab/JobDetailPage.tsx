@@ -15,7 +15,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
-  CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus,
+  CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
@@ -802,14 +802,80 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* Right column — Event log */}
+        {/* Right column — GHL Admin + Event log */}
         <div className="space-y-4">
+          {/* GHL Admin Actions */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <Link size={14} className="text-primary" /> GHL Admin
+            </h3>
+            {job.ghl_opportunity_id ? (
+              <p className="text-xs text-muted-foreground">Opp linked: <span className="font-mono">{job.ghl_opportunity_id}</span></p>
+            ) : (
+              <p className="text-xs text-amber-600 font-medium">No GHL opportunity linked</p>
+            )}
+            <div className="flex flex-col gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs justify-start"
+                disabled={ghlSyncing}
+                onClick={async () => {
+                  setGhlSyncing(true);
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const res = await supabase.functions.invoke("ghl-worker", {
+                      body: { company_id: companyId, job_id: job.id, action: "link_opportunity" },
+                    });
+                    const result = res.data;
+                    if (result?.linked) {
+                      toast({ title: "GHL opportunity linked", description: `ID: ${result.ghl_opportunity_id} (found ${result.search_count} in pipeline)` });
+                    } else {
+                      toast({ title: "No existing opportunity found", description: result?.message || "Will create on next sync", variant: "destructive" });
+                    }
+                    await load();
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  } finally {
+                    setGhlSyncing(false);
+                  }
+                }}
+              >
+                <Link size={12} /> {ghlSyncing ? "Searching…" : "Link Existing GHL Opportunity"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs justify-start"
+                disabled={ghlSyncing}
+                onClick={async () => {
+                  setGhlSyncing(true);
+                  try {
+                    const res = await supabase.functions.invoke("ghl-worker", {
+                      body: { company_id: companyId, job_id: job.id, action: "requeue_latest" },
+                    });
+                    const result = res.data;
+                    toast({ title: "Events requeued", description: `${result?.requeued || 0} latest events requeued: ${(result?.event_types || []).join(", ")}` });
+                    await load();
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message, variant: "destructive" });
+                  } finally {
+                    setGhlSyncing(false);
+                  }
+                }}
+              >
+                <RotateCcw size={12} /> {ghlSyncing ? "Requeuing…" : "Requeue Latest Events"}
+              </Button>
+            </div>
+          </div>
+
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-mono text-sm font-bold text-foreground mb-3">Event Log</h3>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {events.map(ev => (
                 <div key={ev.id} className="text-xs border-l-2 border-primary/30 pl-3 py-1">
                   <span className="font-mono text-primary">{ev.event_type}</span>
+                  <Badge variant={ev.status === "success" ? "default" : ev.status === "failed" ? "destructive" : "outline"} className="ml-2 text-[9px]">{ev.status}</Badge>
                   <span className="block text-muted-foreground">{format(new Date(ev.created_at), "dd MMM HH:mm")}</span>
                 </div>
               ))}

@@ -387,6 +387,90 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Link existing GHL opportunity to a job
+    if (action === "link_opportunity") {
+      if (!jobId) return new Response(JSON.stringify({ error: "job_id required" }), { status: 400, headers: corsHeaders });
+
+      const { data: job } = await supabase.from("cab_jobs").select("*").eq("id", jobId).single();
+      if (!job) return new Response(JSON.stringify({ error: "Job not found" }), { status: 404, headers: corsHeaders });
+
+      const { data: customer } = await supabase.from("cab_customers").select("*").eq("id", job.customer_id).single();
+      if (!customer) return new Response(JSON.stringify({ error: "Customer not found" }), { status: 404, headers: corsHeaders });
+
+      // Upsert contact first
+      let ghlContactId = job.ghl_contact_id;
+      if (!ghlContactId) {
+        const contact = await upsertContact(ghlApiKey, ghlLocationId, customer);
+        ghlContactId = contact.id;
+        await supabase.from("cab_jobs").update({ ghl_contact_id: ghlContactId }).eq("id", job.id);
+      }
+
+      const search = await findContactOpportunity(ghlApiKey, ghlContactId, pipelineId);
+      if (search.id) {
+        await supabase.from("cab_jobs").update({ ghl_opportunity_id: search.id }).eq("id", job.id);
+        return new Response(JSON.stringify({
+          linked: true,
+          ghl_opportunity_id: search.id,
+          search_count: search.totalFound,
+          ghl_contact_id: ghlContactId,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({
+        linked: false,
+        message: "No existing opportunity found for this contact in the configured pipeline",
+        ghl_contact_id: ghlContactId,
+        search_count: 0,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Requeue latest events for a job (ignore old failed ones)
+    if (action === "requeue_latest") {
+      if (!jobId) return new Response(JSON.stringify({ error: "job_id required" }), { status: 400, headers: corsHeaders });
+
+      // Mark all old failed/pending events as skipped
+      await supabase.from("cab_events")
+        .update({ status: "skipped" })
+        .eq("job_id", jobId)
+        .eq("company_id", companyId)
+        .in("status", ["failed", "pending"]);
+
+      // Get the latest event for each event_type and re-insert as fresh pending
+      const { data: latestEvents } = await supabase.from("cab_events")
+        .select("*")
+        .eq("job_id", jobId)
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false });
+
+      const seenTypes = new Set<string>();
+      const toRequeue: any[] = [];
+      for (const ev of (latestEvents || [])) {
+        if (!seenTypes.has(ev.event_type)) {
+          seenTypes.add(ev.event_type);
+          toRequeue.push(ev);
+        }
+      }
+
+      let requeued = 0;
+      for (const ev of toRequeue) {
+        await supabase.from("cab_events").insert({
+          company_id: companyId,
+          event_type: ev.event_type,
+          job_id: jobId,
+          customer_id: ev.customer_id,
+          payload_json: ev.payload_json,
+          status: "pending",
+          attempts: 0,
+        });
+        requeued++;
+      }
+
+      return new Response(JSON.stringify({
+        skipped_old: true,
+        requeued,
+        event_types: Array.from(seenTypes),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (!pipelineId) {
       return new Response(JSON.stringify({ error: "GHL pipeline not configured. Set up in /admin/ghl" }), {
         status: 400,
@@ -461,6 +545,7 @@ Deno.serve(async (req) => {
         // 3) Upsert opportunity (idempotent: one job = one opportunity)
         let ghlOppId = job.ghl_opportunity_id;
         let oppAction = "skipped";
+        let oppSearchCount = 0;
         const targetStageForOpp = targetStageId || stageIds["lead_captured"] || "";
         
         if (!ghlOppId || targetStageId) {
@@ -474,6 +559,7 @@ Deno.serve(async (req) => {
             ghlOppId || undefined
           );
           oppAction = result.action;
+          oppSearchCount = result.searchCount;
           if (!ghlOppId || result.action === "found_and_updated") {
             ghlOppId = result.id;
             await supabase.from("cab_jobs").update({ ghl_opportunity_id: ghlOppId }).eq("id", job.id);
@@ -516,7 +602,7 @@ Deno.serve(async (req) => {
           company_id: companyId,
           event_id: event.id,
           job_id: event.job_id,
-          action: `${event.event_type} → stage:${actions.stageKey || "none"} tags:${actions.tags.join(",")} opp:${oppAction} opp_id:${ghlOppId || "none"}`,
+          action: `${event.event_type} → stage:${actions.stageKey || "none"} tags:${actions.tags.join(",")} opp:${oppAction}(searched:${oppSearchCount}) opp_id:${ghlOppId || "none"}`,
           success: true,
         });
 
