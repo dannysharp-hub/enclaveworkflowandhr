@@ -51,13 +51,24 @@ function norm(s: string | null | undefined): string {
   return (s || "").trim().toLowerCase();
 }
 
+/** Normalize phone: strip spaces, dashes, parens; ensure +44 or 0-prefix consistency */
+function normPhone(s: string | null | undefined): string {
+  if (!s) return "";
+  let p = s.replace(/[\s\-\(\)\.]/g, "");
+  // Standardize UK: +440 → +44, 0044 → +44
+  if (p.startsWith("0044")) p = "+44" + p.slice(4);
+  if (p.startsWith("+440")) p = "+44" + p.slice(4);
+  // If starts with +44 and next char isn't 0, fine; if local 07xxx keep as-is
+  return p;
+}
+
 function extractFields(payload: Record<string, unknown>) {
   const contact = (payload.contact || {}) as Record<string, unknown>;
   return {
     firstName: ((payload.first_name || payload.firstName || contact.first_name || contact.firstName || "Unknown") as string).trim(),
     lastName: ((payload.last_name || payload.lastName || contact.last_name || contact.lastName || "") as string).trim(),
     email: norm(payload.email as string || contact.email as string) || null,
-    phone: ((payload.phone || contact.phone || null) as string | null)?.trim() || null,
+    phone: normPhone(payload.phone as string || contact.phone as string) || null,
     postcode: ((payload.postcode || payload.postal_code || contact.postalCode || contact.postal_code || null) as string | null)?.trim() || null,
     formName: (payload.form_name || payload.formName || (payload.page as Record<string, unknown>)?.name || "unknown") as string,
     contactId: (payload.contact_id || payload.contactId || contact.id || null) as string | null,
