@@ -186,59 +186,87 @@ export default function JobDetailPage() {
       toast({ title: "Send ballpark first", description: "Appointment booking is only available after a ballpark has been sent.", variant: "destructive" });
       return;
     }
-    const settings = company?.settings_json || {};
-    const repName = settings.site_visit_rep_name || "Alistair";
-    const calId = settings.site_visit_calendar_id || "";
+    setEmitting("appointment_request");
+    try {
+      const settings = company?.settings_json || {};
+      const repName = settings.site_visit_rep_name || "Alistair";
+      const calId = settings.site_visit_calendar_id || "";
 
-    const jobPostcode = job.property_address_json?.postcode;
-    if (jobPostcode && company?.base_postcode && company?.service_radius_miles) {
-      const dist = estimatePostcodeDistance(company.base_postcode, jobPostcode);
-      if (dist !== null && dist > company.service_radius_miles) {
-        await insertCabEvent({
-          companyId: companyId!,
-          eventType: "appointment.requested_out_of_area",
-          jobId: job.id,
-          payload: { distance_miles: Math.round(dist), postcode: jobPostcode },
-        });
-        toast({
-          title: "Outside service area",
-          description: `${jobPostcode} is ~${Math.round(dist)} miles away (limit: ${company.service_radius_miles}mi). Manual review required.`,
-          variant: "destructive",
-        });
-        load();
-        return;
+      const jobPostcode = job.property_address_json?.postcode;
+      if (jobPostcode && company?.base_postcode && company?.service_radius_miles) {
+        const dist = estimatePostcodeDistance(company.base_postcode, jobPostcode);
+        if (dist !== null && dist > company.service_radius_miles) {
+          await insertCabEvent({
+            companyId: companyId!,
+            eventType: "appointment.requested_out_of_area",
+            jobId: job.id,
+            payload: { distance_miles: Math.round(dist), postcode: jobPostcode },
+          });
+          toast({
+            title: "Outside service area",
+            description: `${jobPostcode} is ~${Math.round(dist)} miles away (limit: ${company.service_radius_miles}mi). Manual review required.`,
+            variant: "destructive",
+          });
+          load();
+          setEmitting(null);
+          return;
+        }
       }
+
+      const nextAction = new Date();
+      nextAction.setDate(nextAction.getDate() + 3);
+
+      const bookingUrl = calId
+        ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
+        : "";
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 1) Update job fields
+      await updateJob({
+        assigned_rep_name: repName,
+        assigned_rep_calendar_id: calId,
+        booking_url: bookingUrl || null,
+        appointment_requested_at: new Date().toISOString(),
+        appointment_requested_by: user?.id || null,
+        current_stage_key: "appointment_requested",
+        state: "awaiting_appointment_booking",
+        estimated_next_action_at: nextAction.toISOString(),
+      });
+      console.log("[Request Appointment] Job updated:", { bookingUrl, calId, repName, jobRef: job.job_ref });
+
+      // 2) Insert cab_events
+      const eventPayload = { rep_name: repName, calendar_id: calId, booking_url: bookingUrl, job_ref: job.job_ref };
+      await insertCabEvent({
+        companyId: companyId!,
+        eventType: "appointment.requested",
+        jobId: job.id,
+        payload: eventPayload,
+      });
+      console.log("[Request Appointment] Event inserted:", eventPayload);
+
+      // 3) Auto-trigger GHL sync so the event is processed immediately
+      try {
+        const syncRes = await supabase.functions.invoke("ghl-worker", {
+          body: { company_id: companyId, job_id: job.id },
+        });
+        console.log("[Request Appointment] GHL sync result:", syncRes.data);
+        const syncData = syncRes.data || {};
+        toast({
+          title: "Appointment requested & synced to GHL",
+          description: `Processed: ${syncData.processed || 0}, Errors: ${syncData.errors || 0}`,
+        });
+      } catch (syncErr: any) {
+        console.error("[Request Appointment] GHL sync failed:", syncErr);
+        toast({ title: "Event created but GHL sync failed", description: syncErr.message, variant: "destructive" });
+      }
+
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setEmitting(null);
     }
-
-    const nextAction = new Date();
-    nextAction.setDate(nextAction.getDate() + 3);
-
-    const bookingUrl = calId
-      ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
-      : "";
-
-    const { data: { user } } = await supabase.auth.getUser();
-
-    await updateJob({
-      assigned_rep_name: repName,
-      assigned_rep_calendar_id: calId,
-      booking_url: bookingUrl || null,
-      appointment_requested_at: new Date().toISOString(),
-      appointment_requested_by: user?.id || null,
-      current_stage_key: "appointment_requested",
-      state: "awaiting_appointment_booking",
-      estimated_next_action_at: nextAction.toISOString(),
-    });
-
-    await insertCabEvent({
-      companyId: companyId!,
-      eventType: "appointment.requested",
-      jobId: job.id,
-      payload: { rep_name: repName, calendar_id: calId, booking_url: bookingUrl, job_ref: job.job_ref },
-    });
-
-    toast({ title: "Appointment requested — GHL will send booking link" });
-    load();
   };
 
   const handleMarkDepositPaid = async (invoiceId: string, method: string) => {
@@ -481,12 +509,39 @@ export default function JobDetailPage() {
             </div>
           </div>
 
+          {/* Appointment Request Status */}
+          {(job.appointment_requested_at || job.booking_url) && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+              <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-emerald-500" /> Appointment Requested
+              </h3>
+              {job.appointment_requested_at && (
+                <p className="text-xs text-muted-foreground">
+                  Requested at: <span className="font-mono text-foreground">{format(new Date(job.appointment_requested_at), "dd MMM yyyy HH:mm")}</span>
+                </p>
+              )}
+              {job.booking_url && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Booking URL:</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-[10px] bg-muted p-2 rounded font-mono break-all select-all">{job.booking_url}</code>
+                    <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs" onClick={() => { navigator.clipboard.writeText(job.booking_url); toast({ title: "Copied" }); }}>
+                      <Copy size={12} />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Actions */}
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h3 className="font-mono text-sm font-bold text-foreground">Actions</h3>
             <div className="flex flex-wrap gap-2">
-              {stageKey === "ballpark_sent" && (
-                <Button size="sm" onClick={handleRequestAppointment}><CalendarPlus size={14} /> Request Appointment</Button>
+              {APPOINTMENT_ALLOWED_STAGES.includes(stageKey || "") && (
+                <Button size="sm" onClick={handleRequestAppointment} disabled={emitting === "appointment_request"}>
+                  <CalendarPlus size={14} /> {emitting === "appointment_request" ? "Requesting…" : "Request Appointment"}
+                </Button>
               )}
               <Button
                 size="sm"
