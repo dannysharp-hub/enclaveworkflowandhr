@@ -258,6 +258,26 @@ Deno.serve(async (req) => {
     const pipelineId = settings.ghl_pipeline_id as string;
     const stageIds = (settings.ghl_stage_ids as Record<string, string>) || {};
 
+    // List pipelines action — fetch from GHL API
+    if (action === "list_pipelines") {
+      try {
+        const data = await ghlFetch(`/opportunities/pipelines?locationId=${ghlLocationId}`, ghlApiKey);
+        const pipelines = (data.pipelines || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          stages: (p.stages || []).map((s: any) => ({ id: s.id, name: s.name })),
+        }));
+        return new Response(JSON.stringify({ pipelines }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        return new Response(JSON.stringify({ error: errMsg, pipelines: [] }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (!pipelineId) {
       return new Response(JSON.stringify({ error: "GHL pipeline not configured. Set up in /admin/ghl" }), {
         status: 400,
