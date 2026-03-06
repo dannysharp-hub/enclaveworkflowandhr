@@ -103,6 +103,17 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
 /* ─── GHL API helpers ─── */
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
+class GhlError extends Error {
+  requestPayload: unknown;
+  responseBody: unknown;
+  constructor(method: string, path: string, status: number, responseBody: unknown, requestPayload?: unknown) {
+    super(`GHL ${method} ${path} ${status}: ${JSON.stringify(responseBody)}`);
+    this.name = "GhlError";
+    this.requestPayload = requestPayload;
+    this.responseBody = responseBody;
+  }
+}
+
 async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unknown) {
   const opts: RequestInit = {
     method,
@@ -115,7 +126,7 @@ async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unk
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${GHL_BASE}${path}`, opts);
   const data = await res.json();
-  if (!res.ok) throw new Error(`GHL ${method} ${path} ${res.status}: ${JSON.stringify(data)}`);
+  if (!res.ok) throw new GhlError(method, path, res.status, data, body);
   return data;
 }
 
@@ -215,10 +226,12 @@ Deno.serve(async (req) => {
     let companyId: string | undefined;
     let jobId: string | undefined;
     let limit = 50;
+    let action: string | undefined;
     try {
       const body = await req.json();
       companyId = body.company_id;
       jobId = body.job_id;
+      action = body.action;
       if (body.limit !== undefined) limit = Math.min(body.limit, 100);
     } catch { /* no body */ }
 
@@ -244,6 +257,26 @@ Deno.serve(async (req) => {
     const settings = (company?.settings_json as Record<string, unknown>) || {};
     const pipelineId = settings.ghl_pipeline_id as string;
     const stageIds = (settings.ghl_stage_ids as Record<string, string>) || {};
+
+    // List pipelines action — fetch from GHL API
+    if (action === "list_pipelines") {
+      try {
+        const data = await ghlFetch(`/opportunities/pipelines?locationId=${ghlLocationId}`, ghlApiKey);
+        const pipelines = (data.pipelines || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          stages: (p.stages || []).map((s: any) => ({ id: s.id, name: s.name })),
+        }));
+        return new Response(JSON.stringify({ pipelines }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        return new Response(JSON.stringify({ error: errMsg, pipelines: [] }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     if (!pipelineId) {
       return new Response(JSON.stringify({ error: "GHL pipeline not configured. Set up in /admin/ghl" }), {
@@ -381,13 +414,22 @@ Deno.serve(async (req) => {
         const newStatus = attempts >= 10 ? "failed" : "pending";
         await supabase.from("cab_events").update({ status: newStatus, attempts, last_error: errMsg }).eq("id", event.id);
 
-        const payload = (event.payload_json as Record<string, unknown>) || {};
-        const actions = resolveActions(event.event_type, payload.milestone as string | undefined, payload);
+        const evPayload = (event.payload_json as Record<string, unknown>) || {};
+        const actions = resolveActions(event.event_type, evPayload.milestone as string | undefined, evPayload);
+        // Include request payload and GHL response for debugging
+        const debugInfo: Record<string, unknown> = {
+          stageKey: actions?.stageKey,
+          tags: actions?.tags,
+        };
+        if (err instanceof GhlError) {
+          debugInfo.requestPayload = err.requestPayload;
+          debugInfo.ghlResponse = err.responseBody;
+        }
         await supabase.from("cab_ghl_sync_log").insert({
           company_id: companyId!,
           event_id: event.id,
           job_id: event.job_id,
-          action: `${event.event_type} | payload: ${JSON.stringify({ stageKey: actions?.stageKey, tags: actions?.tags })}`,
+          action: `${event.event_type} | debug: ${JSON.stringify(debugInfo).slice(0, 1000)}`,
           success: false,
           error: errMsg,
         });

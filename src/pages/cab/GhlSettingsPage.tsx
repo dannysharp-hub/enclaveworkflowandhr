@@ -43,6 +43,8 @@ export default function GhlSettingsPage() {
   const [formWebhookUrl, setFormWebhookUrl] = useState("");
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [testingWebhook, setTestingWebhook] = useState(false);
+  const [fetchingPipelines, setFetchingPipelines] = useState(false);
+  const [pipelines, setPipelines] = useState<any[]>([]);
 
   // Site visit fields
   const [siteVisitCalendarId, setSiteVisitCalendarId] = useState("");
@@ -418,6 +420,82 @@ export default function GhlSettingsPage() {
             />
           </div>
         </div>
+
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={fetchingPipelines}
+          onClick={async () => {
+            setFetchingPipelines(true);
+            try {
+              const res = await supabase.functions.invoke("ghl-worker", {
+                body: { company_id: companyId, action: "list_pipelines" },
+              });
+              if (res.error) throw new Error(res.error.message);
+              setPipelines(res.data?.pipelines || []);
+              if (!res.data?.pipelines?.length) {
+                toast({ title: "No pipelines found", description: "Check your GHL API key and location ID", variant: "destructive" });
+              }
+            } catch (err: any) {
+              toast({ title: "Failed to fetch pipelines", description: err.message, variant: "destructive" });
+            } finally {
+              setFetchingPipelines(false);
+            }
+          }}
+        >
+          <RefreshCw size={12} className={fetchingPipelines ? "animate-spin" : ""} />
+          {fetchingPipelines ? "Fetching…" : "Fetch Pipelines from GHL"}
+        </Button>
+
+        {pipelines.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">Available Pipelines:</p>
+            {pipelines.map((p: any) => (
+              <div key={p.id} className="border border-border rounded p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold">{p.name}</span>
+                  <Button
+                    size="sm"
+                    variant={pipelineId === p.id ? "default" : "outline"}
+                    className="h-6 text-[10px]"
+                    onClick={() => {
+                      setPipelineId(p.id);
+                      // Auto-map stages if stage names match
+                      if (p.stages?.length) {
+                        toast({ title: `Pipeline "${p.name}" selected`, description: `ID: ${p.id}` });
+                      }
+                    }}
+                  >
+                    {pipelineId === p.id ? "Selected ✓" : "Select"}
+                  </Button>
+                </div>
+                <code className="text-[9px] text-muted-foreground font-mono">{p.id}</code>
+                {p.stages?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground">Stages:</p>
+                    {p.stages.map((s: any) => (
+                      <div key={s.id} className="flex items-center gap-2 text-[10px]">
+                        <span className="font-mono text-muted-foreground w-48 truncate">{s.name}</span>
+                        <code className="text-[9px] text-muted-foreground">{s.id}</code>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 text-[9px] px-1"
+                          onClick={() => {
+                            navigator.clipboard.writeText(s.id);
+                            toast({ title: `Copied: ${s.name}` });
+                          }}
+                        >
+                          <Copy size={10} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Stage ID mapping */}
