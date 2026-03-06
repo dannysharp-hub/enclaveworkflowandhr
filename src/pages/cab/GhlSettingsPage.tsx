@@ -43,6 +43,8 @@ export default function GhlSettingsPage() {
   const [formWebhookUrl, setFormWebhookUrl] = useState("");
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [testingWebhook, setTestingWebhook] = useState(false);
+  const [fetchingPipelines, setFetchingPipelines] = useState(false);
+  const [pipelines, setPipelines] = useState<any[]>([]);
 
   // Site visit fields
   const [siteVisitCalendarId, setSiteVisitCalendarId] = useState("");
