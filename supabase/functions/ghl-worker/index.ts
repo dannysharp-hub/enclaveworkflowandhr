@@ -103,6 +103,17 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
 /* ─── GHL API helpers ─── */
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
+class GhlError extends Error {
+  requestPayload: unknown;
+  responseBody: unknown;
+  constructor(method: string, path: string, status: number, responseBody: unknown, requestPayload?: unknown) {
+    super(`GHL ${method} ${path} ${status}: ${JSON.stringify(responseBody)}`);
+    this.name = "GhlError";
+    this.requestPayload = requestPayload;
+    this.responseBody = responseBody;
+  }
+}
+
 async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unknown) {
   const opts: RequestInit = {
     method,
@@ -115,7 +126,7 @@ async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unk
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${GHL_BASE}${path}`, opts);
   const data = await res.json();
-  if (!res.ok) throw new Error(`GHL ${method} ${path} ${res.status}: ${JSON.stringify(data)}`);
+  if (!res.ok) throw new GhlError(method, path, res.status, data, body);
   return data;
 }
 
@@ -381,13 +392,22 @@ Deno.serve(async (req) => {
         const newStatus = attempts >= 10 ? "failed" : "pending";
         await supabase.from("cab_events").update({ status: newStatus, attempts, last_error: errMsg }).eq("id", event.id);
 
-        const payload = (event.payload_json as Record<string, unknown>) || {};
-        const actions = resolveActions(event.event_type, payload.milestone as string | undefined, payload);
+        const evPayload = (event.payload_json as Record<string, unknown>) || {};
+        const actions = resolveActions(event.event_type, evPayload.milestone as string | undefined, evPayload);
+        // Include request payload and GHL response for debugging
+        const debugInfo: Record<string, unknown> = {
+          stageKey: actions?.stageKey,
+          tags: actions?.tags,
+        };
+        if (err instanceof GhlError) {
+          debugInfo.requestPayload = err.requestPayload;
+          debugInfo.ghlResponse = err.responseBody;
+        }
         await supabase.from("cab_ghl_sync_log").insert({
           company_id: companyId!,
           event_id: event.id,
           job_id: event.job_id,
-          action: `${event.event_type} | payload: ${JSON.stringify({ stageKey: actions?.stageKey, tags: actions?.tags })}`,
+          action: `${event.event_type} | debug: ${JSON.stringify(debugInfo).slice(0, 1000)}`,
           success: false,
           error: errMsg,
         });
