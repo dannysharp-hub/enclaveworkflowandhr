@@ -230,7 +230,7 @@ export async function submitLead(companyId: string, form: {
   address: string; postcode: string; roomType: string; dimensions: string; notes: string;
 }): Promise<{ jobId: string; jobRef: string; reused: boolean }> {
   const normEmail = form.email?.trim().toLowerCase() || "";
-  const normPhone = form.phone?.trim() || "";
+  const normPhone = form.phone?.replace(/[\s\-\(\)\.]/g, "") || "";
 
   // Upsert customer (match by email or phone)
   let customerId: string | null = null;
@@ -279,19 +279,52 @@ export async function submitLead(companyId: string, form: {
     customerId = newCust.id;
   }
 
-  // Check for existing active job
-  const { data: existingJob } = await (supabase.from("cab_jobs") as any)
-    .select("id, job_ref, current_stage_key")
+  // Check for existing active job (within 90 days)
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+  const { data: activeJobs } = await (supabase.from("cab_jobs") as any)
+    .select("id, job_ref, current_stage_key, room_type, property_address_json")
     .eq("company_id", companyId)
     .eq("customer_id", customerId)
     .in("current_stage_key", ACTIVE_STAGES_CLIENT)
     .neq("status", "closed")
     .neq("status", "cancelled")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .gte("created_at", ninetyDaysAgo.toISOString())
+    .order("created_at", { ascending: false });
 
-  if (existingJob) {
+  const activeCount = activeJobs?.length || 0;
+
+  // "Different project" detection: different room AND different postcode
+  const isDiffProject = (j: any) => {
+    if (!form.roomType) return false;
+    const diffRoom = j.room_type && j.room_type !== form.roomType.toLowerCase().replace(/\s+/g, "_");
+    const existingPc = j.property_address_json?.postcode?.trim().toLowerCase() || "";
+    const newPc = form.postcode?.trim().toLowerCase() || "";
+    const diffAddr = newPc && existingPc && newPc !== existingPc;
+    return !!(diffRoom && diffAddr);
+  };
+
+  if (activeCount > 1) {
+    // Multiple active → flag duplicate on latest, don't create
+    const latest = activeJobs![0];
+    await insertCabEvent({
+      companyId,
+      eventType: "lead.possible_duplicate",
+      jobId: latest.id,
+      customerId: customerId!,
+      payload: {
+        room_type: form.roomType,
+        active_job_count: activeCount,
+        active_job_refs: activeJobs!.map((j: any) => j.job_ref),
+        note: "Multiple active jobs — flagged via admin form",
+      },
+    });
+    return { jobId: latest.id, jobRef: latest.job_ref, reused: true };
+  }
+
+  if (activeCount === 1 && !isDiffProject(activeJobs![0])) {
+    const existingJob = activeJobs![0];
     // Reuse — update fields + emit resubmitted event
     await (supabase.from("cab_jobs") as any).update({
       room_type: form.roomType || existingJob.room_type,
