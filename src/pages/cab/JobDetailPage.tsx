@@ -16,6 +16,7 @@ import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
   CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
+  Users, ExternalLink,
 } from "lucide-react";
 
 /* ─── Testing event buttons ─── */
