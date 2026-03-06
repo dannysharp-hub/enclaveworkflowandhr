@@ -226,10 +226,12 @@ Deno.serve(async (req) => {
     let companyId: string | undefined;
     let jobId: string | undefined;
     let limit = 50;
+    let action: string | undefined;
     try {
       const body = await req.json();
       companyId = body.company_id;
       jobId = body.job_id;
+      action = body.action;
       if (body.limit !== undefined) limit = Math.min(body.limit, 100);
     } catch { /* no body */ }
 
