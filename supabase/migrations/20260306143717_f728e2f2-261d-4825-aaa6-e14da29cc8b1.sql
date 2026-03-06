@@ -1,0 +1,1 @@
+ALTER TABLE public.cab_customers ADD COLUMN IF NOT EXISTS ghl_contact_id text;
