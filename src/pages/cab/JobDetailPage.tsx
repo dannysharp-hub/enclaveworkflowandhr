@@ -785,29 +785,6 @@ export default function JobDetailPage() {
             );
           })()}
 
-          {/* Test event emitters */}
-          {job.status !== "closed" && (
-            <div className="rounded-lg border border-dashed border-amber-500/50 bg-amber-500/5 p-4 space-y-3">
-              <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
-                <AlertTriangle size={14} className="text-amber-500" /> Testing: Emit Events
-              </h3>
-              <p className="text-xs text-muted-foreground">These trigger the event-driven state machine via the DB trigger.</p>
-              <div className="flex flex-wrap gap-2">
-                {TEST_EVENTS.map(({ eventType, label, icon: Icon }) => (
-                  <Button
-                    key={eventType}
-                    size="sm"
-                    variant="outline"
-                    disabled={emitting !== null}
-                    onClick={() => handleEmitTestEvent(eventType)}
-                    className="text-xs"
-                  >
-                    <Icon size={12} /> {emitting === eventType ? "…" : label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Quotes */}
           {quotes.length > 0 && (
