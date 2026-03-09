@@ -302,17 +302,6 @@ export default function JobDetailPage() {
     load();
   };
 
-  const handleEmitTestEvent = async (eventType: string) => {
-    setEmitting(eventType);
-    try {
-      await insertCabEvent({ companyId: companyId!, eventType, jobId: job.id });
-      toast({ title: `Event emitted: ${eventType}` });
-      await new Promise(r => setTimeout(r, 300));
-      await load();
-    } finally {
-      setEmitting(null);
-    }
-  };
 
   const handleSendBookingLink = async () => {
     if (!APPOINTMENT_ALLOWED_STAGES.includes(job?.current_stage_key || "")) {
