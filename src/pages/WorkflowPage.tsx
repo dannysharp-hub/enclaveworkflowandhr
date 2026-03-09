@@ -51,7 +51,7 @@ const BADGE_PALETTE = [
 ];
 
 export default function WorkflowPage() {
-  const { userRole } = useAuth();
+  const { userRole, cabCompanyId } = useAuth();
   const { stages: stageConfig, loading: stagesLoading } = useStageConfig();
   const [jobStages, setJobStages] = useState<Stage[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
@@ -74,14 +74,15 @@ export default function WorkflowPage() {
   }, [stageConfig]);
 
   const fetchData = useCallback(async () => {
+    if (!cabCompanyId) { setLoading(false); return; }
     const [stagesRes, jobsRes, profilesRes] = await Promise.all([
       supabase.from("job_stages").select("*").order("created_at"),
-      supabase.from("jobs").select("id, job_id, job_name").neq("status", "complete"),
+      supabase.from("cab_jobs").select("id, job_ref, job_title").eq("company_id", cabCompanyId).neq("status", "closed"),
       supabase.from("profiles").select("user_id, full_name"),
     ]);
 
-    const jobMap = new Map((jobsRes.data ?? []).map(j => [j.id, `${j.job_id} — ${j.job_name}`]));
-    const activeJobIds = new Set((jobsRes.data ?? []).map(j => j.id));
+    const jobMap = new Map((jobsRes.data ?? []).map((j: any) => [j.id, `${j.job_ref} — ${j.job_title}`]));
+    const activeJobIds = new Set((jobsRes.data ?? []).map((j: any) => j.id));
     const profMap: Record<string, string> = {};
     const staffList: { id: string; name: string }[] = [];
     (profilesRes.data ?? []).forEach(p => {
@@ -100,7 +101,7 @@ export default function WorkflowPage() {
         }))
     );
     setLoading(false);
-  }, []);
+  }, [cabCompanyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
