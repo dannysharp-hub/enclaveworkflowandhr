@@ -96,8 +96,6 @@ const AppRoutes = () => (
     <Route path="/login" element={<LoginPage />} />
     {/* Public enquiry form */}
     <Route path="/enquiry" element={<EnquiryPage />} />
-    {/* Public enquiry form */}
-    <Route path="/enquiry" element={<EnquiryPage />} />
     {/* Client Portal routes (legacy) */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
