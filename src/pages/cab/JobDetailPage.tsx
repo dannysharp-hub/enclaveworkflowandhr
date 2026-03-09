@@ -380,6 +380,14 @@ export default function JobDetailPage() {
       </div>
 
       <StagePipeline currentStageKey={stageKey} />
+      <NextActionsPanel
+        job={job}
+        companyId={companyId!}
+        stageKey={stageKey}
+        onRefresh={load}
+        onRequestAppointment={handleRequestAppointment}
+        emitting={emitting}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column */}
