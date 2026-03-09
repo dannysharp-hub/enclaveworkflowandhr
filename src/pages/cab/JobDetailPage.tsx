@@ -496,16 +496,13 @@ export default function JobDetailPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleSaveBallpark} disabled={ballparkSaving}>
-                {ballparkSaving ? "Saving…" : "Save Ballpark"}
-              </Button>
               <Button
                 size="sm"
                 onClick={handleSendBallpark}
-                disabled={ballparkSending || !ballparkMin || !ballparkMax || !!job.ballpark_sent_at}
+                disabled={ballparkSending}
               >
                 <Send size={12} />
-                {ballparkSending ? "Sending…" : job.ballpark_sent_at ? "Already Sent" : "Send Ballpark to Customer"}
+                {ballparkSending ? "Sending…" : "Send Ballpark to Customer"}
               </Button>
             </div>
           </div>
