@@ -170,7 +170,7 @@ async function ensureGhlContact(
   if (customer.phone) {
     try {
       const search = await ghlFetch(
-        `/contacts/search/duplicate?locationId=${locationId}&phone=${encodeURIComponent(customer.phone)}`,
+        `/contacts/search/duplicate?locationId=${locationId}&phone=${encodeURIComponent(formatUKPhone(customer.phone) || "")}`,
         apiKey
       );
       if (search.contacts?.length) {
