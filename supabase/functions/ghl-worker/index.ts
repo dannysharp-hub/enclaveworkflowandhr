@@ -128,6 +128,15 @@ async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unk
   return data;
 }
 
+function formatUKPhone(phone: string | null | undefined): string | undefined {
+  if (!phone) return undefined;
+  const cleaned = phone.replace(/\s+/g, "").replace(/-/g, "");
+  if (cleaned.startsWith("+")) return cleaned;
+  if (cleaned.startsWith("07")) return "+44" + cleaned.slice(1);
+  if (cleaned.startsWith("44")) return "+" + cleaned;
+  return cleaned;
+}
+
 /* ─── Contact ensure: search by email, fallback phone, create if not found ─── */
 interface EnsureContactResult {
   ghlContactId: string;
@@ -161,7 +170,7 @@ async function ensureGhlContact(
   if (customer.phone) {
     try {
       const search = await ghlFetch(
-        `/contacts/search/duplicate?locationId=${locationId}&phone=${encodeURIComponent(customer.phone)}`,
+        `/contacts/search/duplicate?locationId=${locationId}&phone=${encodeURIComponent(formatUKPhone(customer.phone) || "")}`,
         apiKey
       );
       if (search.contacts?.length) {
@@ -182,7 +191,7 @@ async function ensureGhlContact(
       firstName: customer.first_name,
       lastName: customer.last_name,
       email: customer.email || undefined,
-      phone: customer.phone || undefined,
+      phone: formatUKPhone(customer.phone),
     });
     const newId = created.contact?.id || created.id;
     console.log(`[ghl-worker] Contact created: ${newId}`);
