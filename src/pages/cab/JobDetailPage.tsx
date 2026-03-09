@@ -313,8 +313,10 @@ export default function JobDetailPage() {
     setEmitting("booking_link");
     try {
       const calId = job.assigned_rep_calendar_id || company?.settings_json?.site_visit_calendar_id || "";
-      const bookingUrl = calId
-        ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
+      const baseUrl = company?.settings_json?.site_visit_booking_url
+        || (calId ? `https://api.leadconnectorhq.com/widget/booking/${calId}` : "");
+      const bookingUrl = baseUrl
+        ? `${baseUrl}?job_ref=${encodeURIComponent(job.job_ref)}`
         : "";
 
       await insertCabEvent({
