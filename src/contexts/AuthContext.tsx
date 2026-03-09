@@ -28,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   setRoleOverride: () => {},
   profile: null,
   tenantId: null,
+  cabCompanyId: null,
   signOut: async () => {},
 });
 
