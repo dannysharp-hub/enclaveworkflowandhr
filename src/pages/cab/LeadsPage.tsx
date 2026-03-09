@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Plus, ArrowRight, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 
@@ -29,6 +32,9 @@ const ACTIVE_STAGES = [
   "lead_captured", "ballpark_sent", "appointment_requested",
   "appointment_booked", "quote_sent", "quote_viewed", "awaiting_deposit", "project_confirmed",
 ];
+
+const JOB_TYPES = ["Wardrobe", "Home Office", "Commercial Fit-out", "Other"] as const;
+const SOURCES = ["Word of mouth", "Website", "Referral", "Social media", "Other"] as const;
 
 export default function LeadsPage() {
   const navigate = useNavigate();
@@ -64,7 +70,6 @@ export default function LeadsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Build a set of customer_ids that have >1 active job (duplicates)
   const duplicateCustomerIds = useMemo(() => {
     const countMap = new Map<string, number>();
     for (const j of allActiveJobs) {
@@ -124,9 +129,6 @@ export default function LeadsPage() {
               {leads.map(lead => {
                 const isDuplicate = duplicateCustomerIds.has(lead.customer_id);
                 const otherRefs = (dupJobRefs.get(lead.customer_id) || []).filter(r => r !== lead.job_ref);
-                // Check events for resubmitted/duplicate flags
-                const hasResubmitted = (lead as any)._resubmitted;
-                const hasDuplicateFlag = (lead as any)._duplicateFlag;
                 return (
                   <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/admin/jobs/${lead.job_ref}`)}>
                     <TableCell className="font-mono text-xs">
@@ -164,13 +166,35 @@ export default function LeadsPage() {
   );
 }
 
+/* ─── Create Lead Dialog ─── */
+
+interface LeadForm {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  street: string;
+  city: string;
+  postcode: string;
+  jobType: string;
+  notes: string;
+  source: string;
+}
+
+const EMPTY_FORM: LeadForm = {
+  firstName: "", lastName: "", phone: "", email: "",
+  street: "", city: "", postcode: "",
+  jobType: "", notes: "", source: "",
+};
+
 function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
   open: boolean; onOpenChange: (o: boolean) => void; companyId: string | null; onSuccess: () => void;
 }) {
-  const [form, setForm] = useState({ firstName: "", lastName: "", phone: "", email: "", address: "", postcode: "", roomType: "", dimensions: "", notes: "" });
+  const navigate = useNavigate();
+  const [form, setForm] = useState<LeadForm>({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
 
-  const update = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
+  const update = (key: keyof LeadForm, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,9 +206,10 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
         title: result.reused ? "Lead merged into existing job" : "Lead created",
         description: result.reused ? `Reused ${result.jobRef} — duplicate enquiry merged` : `New job ${result.jobRef}`,
       });
-      setForm({ firstName: "", lastName: "", phone: "", email: "", address: "", postcode: "", roomType: "", dimensions: "", notes: "" });
+      setForm({ ...EMPTY_FORM });
       onOpenChange(false);
       onSuccess();
+      navigate(`/admin/jobs/${result.jobRef}`);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -195,61 +220,107 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="font-mono">Create Lead</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>First Name *</Label><Input required value={form.firstName} onChange={e => update("firstName", e.target.value)} /></div>
-            <div><Label>Last Name *</Label><Input required value={form.lastName} onChange={e => update("lastName", e.target.value)} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Phone</Label><Input value={form.phone} onChange={e => update("phone", e.target.value)} /></div>
-            <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => update("email", e.target.value)} /></div>
-          </div>
-          <div><Label>Address</Label><Input value={form.address} onChange={e => update("address", e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Postcode</Label><Input value={form.postcode} onChange={e => update("postcode", e.target.value)} /></div>
-            <div><Label>Room Type</Label><Input value={form.roomType} onChange={e => update("roomType", e.target.value)} placeholder="e.g. Kitchen" /></div>
-          </div>
-          <div><Label>Rough Dimensions</Label><Input value={form.dimensions} onChange={e => update("dimensions", e.target.value)} placeholder="e.g. 4m x 3m L-shape" /></div>
-          <div><Label>Notes</Label><textarea className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" rows={3} value={form.notes} onChange={e => update("notes", e.target.value)} /></div>
-          <Button type="submit" disabled={submitting} className="w-full">{submitting ? "Creating…" : "Create Lead"}</Button>
+        <DialogHeader><DialogTitle className="font-mono">New Lead</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Customer */}
+          <fieldset className="space-y-3">
+            <legend className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-wider">Customer</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">First Name *</Label><Input required value={form.firstName} onChange={e => update("firstName", e.target.value)} /></div>
+              <div><Label className="text-xs">Last Name *</Label><Input required value={form.lastName} onChange={e => update("lastName", e.target.value)} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">Phone</Label><Input type="tel" value={form.phone} onChange={e => update("phone", e.target.value)} placeholder="07700 900000" /></div>
+              <div><Label className="text-xs">Email</Label><Input type="email" value={form.email} onChange={e => update("email", e.target.value)} placeholder="name@example.com" /></div>
+            </div>
+          </fieldset>
+
+          {/* Property */}
+          <fieldset className="space-y-3">
+            <legend className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-wider">Property Address</legend>
+            <div><Label className="text-xs">Street</Label><Input value={form.street} onChange={e => update("street", e.target.value)} placeholder="123 High Street" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label className="text-xs">City</Label><Input value={form.city} onChange={e => update("city", e.target.value)} /></div>
+              <div><Label className="text-xs">Postcode</Label><Input value={form.postcode} onChange={e => update("postcode", e.target.value)} placeholder="AB1 2CD" /></div>
+            </div>
+          </fieldset>
+
+          {/* Job details */}
+          <fieldset className="space-y-3">
+            <legend className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-wider">Project Details</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Job Type *</Label>
+                <Select value={form.jobType} onValueChange={v => update("jobType", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    {JOB_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">How they heard about us</Label>
+                <Select value={form.source} onValueChange={v => update("source", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                  <SelectContent>
+                    {SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Notes / Description</Label>
+              <textarea
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                rows={3}
+                value={form.notes}
+                onChange={e => update("notes", e.target.value)}
+                placeholder="Brief description of what the customer needs…"
+              />
+            </div>
+          </fieldset>
+
+          <Button type="submit" disabled={submitting || !form.firstName || !form.lastName || !form.jobType} className="w-full">
+            {submitting ? "Creating…" : "Create Lead"}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
 
+/* ─── Shared lead submission logic (used by admin form + public enquiry) ─── */
+
 const ACTIVE_STAGES_CLIENT = [
   "lead_captured", "ballpark_sent", "appointment_requested",
   "appointment_booked", "quote_sent", "quote_viewed", "awaiting_deposit",
 ];
 
-/** Shared lead submission logic (used by admin form + public enquiry) — now idempotent */
 export async function submitLead(companyId: string, form: {
   firstName: string; lastName: string; phone: string; email: string;
-  address: string; postcode: string; roomType: string; dimensions: string; notes: string;
+  street?: string; city?: string; postcode: string;
+  jobType: string; notes: string; source?: string;
+  // Legacy compat
+  address?: string; roomType?: string; dimensions?: string;
 }): Promise<{ jobId: string; jobRef: string; reused: boolean }> {
   const normEmail = form.email?.trim().toLowerCase() || "";
   const normPhone = form.phone?.replace(/[\s\-\(\)\.]/g, "") || "";
+  const jobType = form.jobType || form.roomType || "Project";
+  const street = form.street || form.address || "";
+  const postcode = form.postcode || "";
 
   // Upsert customer (match by email or phone)
   let customerId: string | null = null;
 
   if (normEmail) {
     const { data: existing } = await (supabase.from("cab_customers") as any)
-      .select("id")
-      .eq("company_id", companyId)
-      .ilike("email", normEmail)
-      .maybeSingle();
+      .select("id").eq("company_id", companyId).ilike("email", normEmail).maybeSingle();
     if (existing) customerId = existing.id;
   }
 
   if (!customerId && normPhone) {
     const { data: existing } = await (supabase.from("cab_customers") as any)
-      .select("id")
-      .eq("company_id", companyId)
-      .eq("phone", normPhone)
-      .maybeSingle();
+      .select("id").eq("company_id", companyId).eq("phone", normPhone).maybeSingle();
     if (existing) customerId = existing.id;
   }
 
@@ -259,8 +330,9 @@ export async function submitLead(companyId: string, form: {
       last_name: form.lastName,
       phone: normPhone || null,
       email: normEmail || null,
-      address_line_1: form.address || null,
-      postcode: form.postcode || null,
+      address_line_1: street || null,
+      city: form.city || null,
+      postcode: postcode || null,
     }).eq("id", customerId);
   } else {
     const { data: newCust, error: custErr } = await (supabase.from("cab_customers") as any)
@@ -270,11 +342,10 @@ export async function submitLead(companyId: string, form: {
         last_name: form.lastName,
         phone: normPhone || null,
         email: normEmail || null,
-        address_line_1: form.address || null,
-        postcode: form.postcode || null,
-      })
-      .select("id")
-      .single();
+        address_line_1: street || null,
+        city: form.city || null,
+        postcode: postcode || null,
+      }).select("id").single();
     if (custErr) throw custErr;
     customerId = newCust.id;
   }
@@ -295,61 +366,40 @@ export async function submitLead(companyId: string, form: {
 
   const activeCount = activeJobs?.length || 0;
 
-  // "Different project" detection: different room AND different postcode
   const isDiffProject = (j: any) => {
-    if (!form.roomType) return false;
-    const diffRoom = j.room_type && j.room_type !== form.roomType.toLowerCase().replace(/\s+/g, "_");
+    if (!jobType || jobType === "Project") return false;
+    const diffRoom = j.room_type && j.room_type.toLowerCase() !== jobType.toLowerCase();
     const existingPc = j.property_address_json?.postcode?.trim().toLowerCase() || "";
-    const newPc = form.postcode?.trim().toLowerCase() || "";
+    const newPc = postcode?.trim().toLowerCase() || "";
     const diffAddr = newPc && existingPc && newPc !== existingPc;
     return !!(diffRoom && diffAddr);
   };
 
   if (activeCount > 1) {
-    // Multiple active → flag duplicate on latest, don't create
     const latest = activeJobs![0];
     await insertCabEvent({
-      companyId,
-      eventType: "lead.possible_duplicate",
-      jobId: latest.id,
-      customerId: customerId!,
-      payload: {
-        room_type: form.roomType,
-        active_job_count: activeCount,
-        active_job_refs: activeJobs!.map((j: any) => j.job_ref),
-        note: "Multiple active jobs — flagged via admin form",
-      },
+      companyId, eventType: "lead.possible_duplicate", jobId: latest.id, customerId: customerId!,
+      payload: { room_type: jobType, active_job_count: activeCount, active_job_refs: activeJobs!.map((j: any) => j.job_ref), note: "Multiple active jobs — flagged" },
     });
     return { jobId: latest.id, jobRef: latest.job_ref, reused: true };
   }
 
   if (activeCount === 1 && !isDiffProject(activeJobs![0])) {
     const existingJob = activeJobs![0];
-    // Reuse — update fields + emit resubmitted event
     await (supabase.from("cab_jobs") as any).update({
-      room_type: form.roomType || existingJob.room_type,
-      property_address_json: form.address || form.postcode ? { address: form.address, postcode: form.postcode } : undefined,
+      room_type: jobType !== "Project" ? jobType : existingJob.room_type,
+      property_address_json: street || postcode ? { address: street, city: form.city || "", postcode } : undefined,
       updated_at: new Date().toISOString(),
     }).eq("id", existingJob.id);
 
     await insertCabEvent({
-      companyId,
-      eventType: "lead.resubmitted",
-      jobId: existingJob.id,
-      customerId: customerId!,
-      payload: {
-        room_type: form.roomType,
-        rough_dimensions: form.dimensions,
-        notes: form.notes,
-        note: "Duplicate enquiry merged via admin form",
-        original_stage: existingJob.current_stage_key,
-      },
+      companyId, eventType: "lead.resubmitted", jobId: existingJob.id, customerId: customerId!,
+      payload: { room_type: jobType, notes: form.notes, source: form.source || null, original_stage: existingJob.current_stage_key },
     });
-
     return { jobId: existingJob.id, jobRef: existingJob.job_ref, reused: true };
   }
 
-  // No active job → create new
+  // Create new job
   const jobRef = await generateJobRef(companyId, form.firstName, form.lastName);
 
   const { data: job, error: jobErr } = await (supabase.from("cab_jobs") as any)
@@ -357,31 +407,19 @@ export async function submitLead(companyId: string, form: {
       company_id: companyId,
       customer_id: customerId,
       job_ref: jobRef,
-      job_title: `${form.roomType || "Project"} – ${form.firstName} ${form.lastName}`,
-      room_type: form.roomType || null,
+      job_title: `${jobType} — ${form.lastName}`,
+      room_type: jobType,
       status: "lead",
       state: "awaiting_ballpark",
       current_stage_key: "lead_captured",
-      property_address_json: {
-        address: form.address,
-        postcode: form.postcode,
-      },
-    })
-    .select("id")
-    .single();
+      property_address_json: { address: street, city: form.city || "", postcode },
+    }).select("id").single();
 
   if (jobErr) throw jobErr;
 
   await insertCabEvent({
-    companyId,
-    eventType: "lead.created",
-    jobId: job.id,
-    customerId: customerId!,
-    payload: {
-      room_type: form.roomType,
-      rough_dimensions: form.dimensions,
-      notes: form.notes,
-    },
+    companyId, eventType: "lead.captured", jobId: job.id, customerId: customerId!,
+    payload: { room_type: jobType, notes: form.notes, source: form.source || null },
   });
 
   return { jobId: job.id, jobRef, reused: false };
