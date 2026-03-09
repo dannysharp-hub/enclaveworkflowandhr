@@ -1,228 +1,149 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useStageConfig } from "@/hooks/useStageConfig";
+import { insertCabEvent } from "@/lib/cabHelpers";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import {
-  GripVertical, User, Calendar, Filter, Search, ChevronDown,
-  AlertTriangle, Clock, UserPlus, X,
-} from "lucide-react";
-import { format, differenceInDays } from "date-fns";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
+import { GripVertical, Search, Clock } from "lucide-react";
+import { differenceInDays } from "date-fns";
 
-interface Stage {
+/* ─── Stage column definitions ─── */
+const COLUMNS = [
+  { label: "Enquiry", keys: ["lead_captured"], primary: "lead_captured", color: "border-[hsl(var(--info))]", header: "text-[hsl(var(--info))]" },
+  { label: "Ballpark", keys: ["ballpark_sent"], primary: "ballpark_sent", color: "border-[hsl(210,70%,55%)]", header: "text-[hsl(210,70%,55%)]" },
+  { label: "Survey", keys: ["appointment_booked", "appointment_requested"], primary: "appointment_booked", color: "border-[hsl(var(--accent))]", header: "text-[hsl(var(--accent))]" },
+  { label: "Quoted", keys: ["quote_sent", "quote_viewed"], primary: "quote_sent", color: "border-[hsl(260,50%,55%)]", header: "text-[hsl(260,50%,55%)]" },
+  { label: "Deposit", keys: ["awaiting_deposit"], primary: "awaiting_deposit", color: "border-[hsl(var(--warning))]", header: "text-[hsl(var(--warning))]" },
+  { label: "Production", keys: ["project_confirmed", "in_production", "materials_ordered", "manufacturing_started", "cabinetry_assembled", "ready_for_installation"], primary: "project_confirmed", color: "border-[hsl(var(--primary))]", header: "text-[hsl(var(--primary))]" },
+  { label: "Install", keys: ["install_booked", "installation_complete", "awaiting_signoff"], primary: "install_booked", color: "border-[hsl(160,55%,45%)]", header: "text-[hsl(160,55%,45%)]" },
+  { label: "Complete", keys: ["install_completed", "practical_completed", "closed", "closed_paid"], primary: "closed", color: "border-[hsl(var(--success))]", header: "text-[hsl(var(--success))]" },
+] as const;
+
+interface JobCard {
   id: string;
-  job_id: string;
-  stage_name: string;
-  status: string;
-  assigned_staff_ids: string[] | null;
-  due_date: string | null;
-  notes: string | null;
-  job_display?: string;
-  priority?: number;
+  job_ref: string;
+  job_title: string;
+  current_stage_key: string | null;
+  updated_at: string;
+  customer_name: string;
+  company_id: string;
 }
 
-const STATUSES = ["Not Started", "In Progress", "Blocked", "Done"] as const;
-const STATUS_COLORS: Record<string, string> = {
-  "Not Started": "border-muted-foreground/30",
-  "In Progress": "border-primary",
-  "Blocked": "border-destructive",
-  "Done": "border-success",
-};
-const STATUS_HEADER_COLORS: Record<string, string> = {
-  "Not Started": "text-muted-foreground",
-  "In Progress": "text-primary",
-  "Blocked": "text-destructive",
-  "Done": "text-success",
-};
-
-const BADGE_PALETTE = [
-  "bg-info/15 text-info",
-  "bg-accent/15 text-accent",
-  "bg-primary/15 text-primary",
-  "bg-warning/15 text-warning",
-  "bg-success/15 text-success",
-  "bg-destructive/15 text-destructive",
-  "bg-muted text-muted-foreground",
-];
+function columnForStage(key: string | null): number {
+  if (!key) return 0;
+  const idx = COLUMNS.findIndex(c => (c.keys as readonly string[]).includes(key));
+  return idx === -1 ? 0 : idx;
+}
 
 export default function WorkflowPage() {
-  const { userRole, cabCompanyId } = useAuth();
-  const { stages: stageConfig, loading: stagesLoading } = useStageConfig();
-  const [jobStages, setJobStages] = useState<Stage[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, string>>({});
-  const [allStaff, setAllStaff] = useState<{ id: string; name: string }[]>([]);
+  const { cabCompanyId } = useAuth();
+  const [jobs, setJobs] = useState<JobCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStage, setFilterStage] = useState<string>("all");
-  const [filterStaff, setFilterStaff] = useState<string>("all");
-  const [showFilters, setShowFilters] = useState(false);
-  const [assigningStageId, setAssigningStageId] = useState<string | null>(null);
-
-  const canManage = userRole === "admin" || userRole === "supervisor" || userRole === "engineer";
-
-  const stageBadge = useMemo(() => {
-    const map: Record<string, string> = {};
-    stageConfig.forEach((sc, i) => {
-      map[sc.stage_name] = BADGE_PALETTE[i % BADGE_PALETTE.length];
-    });
-    return map;
-  }, [stageConfig]);
 
   const fetchData = useCallback(async () => {
     if (!cabCompanyId) { setLoading(false); return; }
-    const [stagesRes, jobsRes, profilesRes] = await Promise.all([
-      supabase.from("job_stages").select("*").order("created_at"),
-      supabase.from("cab_jobs").select("id, job_ref, job_title").eq("company_id", cabCompanyId).neq("status", "closed"),
-      supabase.from("profiles").select("user_id, full_name"),
-    ]);
 
-    const jobMap = new Map((jobsRes.data ?? []).map((j: any) => [j.id, `${j.job_ref} — ${j.job_title}`]));
-    const activeJobIds = new Set((jobsRes.data ?? []).map((j: any) => j.id));
-    const profMap: Record<string, string> = {};
-    const staffList: { id: string; name: string }[] = [];
-    (profilesRes.data ?? []).forEach(p => {
-      profMap[p.user_id] = p.full_name;
-      staffList.push({ id: p.user_id, name: p.full_name });
-    });
-    setProfiles(profMap);
-    setAllStaff(staffList.sort((a, b) => a.name.localeCompare(b.name)));
+    const { data: jobsData } = await (supabase.from("cab_jobs") as any)
+      .select("id, job_ref, job_title, current_stage_key, updated_at, company_id, customer_id")
+      .eq("company_id", cabCompanyId)
+      .neq("status", "closed")
+      .order("updated_at", { ascending: false });
 
-    setJobStages(
-      (stagesRes.data ?? [])
-        .filter(s => activeJobIds.has(s.job_id))
-        .map(s => ({
-          ...s,
-          job_display: jobMap.get(s.job_id) || s.job_id,
-        }))
-    );
+    if (!jobsData || jobsData.length === 0) {
+      setJobs([]);
+      setLoading(false);
+      return;
+    }
+
+    // Also fetch closed jobs that are in "complete" column stages
+    const { data: closedData } = await (supabase.from("cab_jobs") as any)
+      .select("id, job_ref, job_title, current_stage_key, updated_at, company_id, customer_id")
+      .eq("company_id", cabCompanyId)
+      .eq("status", "closed")
+      .order("updated_at", { ascending: false })
+      .limit(20);
+
+    const allJobs = [...(jobsData || []), ...(closedData || [])];
+
+    const customerIds = [...new Set(allJobs.map((j: any) => j.customer_id).filter(Boolean))];
+    const { data: customers } = await (supabase.from("cab_customers") as any)
+      .select("id, first_name, last_name")
+      .in("id", customerIds);
+
+    const custMap = new Map((customers ?? []).map((c: any) => [c.id, `${c.first_name} ${c.last_name}`]));
+
+    setJobs(allJobs.map((j: any) => ({
+      id: j.id,
+      job_ref: j.job_ref,
+      job_title: j.job_title,
+      current_stage_key: j.current_stage_key,
+      updated_at: j.updated_at,
+      customer_name: custMap.get(j.customer_id) || "",
+      company_id: j.company_id,
+    })));
     setLoading(false);
   }, [cabCompanyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const onDragEnd = async (result: DropResult) => {
-    if (!result.destination || !canManage) return;
-    const newStatus = result.destination.droppableId;
-    const stageId = result.draggableId;
-    const stage = jobStages.find(s => s.id === stageId);
-    if (!stage) return;
-
-    if (newStatus === "In Progress" && stage.assigned_staff_ids && stage.assigned_staff_ids.length > 0) {
-      const warnings: string[] = [];
-      for (const staffId of stage.assigned_staff_ids) {
-        const { data } = await supabase.rpc("check_staff_stage_authorisation", {
-          _staff_id: staffId,
-          _stage_name: stage.stage_name,
-        });
-        const row = data?.[0];
-        if (row && !row.authorised) {
-          const missing = (row.missing_skills as any[]) ?? [];
-          const staffName = profiles[staffId]?.split(" ")[0] || "Staff";
-          const skillNames = missing.map((m: any) => `${m.skill_name} (needs ${m.required})`).join(", ");
-          warnings.push(`${staffName}: missing ${skillNames}`);
-        }
-      }
-      if (warnings.length > 0) {
-        toast({ title: "⚠️ Machine Auth Warning", description: warnings.join(" · "), variant: "destructive" });
-      }
-    }
-
-    setJobStages(prev => prev.map(s => (s.id === stageId ? { ...s, status: newStatus } : s)));
-
-    const { error } = await supabase.from("job_stages").update({ status: newStatus }).eq("id", stageId);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      fetchData();
-    }
-  };
-
-  const quickAssign = async (stageId: string, staffId: string) => {
-    const stage = jobStages.find(s => s.id === stageId);
-    if (!stage) return;
-    const current = stage.assigned_staff_ids || [];
-    if (current.includes(staffId)) return;
-    const updated = [...current, staffId];
-
-    setJobStages(prev => prev.map(s => s.id === stageId ? { ...s, assigned_staff_ids: updated } : s));
-    setAssigningStageId(null);
-
-    const { error } = await supabase.from("job_stages").update({ assigned_staff_ids: updated }).eq("id", stageId);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      fetchData();
-    } else {
-      toast({ title: "Staff assigned", description: `${profiles[staffId]} assigned` });
-    }
-  };
-
-  const removeAssignment = async (stageId: string, staffId: string) => {
-    const stage = jobStages.find(s => s.id === stageId);
-    if (!stage) return;
-    const updated = (stage.assigned_staff_ids || []).filter(id => id !== staffId);
-
-    setJobStages(prev => prev.map(s => s.id === stageId ? { ...s, assigned_staff_ids: updated } : s));
-
-    const { error } = await supabase.from("job_stages").update({ assigned_staff_ids: updated }).eq("id", stageId);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      fetchData();
-    }
-  };
-
-  // ── Filtering ──
   const filtered = useMemo(() => {
-    let list = [...jobStages];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(s =>
-        s.job_display?.toLowerCase().includes(q) ||
-        s.stage_name.toLowerCase().includes(q) ||
-        s.notes?.toLowerCase().includes(q)
-      );
-    }
-    if (filterStage !== "all") list = list.filter(s => s.stage_name === filterStage);
-    if (filterStaff !== "all") list = list.filter(s => s.assigned_staff_ids?.includes(filterStaff));
+    if (!searchQuery) return jobs;
+    const q = searchQuery.toLowerCase();
+    return jobs.filter(j =>
+      j.job_ref.toLowerCase().includes(q) ||
+      j.job_title.toLowerCase().includes(q) ||
+      j.customer_name.toLowerCase().includes(q)
+    );
+  }, [jobs, searchQuery]);
 
-    // Sort: overdue first, then by due date
-    const today = new Date().toISOString().split("T")[0];
-    list.sort((a, b) => {
-      const aOverdue = a.due_date && a.due_date < today && a.status !== "Done" ? -1 : 0;
-      const bOverdue = b.due_date && b.due_date < today && b.status !== "Done" ? -1 : 0;
-      if (aOverdue !== bOverdue) return aOverdue - bOverdue;
-      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
-      return 0;
+  const grouped = useMemo(() => {
+    const map: Record<number, JobCard[]> = {};
+    COLUMNS.forEach((_, i) => { map[i] = []; });
+    filtered.forEach(j => {
+      const col = columnForStage(j.current_stage_key);
+      map[col].push(j);
     });
+    return map;
+  }, [filtered]);
 
-    return list;
-  }, [jobStages, searchQuery, filterStage, filterStaff]);
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const destColIdx = parseInt(result.destination.droppableId);
+    const jobId = result.draggableId;
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
 
-  const grouped = STATUSES.reduce(
-    (acc, status) => {
-      acc[status] = filtered.filter(s => s.status === status);
-      return acc;
-    },
-    {} as Record<string, Stage[]>
-  );
+    const fromStage = job.current_stage_key || "lead_captured";
+    const toStage = COLUMNS[destColIdx].primary;
+    if (fromStage === toStage) return;
 
-  const stageNames = useMemo(() => [...new Set(jobStages.map(s => s.stage_name))].sort(), [jobStages]);
-  const assignedStaffIds = useMemo(() => {
-    const ids = new Set<string>();
-    jobStages.forEach(s => s.assigned_staff_ids?.forEach(id => ids.add(id)));
-    return [...ids];
-  }, [jobStages]);
+    // Optimistic update
+    setJobs(prev => prev.map(j =>
+      j.id === jobId ? { ...j, current_stage_key: toStage, updated_at: new Date().toISOString() } : j
+    ));
 
-  const today = new Date().toISOString().split("T")[0];
-  const overdueCount = jobStages.filter(s => s.due_date && s.due_date < today && s.status !== "Done").length;
-  const unassignedCount = jobStages.filter(s => s.status !== "Done" && (!s.assigned_staff_ids || s.assigned_staff_ids.length === 0)).length;
+    try {
+      await (supabase.from("cab_jobs") as any)
+        .update({ current_stage_key: toStage, updated_at: new Date().toISOString() })
+        .eq("id", jobId);
 
-  const isLoading = loading || stagesLoading;
+      await insertCabEvent({
+        companyId: job.company_id,
+        eventType: "stage.moved",
+        jobId: job.id,
+        payload: { from_stage: fromStage, to_stage: toStage },
+      });
 
-  if (isLoading) {
+      toast({ title: `${job.job_ref} → ${COLUMNS[destColIdx].label}` });
+    } catch (err: any) {
+      toast({ title: "Error moving job", description: err.message, variant: "destructive" });
+      fetchData();
+    }
+  };
+
+  if (loading) {
     return (
       <div className="space-y-6 animate-slide-in">
         <h2 className="text-2xl font-mono font-bold text-foreground">Workflow Board</h2>
@@ -241,15 +162,11 @@ export default function WorkflowPage() {
         <div>
           <h2 className="text-2xl font-mono font-bold text-foreground">Workflow Board</h2>
           <p className="text-sm text-muted-foreground">
-            {filtered.length} stage{filtered.length !== 1 ? "s" : ""} across {new Set(filtered.map(s => s.job_id)).size} jobs
-            {overdueCount > 0 && <span className="text-destructive ml-2">· {overdueCount} overdue</span>}
-            {unassignedCount > 0 && <span className="text-warning ml-2">· {unassignedCount} unassigned</span>}
-            {!canManage && " · View only"}
+            {filtered.length} job{filtered.length !== 1 ? "s" : ""} across {COLUMNS.length} stages
           </p>
         </div>
       </div>
 
-      {/* Search & Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 max-w-xs">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -257,160 +174,81 @@ export default function WorkflowPage() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search jobs, stages…"
+            placeholder="Search jobs…"
             className="w-full h-8 pl-8 pr-3 rounded-md border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
-        <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-mono text-foreground hover:bg-secondary/50 transition-colors">
-          <Filter size={12} /> Filters <ChevronDown size={12} className={cn("transition-transform", showFilters && "rotate-180")} />
-        </button>
-        {showFilters && (
-          <>
-            <select value={filterStage} onChange={e => setFilterStage(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="all">All Stages</option>
-              {stageNames.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              <option value="all">All Staff</option>
-              {assignedStaffIds.map(id => <option key={id} value={id}>{profiles[id] || id}</option>)}
-            </select>
-          </>
-        )}
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
-          {STATUSES.map(status => (
-            <div key={status} className="glass-panel rounded-lg overflow-hidden">
-              <div className="p-3 border-b border-border flex items-center justify-between">
-                <h3 className={cn("font-mono text-xs font-bold uppercase tracking-wider", STATUS_HEADER_COLORS[status])}>
-                  {status}
-                </h3>
-                <span className="text-[10px] font-mono text-muted-foreground">
-                  {grouped[status].length}
-                </span>
-              </div>
+        <div className="flex gap-3 overflow-x-auto pb-4 items-start">
+          {COLUMNS.map((col, colIdx) => {
+            const colJobs = grouped[colIdx] || [];
+            return (
+              <div key={col.label} className="min-w-[220px] w-[220px] flex-shrink-0 glass-panel rounded-lg overflow-hidden">
+                <div className="p-3 border-b border-border flex items-center justify-between">
+                  <h3 className={cn("font-mono text-xs font-bold uppercase tracking-wider", col.header)}>
+                    {col.label}
+                  </h3>
+                  <span className="text-[10px] font-mono text-muted-foreground">{colJobs.length}</span>
+                </div>
 
-              <Droppable droppableId={status} isDropDisabled={!canManage}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={cn(
-                      "p-2 space-y-2 min-h-[120px] transition-colors",
-                      snapshot.isDraggingOver && "bg-primary/5"
-                    )}
-                  >
-                    {grouped[status].map((stage, index) => {
-                      const isOverdue = stage.due_date && stage.due_date < today && stage.status !== "Done";
-                      const daysOverdue = isOverdue ? differenceInDays(new Date(), new Date(stage.due_date!)) : 0;
-                      const isUnassigned = !stage.assigned_staff_ids || stage.assigned_staff_ids.length === 0;
+                <Droppable droppableId={String(colIdx)}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={cn(
+                        "p-2 space-y-2 min-h-[120px] transition-colors",
+                        snapshot.isDraggingOver && "bg-primary/5"
+                      )}
+                    >
+                      {colJobs.map((job, index) => {
+                        const daysSinceUpdate = differenceInDays(new Date(), new Date(job.updated_at));
 
-                      return (
-                        <Draggable key={stage.id} draggableId={stage.id} index={index} isDragDisabled={!canManage}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className={cn(
-                                "rounded-md border-l-2 bg-card p-3 transition-shadow",
-                                isOverdue ? "border-destructive" : STATUS_COLORS[status],
-                                snapshot.isDragging && "shadow-lg shadow-primary/10 ring-1 ring-primary/20"
-                              )}
-                            >
-                              <div className="flex items-start gap-2">
-                                {canManage && (
+                        return (
+                          <Draggable key={job.id} draggableId={job.id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={cn(
+                                  "rounded-md border-l-2 bg-card p-3 transition-shadow",
+                                  col.color,
+                                  snapshot.isDragging && "shadow-lg shadow-primary/10 ring-1 ring-primary/20"
+                                )}
+                              >
+                                <div className="flex items-start gap-2">
                                   <div {...provided.dragHandleProps} className="mt-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab">
                                     <GripVertical size={14} />
                                   </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 mb-1.5">
-                                    <span className={cn(
-                                      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium",
-                                      stageBadge[stage.stage_name] || "bg-muted text-muted-foreground"
-                                    )}>
-                                      {stage.stage_name}
-                                    </span>
-                                    {isOverdue && (
-                                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-destructive">
-                                        <AlertTriangle size={9} /> {daysOverdue}d late
-                                      </span>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="font-mono text-xs font-bold text-primary">{job.job_ref}</span>
+                                    <p className="text-xs text-foreground leading-tight truncate mt-0.5">{job.job_title}</p>
+                                    {job.customer_name && (
+                                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">{job.customer_name}</p>
                                     )}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {stage.job_display}
-                                  </p>
-                                  {stage.notes && (
-                                    <p className="text-[10px] text-muted-foreground/70 mt-1 truncate">
-                                      {stage.notes}
-                                    </p>
-                                  )}
-                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    {stage.assigned_staff_ids && stage.assigned_staff_ids.length > 0 ? (
-                                      stage.assigned_staff_ids.map(id => (
-                                        <span key={id} className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted/50 rounded-full px-1.5 py-0.5 group/tag">
-                                          <User size={9} />
-                                          {profiles[id]?.split(" ")[0] || "?"}
-                                          {canManage && (
-                                            <button onClick={(e) => { e.stopPropagation(); removeAssignment(stage.id, id); }} className="opacity-0 group-hover/tag:opacity-100 ml-0.5 hover:text-destructive">
-                                              <X size={8} />
-                                            </button>
-                                          )}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      status !== "Done" && (
-                                        <span className="text-[9px] font-mono text-warning/70 italic">Unassigned</span>
-                                      )
-                                    )}
-                                    {canManage && status !== "Done" && (
-                                      <Popover open={assigningStageId === stage.id} onOpenChange={open => setAssigningStageId(open ? stage.id : null)}>
-                                        <PopoverTrigger asChild>
-                                          <button className="inline-flex items-center gap-0.5 text-[9px] font-mono text-primary/70 hover:text-primary transition-colors" onClick={e => e.stopPropagation()}>
-                                            <UserPlus size={10} /> Assign
-                                          </button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-48 p-1" align="start" onClick={e => e.stopPropagation()}>
-                                          <div className="max-h-40 overflow-y-auto">
-                                            {allStaff.filter(s => !(stage.assigned_staff_ids || []).includes(s.id)).map(s => (
-                                              <button
-                                                key={s.id}
-                                                onClick={() => quickAssign(stage.id, s.id)}
-                                                className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-muted/50 rounded-sm transition-colors"
-                                              >
-                                                {s.name}
-                                              </button>
-                                            ))}
-                                          </div>
-                                        </PopoverContent>
-                                      </Popover>
-                                    )}
-                                    {stage.due_date && (
-                                      <div className={cn("flex items-center gap-1 text-[10px] ml-auto", isOverdue ? "text-destructive" : "text-muted-foreground")}>
-                                        <Calendar size={10} />
-                                        <span>{format(new Date(stage.due_date), "dd MMM")}</span>
-                                      </div>
-                                    )}
+                                    <div className="flex items-center gap-1 mt-1.5 text-[10px] text-muted-foreground">
+                                      <Clock size={9} />
+                                      <span>{daysSinceUpdate === 0 ? "Today" : `${daysSinceUpdate}d ago`}</span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                    })}
-                    {provided.placeholder}
-                    {grouped[status].length === 0 && (
-                      <p className="text-center text-[10px] text-muted-foreground/50 py-4 font-mono">
-                        No stages
-                      </p>
-                    )}
-                  </div>
-                )}
-              </Droppable>
-            </div>
-          ))}
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                      {colJobs.length === 0 && (
+                        <p className="text-center text-[10px] text-muted-foreground/50 py-4 font-mono">Empty</p>
+                      )}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
         </div>
       </DragDropContext>
     </div>
