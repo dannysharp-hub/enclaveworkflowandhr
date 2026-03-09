@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import QuoteBuilder from "@/components/QuoteBuilder";
+import DriveQuoteAttach from "@/components/DriveQuoteAttach";
 import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
 import JobProfitabilityTab from "@/components/cab/JobProfitabilityTab";
 import StagePipeline from "@/components/cab/StagePipeline";
