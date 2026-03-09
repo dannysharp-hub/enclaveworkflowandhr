@@ -2019,6 +2019,8 @@ export type Database = {
           created_at: string
           currency: string
           document_url: string | null
+          drive_file_id: string | null
+          drive_filename: string | null
           id: string
           job_id: string
           price_max: number | null
@@ -2037,6 +2039,8 @@ export type Database = {
           created_at?: string
           currency?: string
           document_url?: string | null
+          drive_file_id?: string | null
+          drive_filename?: string | null
           id?: string
           job_id: string
           price_max?: number | null
@@ -2055,6 +2059,8 @@ export type Database = {
           created_at?: string
           currency?: string
           document_url?: string | null
+          drive_file_id?: string | null
+          drive_filename?: string | null
           id?: string
           job_id?: string
           price_max?: number | null
