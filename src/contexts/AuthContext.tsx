@@ -42,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [roleOverride, setRoleOverride] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [cabCompanyId, setCabCompanyId] = useState<string | null>(null);
 
   // Effective role: override (admin-only) or real DB role
   const userRole = roleOverride ?? dbRole;
