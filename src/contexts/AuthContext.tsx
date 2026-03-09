@@ -14,6 +14,7 @@ interface AuthContextType {
   setRoleOverride: (role: string | null) => void;
   profile: any | null;
   tenantId: string | null;
+  cabCompanyId: string | null;
   signOut: () => Promise<void>;
 }
 
