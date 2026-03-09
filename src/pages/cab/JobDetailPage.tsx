@@ -12,6 +12,7 @@ import QuoteBuilder from "@/components/QuoteBuilder";
 import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
 import JobProfitabilityTab from "@/components/cab/JobProfitabilityTab";
 import StagePipeline from "@/components/cab/StagePipeline";
+import NextActionsPanel from "@/components/cab/NextActionsPanel";
 import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
