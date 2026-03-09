@@ -711,7 +711,9 @@ export default function JobDetailPage() {
           )}
 
           {/* Quote Builder */}
-          <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+          <div data-section="quote-builder">
+            <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+          </div>
 
           {/* Purchasing Tab — only after project confirmed */}
           {isProjectConfirmed && (
