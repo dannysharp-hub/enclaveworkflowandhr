@@ -202,6 +202,7 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.phone.trim()) { setPhoneError(true); return; }
     if (!companyId) return;
     setSubmitting(true);
     try {
