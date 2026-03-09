@@ -193,8 +193,12 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
   const navigate = useNavigate();
   const [form, setForm] = useState<LeadForm>({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
 
-  const update = (key: keyof LeadForm, val: string) => setForm(prev => ({ ...prev, [key]: val }));
+  const update = (key: keyof LeadForm, val: string) => {
+    if (key === "phone" && val.trim()) setPhoneError(false);
+    setForm(prev => ({ ...prev, [key]: val }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
