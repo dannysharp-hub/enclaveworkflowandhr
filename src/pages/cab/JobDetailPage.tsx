@@ -212,8 +212,10 @@ export default function JobDetailPage() {
       const nextAction = new Date();
       nextAction.setDate(nextAction.getDate() + 3);
 
-      const bookingUrl = calId
-        ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
+      const baseUrl = settings.site_visit_booking_url
+        || (calId ? `https://api.leadconnectorhq.com/widget/booking/${calId}` : "");
+      const bookingUrl = baseUrl
+        ? `${baseUrl}?job_ref=${encodeURIComponent(job.job_ref)}`
         : "";
 
       const { data: { user } } = await supabase.auth.getUser();
