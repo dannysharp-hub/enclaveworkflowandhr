@@ -267,8 +267,32 @@ async function upsertOpportunity(
     monetaryValue,
     status: "open",
   };
-  const created = await ghlFetch("/opportunities/", apiKey, "POST", payload);
-  return { id: created.opportunity?.id || created.id, action: "created", searchCount: 0 };
+  try {
+    const created = await ghlFetch("/opportunities/", apiKey, "POST", payload);
+    return { id: created.opportunity?.id || created.id, action: "created", searchCount: 0 };
+  } catch (err) {
+    if (err instanceof GhlError) {
+      const body = err.responseBody as any;
+      const isDuplicate = body?.statusCode === 400 &&
+        (body?.message?.toLowerCase().includes("duplicate") ||
+         body?.error?.toLowerCase().includes("duplicate"));
+      if (isDuplicate) {
+        // Find the existing opportunity and update it instead
+        console.log(`[ghl-worker] Duplicate opportunity blocked, searching for existing...`);
+        const search = await findContactOpportunity(apiKey, contactId, pipelineId);
+        if (search.id) {
+          await ghlFetch(`/opportunities/${search.id}`, apiKey, "PUT", {
+            pipelineStageId,
+            name,
+            monetaryValue,
+          });
+          console.log(`[ghl-worker] Updated existing opportunity: ${search.id}`);
+          return { id: search.id, action: "found_and_updated", searchCount: search.totalFound };
+        }
+      }
+    }
+    throw err;
+  }
 }
 
 async function addTags(apiKey: string, contactId: string, tags: string[]) {
