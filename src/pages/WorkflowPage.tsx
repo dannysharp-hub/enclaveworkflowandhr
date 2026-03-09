@@ -51,7 +51,7 @@ const BADGE_PALETTE = [
 ];
 
 export default function WorkflowPage() {
-  const { userRole } = useAuth();
+  const { userRole, cabCompanyId } = useAuth();
   const { stages: stageConfig, loading: stagesLoading } = useStageConfig();
   const [jobStages, setJobStages] = useState<Stage[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
