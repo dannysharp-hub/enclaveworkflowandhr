@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoleOverride(null);
         setProfile(null);
         setTenantId(null);
+        setCabCompanyId(null);
       }
       setLoading(false);
     });
