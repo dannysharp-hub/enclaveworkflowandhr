@@ -37,6 +37,13 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
   const [sending, setSending] = useState(false);
 
   const loadQuote = useCallback(async () => {
+    // Clean up old draft quotes with no drive file (leftovers from old builder)
+    await (supabase.from("cab_quotes") as any)
+      .delete()
+      .eq("job_id", job.id)
+      .eq("status", "draft")
+      .is("drive_file_id", null);
+
     const { data: quotes } = await (supabase.from("cab_quotes") as any)
       .select("*")
       .eq("job_id", job.id)

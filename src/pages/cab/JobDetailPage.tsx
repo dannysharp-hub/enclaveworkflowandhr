@@ -313,8 +313,10 @@ export default function JobDetailPage() {
     setEmitting("booking_link");
     try {
       const calId = job.assigned_rep_calendar_id || company?.settings_json?.site_visit_calendar_id || "";
-      const bookingUrl = calId
-        ? `https://updates.physio-leads.com/widget/booking/${calId}?job_ref=${encodeURIComponent(job.job_ref)}`
+      const baseUrl = company?.settings_json?.site_visit_booking_url
+        || (calId ? `https://api.leadconnectorhq.com/widget/booking/${calId}` : "");
+      const bookingUrl = baseUrl
+        ? `${baseUrl}?job_ref=${encodeURIComponent(job.job_ref)}`
         : "";
 
       await insertCabEvent({
@@ -727,8 +729,10 @@ export default function JobDetailPage() {
           {/* Site Visit Debug Panel */}
           {(() => {
             const siteCalId = job.assigned_rep_calendar_id || settings.site_visit_calendar_id || "";
-            const jobBookingUrl = siteCalId
-              ? `https://updates.physio-leads.com/widget/booking/${siteCalId}?job_ref=${encodeURIComponent(job.job_ref)}`
+            const baseBookingUrl = settings.site_visit_booking_url
+              || (siteCalId ? `https://api.leadconnectorhq.com/widget/booking/${siteCalId}` : "");
+            const jobBookingUrl = baseBookingUrl
+              ? `${baseBookingUrl}?job_ref=${encodeURIComponent(job.job_ref)}`
               : "";
             return (
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
