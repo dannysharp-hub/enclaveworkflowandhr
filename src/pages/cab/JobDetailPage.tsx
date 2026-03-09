@@ -21,16 +21,6 @@ import {
   Users, ExternalLink,
 } from "lucide-react";
 
-/* ─── Testing event buttons ─── */
-const TEST_EVENTS = [
-  { eventType: "ballpark.sent", label: "Ballpark Sent (test)", icon: Send },
-  { eventType: "materials.ordered", label: "Materials Ordered", icon: Package },
-  { eventType: "cnc.started", label: "CNC Started", icon: Cog },
-  { eventType: "job.assembled", label: "Job Assembled", icon: Hammer },
-  { eventType: "install.booked", label: "Install Booked", icon: Truck },
-  { eventType: "install.completed", label: "Install Completed", icon: ClipboardCheck },
-  { eventType: "job.practical_completed", label: "Practical Complete", icon: Star },
-] as const;
 
 export default function JobDetailPage() {
   const { jobRef } = useParams();
