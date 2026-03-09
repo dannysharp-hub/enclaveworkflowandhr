@@ -709,9 +709,9 @@ export default function JobDetailPage() {
             </div>
           )}
 
-          {/* Quote Builder */}
+          {/* Quote — Attach & Send from Drive */}
           <div data-section="quote-builder">
-            <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+            <DriveQuoteAttach companyId={companyId!} job={job} customer={customer} onRefresh={load} />
           </div>
 
           {/* Purchasing Tab — only after project confirmed */}
