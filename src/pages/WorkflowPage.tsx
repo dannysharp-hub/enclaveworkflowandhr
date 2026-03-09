@@ -80,7 +80,7 @@ export default function WorkflowPage() {
       job_title: j.job_title,
       current_stage_key: j.current_stage_key,
       updated_at: j.updated_at,
-      customer_name: custMap.get(j.customer_id) || "",
+      customer_name: (custMap.get(j.customer_id) as string) || "",
       company_id: j.company_id,
     })));
     setLoading(false);
