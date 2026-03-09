@@ -454,7 +454,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Ballpark Card */}
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div data-section="ballpark" className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
                 <Banknote size={14} className="text-primary" /> Ballpark Estimate
