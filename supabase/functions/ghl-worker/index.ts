@@ -128,6 +128,15 @@ async function ghlFetch(path: string, apiKey: string, method = "GET", body?: unk
   return data;
 }
 
+function formatUKPhone(phone: string | null | undefined): string | undefined {
+  if (!phone) return undefined;
+  const cleaned = phone.replace(/\s+/g, "").replace(/-/g, "");
+  if (cleaned.startsWith("+")) return cleaned;
+  if (cleaned.startsWith("07")) return "+44" + cleaned.slice(1);
+  if (cleaned.startsWith("44")) return "+" + cleaned;
+  return cleaned;
+}
+
 /* ─── Contact ensure: search by email, fallback phone, create if not found ─── */
 interface EnsureContactResult {
   ghlContactId: string;
