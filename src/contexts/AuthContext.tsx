@@ -14,6 +14,7 @@ interface AuthContextType {
   setRoleOverride: (role: string | null) => void;
   profile: any | null;
   tenantId: string | null;
+  cabCompanyId: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   setRoleOverride: () => {},
   profile: null,
   tenantId: null,
+  cabCompanyId: null,
   signOut: async () => {},
 });
 
@@ -40,18 +42,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [roleOverride, setRoleOverride] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [cabCompanyId, setCabCompanyId] = useState<string | null>(null);
 
   // Effective role: override (admin-only) or real DB role
   const userRole = roleOverride ?? dbRole;
 
   const fetchUserData = async (userId: string) => {
-    const [{ data: roleData }, { data: profileData }] = await Promise.all([
+    const [{ data: roleData }, { data: profileData }, { data: membershipData }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId).limit(1).single(),
       supabase.from("profiles").select("*").eq("user_id", userId).single(),
+      supabase.from("cab_company_memberships").select("company_id").eq("user_id", userId).limit(1).single(),
     ]);
     setDbRole(roleData?.role ?? null);
     setProfile(profileData ?? null);
     setTenantId(profileData?.tenant_id ?? null);
+    setCabCompanyId(membershipData?.company_id ?? null);
   };
 
   useEffect(() => {
@@ -65,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoleOverride(null);
         setProfile(null);
         setTenantId(null);
+        setCabCompanyId(null);
       }
       setLoading(false);
     });
@@ -86,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, realRole: dbRole, roleOverride, setRoleOverride, profile, tenantId, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, realRole: dbRole, roleOverride, setRoleOverride, profile, tenantId, cabCompanyId, signOut }}>
       {children}
     </AuthContext.Provider>
   );
