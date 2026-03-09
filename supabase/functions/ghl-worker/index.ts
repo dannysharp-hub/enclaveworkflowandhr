@@ -176,16 +176,33 @@ async function ensureGhlContact(
 
   // 3) Not found → create
   console.log(`[ghl-worker] Creating new GHL contact: ${customer.first_name} ${customer.last_name}`);
-  const created = await ghlFetch("/contacts/", apiKey, "POST", {
-    locationId,
-    firstName: customer.first_name,
-    lastName: customer.last_name,
-    email: customer.email || undefined,
-    phone: customer.phone || undefined,
-  });
-  const newId = created.contact?.id || created.id;
-  console.log(`[ghl-worker] Contact created: ${newId}`);
-  return { ghlContactId: newId, action: "created", searchDetails: `created new → ${newId}` };
+  try {
+    const created = await ghlFetch("/contacts/", apiKey, "POST", {
+      locationId,
+      firstName: customer.first_name,
+      lastName: customer.last_name,
+      email: customer.email || undefined,
+      phone: customer.phone || undefined,
+    });
+    const newId = created.contact?.id || created.id;
+    console.log(`[ghl-worker] Contact created: ${newId}`);
+    return { ghlContactId: newId, action: "created", searchDetails: `created new → ${newId}` };
+  } catch (err) {
+    // GHL returns 400 with the existing contact ID when duplicates are not allowed
+    if (err instanceof GhlError) {
+      const body = err.responseBody as any;
+      const existingId = body?.meta?.contactId;
+      if (existingId) {
+        console.log(`[ghl-worker] Duplicate contact detected, using existing: ${existingId}`);
+        return {
+          ghlContactId: existingId,
+          action: "found_by_phone",
+          searchDetails: `duplicate_blocked → used existing ${existingId}`,
+        };
+      }
+    }
+    throw err;
+  }
 }
 
 /* Save ghl_contact_id to both cab_jobs and cab_customers */
