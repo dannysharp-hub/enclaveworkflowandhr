@@ -12,6 +12,7 @@ import QuoteBuilder from "@/components/QuoteBuilder";
 import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
 import JobProfitabilityTab from "@/components/cab/JobProfitabilityTab";
 import StagePipeline from "@/components/cab/StagePipeline";
+import NextActionsPanel from "@/components/cab/NextActionsPanel";
 import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
@@ -20,16 +21,6 @@ import {
   Users, ExternalLink,
 } from "lucide-react";
 
-/* ─── Testing event buttons ─── */
-const TEST_EVENTS = [
-  { eventType: "ballpark.sent", label: "Ballpark Sent (test)", icon: Send },
-  { eventType: "materials.ordered", label: "Materials Ordered", icon: Package },
-  { eventType: "cnc.started", label: "CNC Started", icon: Cog },
-  { eventType: "job.assembled", label: "Job Assembled", icon: Hammer },
-  { eventType: "install.booked", label: "Install Booked", icon: Truck },
-  { eventType: "install.completed", label: "Install Completed", icon: ClipboardCheck },
-  { eventType: "job.practical_completed", label: "Practical Complete", icon: Star },
-] as const;
 
 export default function JobDetailPage() {
   const { jobRef } = useParams();
@@ -311,17 +302,6 @@ export default function JobDetailPage() {
     load();
   };
 
-  const handleEmitTestEvent = async (eventType: string) => {
-    setEmitting(eventType);
-    try {
-      await insertCabEvent({ companyId: companyId!, eventType, jobId: job.id });
-      toast({ title: `Event emitted: ${eventType}` });
-      await new Promise(r => setTimeout(r, 300));
-      await load();
-    } finally {
-      setEmitting(null);
-    }
-  };
 
   const handleSendBookingLink = async () => {
     if (!APPOINTMENT_ALLOWED_STAGES.includes(job?.current_stage_key || "")) {
@@ -400,6 +380,14 @@ export default function JobDetailPage() {
       </div>
 
       <StagePipeline currentStageKey={stageKey} />
+      <NextActionsPanel
+        job={job}
+        companyId={companyId!}
+        stageKey={stageKey}
+        onRefresh={load}
+        onRequestAppointment={handleRequestAppointment}
+        emitting={emitting}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column */}
@@ -466,7 +454,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Ballpark Card */}
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div data-section="ballpark" className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
                 <Banknote size={14} className="text-primary" /> Ballpark Estimate
@@ -723,7 +711,9 @@ export default function JobDetailPage() {
           )}
 
           {/* Quote Builder */}
-          <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+          <div data-section="quote-builder">
+            <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+          </div>
 
           {/* Purchasing Tab — only after project confirmed */}
           {isProjectConfirmed && (
@@ -797,29 +787,6 @@ export default function JobDetailPage() {
             );
           })()}
 
-          {/* Test event emitters */}
-          {job.status !== "closed" && (
-            <div className="rounded-lg border border-dashed border-amber-500/50 bg-amber-500/5 p-4 space-y-3">
-              <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
-                <AlertTriangle size={14} className="text-amber-500" /> Testing: Emit Events
-              </h3>
-              <p className="text-xs text-muted-foreground">These trigger the event-driven state machine via the DB trigger.</p>
-              <div className="flex flex-wrap gap-2">
-                {TEST_EVENTS.map(({ eventType, label, icon: Icon }) => (
-                  <Button
-                    key={eventType}
-                    size="sm"
-                    variant="outline"
-                    disabled={emitting !== null}
-                    onClick={() => handleEmitTestEvent(eventType)}
-                    className="text-xs"
-                  >
-                    <Icon size={12} /> {emitting === eventType ? "…" : label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Quotes */}
           {quotes.length > 0 && (
