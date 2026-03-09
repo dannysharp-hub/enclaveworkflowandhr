@@ -299,7 +299,7 @@ const ACTIVE_STAGES_CLIENT = [
 export async function submitLead(companyId: string, form: {
   firstName: string; lastName: string; phone: string; email: string;
   street?: string; city?: string; postcode: string;
-  jobType: string; notes: string; source?: string;
+  jobType?: string; notes: string; source?: string;
   // Legacy compat
   address?: string; roomType?: string; dimensions?: string;
 }): Promise<{ jobId: string; jobRef: string; reused: boolean }> {
