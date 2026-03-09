@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import QuoteBuilder from "@/components/QuoteBuilder";
 import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
 import JobProfitabilityTab from "@/components/cab/JobProfitabilityTab";
+import StagePipeline from "@/components/cab/StagePipeline";
 import { format } from "date-fns";
 import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
@@ -397,6 +398,8 @@ export default function JobDetailPage() {
           )}
         </div>
       </div>
+
+      <StagePipeline currentStageKey={stageKey} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column */}
