@@ -191,7 +191,7 @@ async function ensureGhlContact(
       firstName: customer.first_name,
       lastName: customer.last_name,
       email: customer.email || undefined,
-      phone: customer.phone || undefined,
+      phone: formatUKPhone(customer.phone),
     });
     const newId = created.contact?.id || created.id;
     console.log(`[ghl-worker] Contact created: ${newId}`);
