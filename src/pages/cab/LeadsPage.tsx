@@ -193,11 +193,16 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
   const navigate = useNavigate();
   const [form, setForm] = useState<LeadForm>({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
 
-  const update = (key: keyof LeadForm, val: string) => setForm(prev => ({ ...prev, [key]: val }));
+  const update = (key: keyof LeadForm, val: string) => {
+    if (key === "phone" && val.trim()) setPhoneError(false);
+    setForm(prev => ({ ...prev, [key]: val }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.phone.trim()) { setPhoneError(true); return; }
     if (!companyId) return;
     setSubmitting(true);
     try {
@@ -230,7 +235,11 @@ function CreateLeadDialog({ open, onOpenChange, companyId, onSuccess }: {
               <div><Label className="text-xs">Last Name *</Label><Input required value={form.lastName} onChange={e => update("lastName", e.target.value)} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs">Phone</Label><Input type="tel" value={form.phone} onChange={e => update("phone", e.target.value)} placeholder="07700 900000" /></div>
+              <div>
+                <Label className="text-xs">Phone <span className="text-destructive">*</span></Label>
+                <Input type="tel" required value={form.phone} onChange={e => update("phone", e.target.value)} placeholder="07700 900000" className={phoneError ? "border-destructive" : ""} />
+                {phoneError && <p className="text-xs text-destructive mt-1">Phone number is required</p>}
+              </div>
               <div><Label className="text-xs">Email</Label><Input type="email" value={form.email} onChange={e => update("email", e.target.value)} placeholder="name@example.com" /></div>
             </div>
           </fieldset>
