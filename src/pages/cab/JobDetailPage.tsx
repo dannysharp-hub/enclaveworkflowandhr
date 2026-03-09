@@ -138,7 +138,7 @@ export default function JobDetailPage() {
 
   const handleSendBallpark = async () => {
     if (!ballparkMin || !ballparkMax) {
-      toast({ title: "Save ballpark first", variant: "destructive" });
+      toast({ title: "Enter min and max prices before sending", variant: "destructive" });
       return;
     }
     setBallparkSending(true);
