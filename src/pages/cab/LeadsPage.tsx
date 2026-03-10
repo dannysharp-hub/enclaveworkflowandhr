@@ -94,6 +94,30 @@ export default function LeadsPage() {
     }
     return map;
   }, [allActiveJobs, duplicateCustomerIds]);
+  const handleImportFromDrive = async () => {
+    if (!companyId) return;
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+        body: { action: "scan_root_cab", company_id: companyId },
+      });
+      if (error) throw error;
+      const { created = 0, skipped = 0, conflicts = [] } = data || {};
+      if (created === 0 && conflicts.length === 0) {
+        toast({ title: "No new projects found", description: `${skipped} folder${skipped !== 1 ? "s" : ""} already imported or skipped.` });
+      } else {
+        toast({
+          title: `Imported ${created} project${created !== 1 ? "s" : ""} from Drive`,
+          description: conflicts.length > 0 ? `${conflicts.length} conflict(s): ${conflicts[0]}` : undefined,
+        });
+        load();
+      }
+    } catch (err: any) {
+      toast({ title: "Drive import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
