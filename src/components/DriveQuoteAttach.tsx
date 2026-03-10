@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import {
-  FileText, Send, HardDrive, CheckCircle2, RefreshCw, Loader2, X,
+  FileText, Send, HardDrive, CheckCircle2, RefreshCw, Loader2, X, Mail,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
