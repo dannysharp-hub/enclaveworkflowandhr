@@ -1021,11 +1021,12 @@ Deno.serve(async (req) => {
       const parseRegex = /^(\d{3})_(.+)$/;
 
       let created = 0;
+      let highestNumber = 0;
       const skippedDetails: { folder: string; reason: string }[] = [];
       const conflicts: string[] = [];
       const allFolderNames = folders.map((f: any) => f.name);
 
-      // Load existing cab_jobs for this company to check for duplicates
+      // Load existing cab_jobs for this company to check for duplicates by exact job_ref
       const { data: existingJobs } = await supabaseAdmin
         .from("cab_jobs")
         .select("id, job_ref")
@@ -1045,23 +1046,17 @@ Deno.serve(async (req) => {
         }
 
         const jobNumber = match[1];
+        const num = parseInt(jobNumber, 10);
+        if (num > highestNumber) highestNumber = num;
+
         const rawName = match[2]?.trim() || folder.name;
         const jobTitle = rawName.replace(/[_-]/g, " ").replace(/\s+/g, " ").trim();
         const namePart = rawName.toLowerCase().replace(/[^a-z0-9]/g, "");
         const jobRef = `${jobNumber}_${namePart}`;
 
-        // Already exists?
+        // Only skip if this exact job_ref already exists
         if (existingRefs.has(jobRef)) {
           skippedDetails.push({ folder: folder.name, reason: `already_exists (${jobRef})` });
-          continue;
-        }
-
-        // Also check by job number prefix to catch near-duplicates
-        const existingWithNumber = Array.from(existingRefs).find((r: string) => r.startsWith(jobNumber + "_"));
-        if (existingWithNumber) {
-          const msg = `Job number ${jobNumber} already used by ${existingWithNumber}`;
-          skippedDetails.push({ folder: folder.name, reason: `number_conflict (${msg})` });
-          conflicts.push(`${msg}, skipping folder "${folder.name}"`);
           continue;
         }
 
@@ -1103,14 +1098,15 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Bump the job sequence counter so manual creates don't collide
-        const num = parseInt(jobNumber, 10);
-        await supabaseAdmin
-          .from("cab_job_sequences")
-          .upsert({ company_id: companyId, next_number: num + 1 }, { onConflict: "company_id" });
-
         existingRefs.add(jobRef);
         created++;
+      }
+
+      // Update job sequence counter to highest number found + 1
+      if (highestNumber > 0) {
+        await supabaseAdmin
+          .from("cab_job_sequences")
+          .upsert({ company_id: companyId, next_number: highestNumber + 1 }, { onConflict: "company_id" });
       }
 
       return new Response(JSON.stringify({
