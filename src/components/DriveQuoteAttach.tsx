@@ -181,7 +181,35 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       const customerName = customer
         ? `${customer.first_name} ${customer.last_name}`
         : "customer";
-      toast({ title: `Quote sent to ${customerName}` });
+
+      // Send email to customer
+      if (customer?.email) {
+        const firstName = customer.first_name || "there";
+        const portalUrl = `${window.location.origin}/portal/jobs/${job.id}`;
+        const htmlBody = `<p>Hi ${firstName},</p>
+<p>Please find your quote attached via the link below.</p>
+<p><a href="${portalUrl}" style="display:inline-block;padding:10px 20px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:4px;">View Your Quote</a></p>
+<p>If you have any questions, please reply to this email or call us.</p>
+<p>Kind regards,<br/>Enclave Cabinetry</p>`;
+
+        try {
+          const { error: emailError } = await supabase.functions.invoke("send-email", {
+            body: {
+              to: customer.email,
+              subject: `Your quote from Enclave Cabinetry — ${job.job_ref}`,
+              html: htmlBody,
+              replyTo: "danny@enclavecabinetry.com",
+            },
+          });
+          if (emailError) throw emailError;
+          toast({ title: `Quote emailed to ${customerName}` });
+        } catch (emailErr: any) {
+          console.error("Email send failed:", emailErr);
+          toast({ title: "Quote saved but email failed", description: emailErr.message, variant: "destructive" });
+        }
+      } else {
+        toast({ title: `Quote sent to ${customerName}`, description: "No email on file — email was not sent." });
+      }
       loadQuote();
       onRefresh();
     } catch (err: any) {
