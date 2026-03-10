@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowRight, AlertTriangle } from "lucide-react";
+import { Plus, ArrowRight, AlertTriangle, HardDrive, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface LeadJob {
