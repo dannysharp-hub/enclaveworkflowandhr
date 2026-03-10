@@ -89,12 +89,11 @@ function buildNavGroups(flags: Record<string, boolean>, userRole: string | null)
     .filter(g => g.items.length > 0);
 }
 
-// ── Self-service items (always visible to all) ──
-const selfServiceItems: NavItem[] = [
-  { to: "/my-work", label: "My Work", icon: ClipboardList },
-  { to: "/my-hours", label: "My Hours", icon: Timer },
-  { to: "/my-pay", label: "My Pay", icon: Banknote },
-  { to: "/documents", label: "Documents", icon: FileText },
+// ── Top-level nav items (always visible) ──
+const topLevelItems: NavItem[] = [
+  { to: "/admin/leads", label: "Jobs", icon: Wrench },
+  { to: "/workflow", label: "Workflow Board", icon: Kanban },
+  { to: "/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
 // ── Operative bottom nav items ──
