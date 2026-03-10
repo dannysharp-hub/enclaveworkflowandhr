@@ -210,7 +210,17 @@ export default function LeadsPage() {
                       <Badge variant="outline" className="text-[10px]">{lead.current_stage_key?.replace(/_/g, " ")}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">{format(new Date(lead.created_at), "dd MMM HH:mm")}</TableCell>
-                    <TableCell><ArrowRight size={14} className="text-muted-foreground" /></TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <ArrowRight size={14} className="text-muted-foreground" />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteLead(lead); }}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
