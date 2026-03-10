@@ -342,6 +342,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             <Button size="sm" variant="outline" onClick={handleSendQuote} disabled={sending}>
               <RefreshCw size={12} /> {sending ? "Sending…" : "Send Again"}
             </Button>
+            <Button size="sm" variant="outline" onClick={handleResendEmail} disabled={resending}>
+              <Mail size={12} /> {resending ? "Sending…" : "Re-send Email"}
+            </Button>
           </div>
         </div>
       )}
