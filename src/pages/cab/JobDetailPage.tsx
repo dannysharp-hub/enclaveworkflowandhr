@@ -1074,20 +1074,7 @@ export default function JobDetailPage() {
                   onClick={async () => {
                     setDeleteLoading(true);
                     try {
-                      const jobId = job.id;
-                      // Delete associated records first
-                      await supabase.from("cab_events").delete().eq("job_id", jobId);
-                      await supabase.from("cab_appointments").delete().eq("job_id", jobId);
-                      // Delete quote items then quotes
-                      const { data: jobQuotes } = await supabase.from("cab_quotes").select("id").eq("job_id", jobId);
-                      if (jobQuotes?.length) {
-                        const qIds = jobQuotes.map((q: any) => q.id);
-                        await (supabase.from("cab_quote_items") as any).delete().in("quote_id", qIds);
-                      }
-                      await supabase.from("cab_quotes").delete().eq("job_id", jobId);
-                      // Delete the job itself
-                      const { error } = await supabase.from("cab_jobs").delete().eq("id", jobId);
-                      if (error) throw error;
+                      await deleteCabJob(job.id);
                       toast({ title: "Job deleted" });
                       navigate("/admin/leads");
                     } catch (err: any) {
