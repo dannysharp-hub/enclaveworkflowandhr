@@ -45,10 +45,13 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
     setResending(true);
     try {
       const firstName = customer.first_name || "there";
-      const portalUrl = `${window.location.origin}/portal/jobs/${job.id}`;
+      const driveFileId = quote?.drive_file_id || selectedFile?.id;
+      const quoteUrl = driveFileId
+        ? `https://drive.google.com/file/d/${driveFileId}/view`
+        : `${window.location.origin}/portal/jobs/${job.id}`;
       const htmlBody = `<p>Hi ${firstName},</p>
 <p>Please find your quote attached via the link below.</p>
-<p><a href="${portalUrl}" style="display:inline-block;padding:10px 20px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:4px;">View Your Quote</a></p>
+<p><a href="${quoteUrl}" style="display:inline-block;padding:10px 20px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:4px;">View Your Quote</a></p>
 <p>If you have any questions, please reply to this email or call us.</p>
 <p>Kind regards,<br/>Enclave Cabinetry</p>`;
 
