@@ -61,7 +61,6 @@ export default function LeadsPage() {
       (supabase.from("cab_jobs") as any)
         .select("*, cab_customers(first_name, last_name, phone, email)")
         .eq("company_id", cid)
-        .eq("status", "lead")
         .order("created_at", { ascending: false }),
       (supabase.from("cab_jobs") as any)
         .select("id, customer_id, job_ref, current_stage_key, status")
@@ -138,7 +137,7 @@ export default function LeadsPage() {
     setDeleting(true);
     try {
       await deleteCabJob(deleteLead.id);
-      toast({ title: "Lead deleted", description: `${deleteLead.job_ref} removed` });
+      toast({ title: "Job deleted", description: `${deleteLead.job_ref} removed` });
       setDeleteLead(null);
       load();
     } catch (err: any) {
@@ -150,15 +149,15 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Leads</h1>
-          <p className="text-sm text-muted-foreground">{leads.length} active lead{leads.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-2xl font-bold text-foreground">Jobs</h1>
+          <p className="text-sm text-muted-foreground">{leads.length} active job{leads.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleImportFromDrive} disabled={importing || !companyId}>
             {importing ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
             {importing ? "Importing…" : "Import from Drive"}
           </Button>
-          <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> Create Lead</Button>
+          <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> New Job</Button>
         </div>
       </div>
 
@@ -168,7 +167,7 @@ export default function LeadsPage() {
         </div>
       ) : leads.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-12 text-center text-muted-foreground">
-          No leads yet. Create one or share your enquiry form.
+          No jobs yet. Create one or share your enquiry form.
         </div>
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
@@ -234,7 +233,7 @@ export default function LeadsPage() {
       <AlertDialog open={!!deleteLead} onOpenChange={o => { if (!o) setDeleteLead(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <span className="font-semibold">{deleteLead?.job_ref}</span>? This action cannot be undone.
             </AlertDialogDescription>
