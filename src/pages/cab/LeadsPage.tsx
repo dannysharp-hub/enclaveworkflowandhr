@@ -137,8 +137,7 @@ export default function LeadsPage() {
     if (!deleteLead) return;
     setDeleting(true);
     try {
-      const { error } = await supabase.from("cab_jobs").delete().eq("id", deleteLead.id);
-      if (error) throw error;
+      await deleteCabJob(deleteLead.id);
       toast({ title: "Lead deleted", description: `${deleteLead.job_ref} removed` });
       setDeleteLead(null);
       load();
