@@ -48,6 +48,8 @@ export default function LeadsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [deleteLead, setDeleteLead] = useState<LeadJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
