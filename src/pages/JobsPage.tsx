@@ -51,8 +51,7 @@ export default function JobsPage() {
     if (!deleteJob) return;
     setDeleting(true);
     try {
-      const { error } = await supabase.from("cab_jobs").delete().eq("id", deleteJob.id);
-      if (error) throw error;
+      await deleteCabJob(deleteJob.id);
       toast({ title: "Job deleted", description: `${deleteJob.job_ref} removed` });
       setDeleteJob(null);
       fetchJobs();
