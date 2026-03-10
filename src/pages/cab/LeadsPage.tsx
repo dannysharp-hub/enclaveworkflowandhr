@@ -167,7 +167,7 @@ export default function LeadsPage() {
         </div>
       ) : leads.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-12 text-center text-muted-foreground">
-          No leads yet. Create one or share your enquiry form.
+          No jobs yet. Create one or share your enquiry form.
         </div>
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
