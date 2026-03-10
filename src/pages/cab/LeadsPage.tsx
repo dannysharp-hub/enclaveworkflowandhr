@@ -103,14 +103,20 @@ export default function LeadsPage() {
         body: { action: "scan_root_cab", company_id: companyId },
       });
       if (error) throw error;
-      const { created = 0, skipped = 0, conflicts = [] } = data || {};
+      const { created = 0, skipped = 0, skipped_details = [], conflicts = [], total_folders_found = 0, folder_names = [] } = data || {};
       if (created === 0 && conflicts.length === 0) {
-        toast({ title: "No new projects found", description: `${skipped} folder${skipped !== 1 ? "s" : ""} already imported or skipped.` });
+        const skipReasons = skipped_details.map((s: any) => `• ${s.folder}: ${s.reason}`).join("\n");
+        toast({
+          title: "No new projects found",
+          description: `Found ${total_folders_found} folder(s) in Drive root.\n${skipped} skipped:\n${skipReasons || "None"}${conflicts.length ? `\nConflicts: ${conflicts.join(", ")}` : ""}`,
+        });
+        console.log("[Drive Import] Details:", { total_folders_found, folder_names, skipped_details, conflicts });
       } else {
         toast({
           title: `Imported ${created} project${created !== 1 ? "s" : ""} from Drive`,
-          description: conflicts.length > 0 ? `${conflicts.length} conflict(s): ${conflicts[0]}` : undefined,
+          description: `${total_folders_found} folders found, ${skipped} skipped.${conflicts.length > 0 ? ` ${conflicts.length} conflict(s): ${conflicts[0]}` : ""}`,
         });
+        console.log("[Drive Import] Details:", { total_folders_found, folder_names, skipped_details, conflicts });
         load();
       }
     } catch (err: any) {
