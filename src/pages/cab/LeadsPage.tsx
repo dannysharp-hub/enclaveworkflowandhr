@@ -149,8 +149,8 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Leads</h1>
-          <p className="text-sm text-muted-foreground">{leads.length} active lead{leads.length !== 1 ? "s" : ""}</p>
+          <h1 className="text-2xl font-bold text-foreground">Jobs</h1>
+          <p className="text-sm text-muted-foreground">{leads.length} active job{leads.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleImportFromDrive} disabled={importing || !companyId}>
