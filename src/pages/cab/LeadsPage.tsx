@@ -137,7 +137,7 @@ export default function LeadsPage() {
     setDeleting(true);
     try {
       await deleteCabJob(deleteLead.id);
-      toast({ title: "Lead deleted", description: `${deleteLead.job_ref} removed` });
+      toast({ title: "Job deleted", description: `${deleteLead.job_ref} removed` });
       setDeleteLead(null);
       load();
     } catch (err: any) {
