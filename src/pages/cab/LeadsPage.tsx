@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowRight, AlertTriangle } from "lucide-react";
+import { Plus, ArrowRight, AlertTriangle, HardDrive, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface LeadJob {
@@ -42,6 +42,7 @@ export default function LeadsPage() {
   const [allActiveJobs, setAllActiveJobs] = useState<LeadJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -93,6 +94,30 @@ export default function LeadsPage() {
     }
     return map;
   }, [allActiveJobs, duplicateCustomerIds]);
+  const handleImportFromDrive = async () => {
+    if (!companyId) return;
+    setImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+        body: { action: "scan_root_cab", company_id: companyId },
+      });
+      if (error) throw error;
+      const { created = 0, skipped = 0, conflicts = [] } = data || {};
+      if (created === 0 && conflicts.length === 0) {
+        toast({ title: "No new projects found", description: `${skipped} folder${skipped !== 1 ? "s" : ""} already imported or skipped.` });
+      } else {
+        toast({
+          title: `Imported ${created} project${created !== 1 ? "s" : ""} from Drive`,
+          description: conflicts.length > 0 ? `${conflicts.length} conflict(s): ${conflicts[0]}` : undefined,
+        });
+        load();
+      }
+    } catch (err: any) {
+      toast({ title: "Drive import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -101,7 +126,13 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-foreground">Leads</h1>
           <p className="text-sm text-muted-foreground">{leads.length} active lead{leads.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> Create Lead</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleImportFromDrive} disabled={importing || !companyId}>
+            {importing ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
+            {importing ? "Importing…" : "Import from Drive"}
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> Create Lead</Button>
+        </div>
       </div>
 
       {loading ? (

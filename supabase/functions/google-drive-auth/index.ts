@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
   }
 
   // Actions that require at least supervisor
-  const supervisorActions = ["scan_root", "index_job_files", "index_all_jobs"];
+  const supervisorActions = ["scan_root", "scan_root_cab", "index_job_files", "index_all_jobs"];
   if (supervisorActions.includes(action) && !["admin", "supervisor"].includes(userRole)) {
     return new Response(JSON.stringify({ error: "Supervisor or admin required" }), {
       status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -981,6 +981,136 @@ Deno.serve(async (req) => {
       });
 
       return new Response(JSON.stringify({ created, linked, skipped, conflicts }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── SCAN ROOT CAB (find project folders + auto-create cab_jobs) ───
+    if (action === "scan_root_cab") {
+      const companyId = body.company_id as string;
+      if (!companyId) {
+        return new Response(JSON.stringify({ error: "company_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: settings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!settings?.is_connected || !settings.projects_root_folder_id) {
+        return new Response(JSON.stringify({ error: "Drive not connected or no root folder set" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const rootId = settings.projects_root_folder_id;
+
+      // List immediate subfolders
+      const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&orderBy=name&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message}`);
+
+      const folders = data.files || [];
+      const pattern = /^\d{3}_.+$/;
+      const parseRegex = /^(\d{3})_(.+)$/;
+
+      let created = 0;
+      let skipped = 0;
+      const conflicts: string[] = [];
+
+      // Load existing cab_jobs for this company to check for duplicates
+      const { data: existingJobs } = await supabaseAdmin
+        .from("cab_jobs")
+        .select("id, job_ref")
+        .eq("company_id", companyId);
+      const existingRefs = new Set((existingJobs || []).map((j: any) => j.job_ref));
+
+      for (const folder of folders) {
+        if (!pattern.test(folder.name)) {
+          skipped++;
+          continue;
+        }
+
+        const match = folder.name.match(parseRegex);
+        if (!match) { skipped++; continue; }
+
+        const jobNumber = match[1];
+        // Convert folder name part to a readable title: underscores/hyphens → spaces
+        const rawName = match[2]?.trim() || folder.name;
+        const jobTitle = rawName.replace(/[_-]/g, " ").replace(/\s+/g, " ").trim();
+
+        // Build the job_ref as the system expects: 001_firstnamelastname
+        const namePart = rawName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const jobRef = `${jobNumber}_${namePart}`;
+
+        // Already exists?
+        if (existingRefs.has(jobRef)) {
+          skipped++;
+          continue;
+        }
+
+        // Also check by job number prefix to catch near-duplicates
+        const hasNumber = Array.from(existingRefs).some((r: string) => r.startsWith(jobNumber + "_"));
+        if (hasNumber) {
+          conflicts.push(`Job number ${jobNumber} already exists, skipping folder "${folder.name}"`);
+          continue;
+        }
+
+        // Create a placeholder customer from the folder name
+        const nameParts = jobTitle.split(" ");
+        const firstName = nameParts[0] || "Unknown";
+        const lastName = nameParts.slice(1).join(" ") || "Customer";
+
+        const { data: newCustomer, error: custErr } = await supabaseAdmin
+          .from("cab_customers")
+          .insert({
+            company_id: companyId,
+            first_name: firstName,
+            last_name: lastName,
+          })
+          .select("id")
+          .single();
+
+        if (custErr) {
+          conflicts.push(`Failed to create customer for "${folder.name}": ${custErr.message}`);
+          continue;
+        }
+
+        // Create cab_job
+        const { error: jobErr } = await supabaseAdmin
+          .from("cab_jobs")
+          .insert({
+            company_id: companyId,
+            customer_id: newCustomer!.id,
+            job_ref: jobRef,
+            job_title: jobTitle,
+            status: "lead",
+            current_stage_key: "lead_captured",
+            state: "new_lead",
+          });
+
+        if (jobErr) {
+          conflicts.push(`Failed to create job for "${folder.name}": ${jobErr.message}`);
+          continue;
+        }
+
+        // Bump the job sequence counter so manual creates don't collide
+        const num = parseInt(jobNumber, 10);
+        await supabaseAdmin
+          .from("cab_job_sequences")
+          .upsert({ company_id: companyId, next_number: num + 1 }, { onConflict: "company_id" });
+
+        existingRefs.add(jobRef);
+        created++;
+      }
+
+      return new Response(JSON.stringify({ created, skipped, conflicts }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
