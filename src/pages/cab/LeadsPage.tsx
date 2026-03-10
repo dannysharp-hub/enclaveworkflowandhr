@@ -157,7 +157,7 @@ export default function LeadsPage() {
             {importing ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
             {importing ? "Importing…" : "Import from Drive"}
           </Button>
-          <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> Create Lead</Button>
+          <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> New Job</Button>
         </div>
       </div>
 
