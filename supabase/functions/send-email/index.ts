@@ -7,12 +7,15 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("send-email function invoked, method:", req.method);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    console.log("RESEND_API_KEY present:", !!RESEND_API_KEY);
     if (!RESEND_API_KEY) {
       throw new Error("RESEND_API_KEY is not configured");
     }
