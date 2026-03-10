@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { getCabCompanyId, generateJobRef, insertCabEvent } from "@/lib/cabHelpers";
+import { deleteCabJob } from "@/lib/cabJobDelete";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,8 +137,7 @@ export default function LeadsPage() {
     if (!deleteLead) return;
     setDeleting(true);
     try {
-      const { error } = await supabase.from("cab_jobs").delete().eq("id", deleteLead.id);
-      if (error) throw error;
+      await deleteCabJob(deleteLead.id);
       toast({ title: "Lead deleted", description: `${deleteLead.job_ref} removed` });
       setDeleteLead(null);
       load();
