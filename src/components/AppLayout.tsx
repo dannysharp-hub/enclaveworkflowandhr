@@ -51,88 +51,6 @@ function isOperative(role: string | null): boolean {
 function buildNavGroups(flags: Record<string, boolean>, userRole: string | null): NavGroup[] {
   const groups: NavGroup[] = [];
 
-  // 🏭 Operations
-  groups.push({
-    id: "operations",
-    label: "Operations",
-    icon: Factory,
-    items: [
-      { to: "/workflow", label: "Workflow Board", icon: Kanban },
-      { to: "/jobs", label: "Jobs", icon: Wrench },
-      { to: "/production", label: "Production Planner", icon: Activity },
-      { to: "/drift", label: "Drift Control", icon: TrendingDown },
-      { to: "/capacity", label: "Capacity Planner", icon: Factory },
-      { to: "/calendar", label: "Calendar", icon: CalendarDays },
-    ],
-  });
-
-  // 👥 People
-  groups.push({
-    id: "people",
-    label: "People",
-    icon: Users,
-    items: [
-      { to: "/whos-in", label: "Who's In", icon: Users },
-      { to: "/staff", label: "Staff Directory", icon: Users },
-      { to: "/hr-admin", label: "HR Admin", icon: UserCog },
-      { to: "/holiday-calendar", label: "Holiday Calendar", icon: Palmtree },
-      { to: "/compliance", label: "Compliance", icon: ShieldCheck },
-      { to: "/training", label: "Training", icon: GraduationCap },
-      { to: "/skills", label: "Skills Matrix", icon: Zap },
-      { to: "/machine-auth", label: "Machine Auth", icon: ShieldAlert },
-      { to: "/reviews", label: "Reviews", icon: ClipboardCheck },
-    ],
-  });
-
-  // 📦 Materials
-  groups.push({
-    id: "materials",
-    label: "Materials",
-    icon: Package,
-    items: [
-      { to: "/materials", label: "Materials", icon: Package },
-      { to: "/part-library", label: "Part Library", icon: Package },
-      ...(flags.enable_remnants ? [{ to: "/remnants", label: "Remnants", icon: Recycle }] : []),
-      { to: "/purchasing", label: "Purchase Orders", icon: Truck },
-    ],
-  });
-
-  // 📊 Performance
-  groups.push({
-    id: "performance",
-    label: "Performance",
-    icon: BarChart3,
-    items: [
-      { to: "/reports", label: "Reports", icon: BarChart3 },
-      { to: "/ai-inbox", label: "AI Inbox", icon: Brain },
-      { to: "/export-centre", label: "Export Centre", icon: FileSpreadsheet },
-      ...(flags.enable_smart_quoting ? [{ to: "/quoting", label: "Smart Quoting", icon: TrendingUp }] : []),
-    ],
-  });
-
-  // 💰 Finance
-  if (flags.enable_finance) {
-    groups.push({
-      id: "finance",
-      label: "Finance",
-      icon: BadgePoundSterling,
-      roles: ["admin", "office", "finance"],
-      items: [
-        { to: "/finance", label: "Finance Overview", icon: BadgePoundSterling },
-        { to: "/finance/invoices", label: "Invoices", icon: Receipt },
-        { to: "/finance/bills", label: "Bills", icon: Wallet },
-        { to: "/finance/wages", label: "Wages", icon: Clock },
-        { to: "/finance/overheads", label: "Overheads", icon: Building },
-        { to: "/finance/customers", label: "Customers", icon: Users },
-        { to: "/finance/suppliers", label: "Suppliers", icon: Truck },
-        { to: "/finance/pandle", label: "Pandle", icon: FileSpreadsheet },
-        { to: "/finance/pandle/export", label: "Pandle Export", icon: Download },
-        { to: "/finance/forecast", label: "Forecast", icon: TrendingUp },
-        { to: "/finance/bank", label: "Bank Reconciliation", icon: Landmark },
-      ],
-    });
-  }
-
   // 🗄 Cabinetry Admin
   groups.push({
     id: "cab-admin",
@@ -140,21 +58,17 @@ function buildNavGroups(flags: Record<string, boolean>, userRole: string | null)
     icon: Briefcase,
     roles: ["admin"],
     items: [
-      { to: "/admin/leads", label: "Leads & Jobs", icon: Contact },
-      { to: "/admin/profit-watch", label: "Profit Watch", icon: AlertTriangle },
       { to: "/admin/production", label: "Production Board", icon: Factory },
       { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
-      { to: "/admin/team", label: "Team & Invites", icon: Users },
       { to: "/admin/ghl", label: "GHL Settings", icon: Link2 },
-      { to: "/admin/webhooks", label: "Webhook Logs", icon: Activity },
-      { to: "/admin/bootstrap", label: "Bootstrap", icon: FileBox },
+      { to: "/admin/team", label: "Team & Invites", icon: Users },
     ],
   });
 
-  // ⚙ System
+  // ⚙ Settings (bottom)
   groups.push({
     id: "system",
-    label: "System",
+    label: "Settings",
     icon: Settings,
     roles: ["admin"],
     items: [
