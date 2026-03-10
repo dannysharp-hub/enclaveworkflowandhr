@@ -391,6 +391,11 @@ export default function JobDetailPage() {
             </div>
           )}
         </div>
+        {userRole === "admin" && (
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)} className="flex items-center gap-1.5">
+            <Trash2 size={14} /> Delete
+          </Button>
+        )}
       </div>
 
       <StagePipeline currentStageKey={stageKey} />
