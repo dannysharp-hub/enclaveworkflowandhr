@@ -20,8 +20,12 @@ import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
   CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
-  Users, ExternalLink,
+  Users, ExternalLink, Trash2,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 export default function JobDetailPage() {
