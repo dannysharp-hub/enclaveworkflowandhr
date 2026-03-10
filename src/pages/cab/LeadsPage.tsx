@@ -94,6 +94,7 @@ export default function LeadsPage() {
     }
     return map;
   }, [allActiveJobs, duplicateCustomerIds]);
+
   const handleImportFromDrive = async () => {
     if (!companyId) return;
     setImporting(true);
