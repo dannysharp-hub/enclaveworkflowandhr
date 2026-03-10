@@ -8,11 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowRight, AlertTriangle, HardDrive, Loader2 } from "lucide-react";
+import { Plus, ArrowRight, AlertTriangle, HardDrive, Loader2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface LeadJob {
@@ -44,6 +48,8 @@ export default function LeadsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [deleteLead, setDeleteLead] = useState<LeadJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -126,6 +132,20 @@ export default function LeadsPage() {
     }
   };
 
+  const handleDeleteLead = useCallback(async () => {
+    if (!deleteLead) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("cab_jobs").delete().eq("id", deleteLead.id);
+      if (error) throw error;
+      toast({ title: "Lead deleted", description: `${deleteLead.job_ref} removed` });
+      setDeleteLead(null);
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setDeleting(false); }
+  }, [deleteLead, load]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -190,7 +210,17 @@ export default function LeadsPage() {
                       <Badge variant="outline" className="text-[10px]">{lead.current_stage_key?.replace(/_/g, " ")}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">{format(new Date(lead.created_at), "dd MMM HH:mm")}</TableCell>
-                    <TableCell><ArrowRight size={14} className="text-muted-foreground" /></TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <ArrowRight size={14} className="text-muted-foreground" />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteLead(lead); }}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -200,6 +230,23 @@ export default function LeadsPage() {
       )}
 
       <CreateLeadDialog open={dialogOpen} onOpenChange={setDialogOpen} companyId={companyId} onSuccess={load} />
+
+      <AlertDialog open={!!deleteLead} onOpenChange={o => { if (!o) setDeleteLead(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold">{deleteLead?.job_ref}</span>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteLead} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
