@@ -47,6 +47,8 @@ export default function JobDetailPage() {
   const [emitting, setEmitting] = useState<string | null>(null);
   const [ghlSyncing, setGhlSyncing] = useState(false);
   const [installAssigning, setInstallAssigning] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
