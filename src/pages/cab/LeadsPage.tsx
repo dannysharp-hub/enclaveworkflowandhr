@@ -132,6 +132,20 @@ export default function LeadsPage() {
     }
   };
 
+  const handleDeleteLead = useCallback(async () => {
+    if (!deleteLead) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("cab_jobs").delete().eq("id", deleteLead.id);
+      if (error) throw error;
+      toast({ title: "Lead deleted", description: `${deleteLead.job_ref} removed` });
+      setDeleteLead(null);
+      load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally { setDeleting(false); }
+  }, [deleteLead, load]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
