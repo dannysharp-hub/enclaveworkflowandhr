@@ -61,7 +61,6 @@ export default function LeadsPage() {
       (supabase.from("cab_jobs") as any)
         .select("*, cab_customers(first_name, last_name, phone, email)")
         .eq("company_id", cid)
-        .eq("status", "lead")
         .order("created_at", { ascending: false }),
       (supabase.from("cab_jobs") as any)
         .select("id, customer_id, job_ref, current_stage_key, status")
