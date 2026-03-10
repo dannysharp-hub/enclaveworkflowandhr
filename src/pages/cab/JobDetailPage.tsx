@@ -29,6 +29,7 @@ import {
 
 
 export default function JobDetailPage() {
+  const { userRole } = useAuth();
   const { jobRef } = useParams();
   const navigate = useNavigate();
   const [companyId, setCompanyId] = useState<string | null>(null);
