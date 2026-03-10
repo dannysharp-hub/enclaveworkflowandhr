@@ -102,7 +102,13 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-foreground">Leads</h1>
           <p className="text-sm text-muted-foreground">{leads.length} active lead{leads.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> Create Lead</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleImportFromDrive} disabled={importing || !companyId}>
+            {importing ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
+            {importing ? "Importing…" : "Import from Drive"}
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> Create Lead</Button>
+        </div>
       </div>
 
       {loading ? (
