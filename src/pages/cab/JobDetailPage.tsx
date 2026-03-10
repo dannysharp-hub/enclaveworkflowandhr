@@ -716,6 +716,11 @@ export default function JobDetailPage() {
             <DriveQuoteAttach companyId={companyId!} job={job} customer={customer} onRefresh={load} />
           </div>
 
+          {/* Manual Quote Builder */}
+          <div data-section="manual-quote-builder">
+            <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+          </div>
+
           {/* Purchasing Tab — only after project confirmed */}
           {isProjectConfirmed && (
             <JobPurchasingTab companyId={companyId!} job={job} onRefresh={load} />
