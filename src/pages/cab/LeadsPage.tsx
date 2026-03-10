@@ -233,7 +233,7 @@ export default function LeadsPage() {
       <AlertDialog open={!!deleteLead} onOpenChange={o => { if (!o) setDeleteLead(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <span className="font-semibold">{deleteLead?.job_ref}</span>? This action cannot be undone.
             </AlertDialogDescription>
