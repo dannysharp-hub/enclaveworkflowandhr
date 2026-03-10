@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { getCabCompanyId, getCabCompany, insertCabEvent, estimatePostcodeDistance } from "@/lib/cabHelpers";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -19,11 +20,16 @@ import {
   ArrowLeft, Send, CalendarPlus, FileText, CheckCircle2, Banknote,
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
   CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
-  Users, ExternalLink,
+  Users, ExternalLink, Trash2,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 export default function JobDetailPage() {
+  const { userRole } = useAuth();
   const { jobRef } = useParams();
   const navigate = useNavigate();
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -41,6 +47,8 @@ export default function JobDetailPage() {
   const [emitting, setEmitting] = useState<string | null>(null);
   const [ghlSyncing, setGhlSyncing] = useState(false);
   const [installAssigning, setInstallAssigning] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -1034,6 +1042,60 @@ export default function JobDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Job - admin only */}
+      {userRole === "admin" && job && (
+        <>
+          <div className="border-t border-border pt-8 mt-8">
+            <Button variant="destructive" onClick={() => setDeleteOpen(true)} className="flex items-center gap-2">
+              <Trash2 size={16} /> Delete Job
+            </Button>
+          </div>
+
+          <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Job</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this job? This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={deleteLoading}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    setDeleteLoading(true);
+                    try {
+                      const jobId = job.id;
+                      // Delete associated records first
+                      await supabase.from("cab_events").delete().eq("job_id", jobId);
+                      await supabase.from("cab_appointments").delete().eq("job_id", jobId);
+                      // Delete quote items then quotes
+                      const { data: jobQuotes } = await supabase.from("cab_quotes").select("id").eq("job_id", jobId);
+                      if (jobQuotes?.length) {
+                        const qIds = jobQuotes.map((q: any) => q.id);
+                        await (supabase.from("cab_quote_items") as any).delete().in("quote_id", qIds);
+                      }
+                      await supabase.from("cab_quotes").delete().eq("job_id", jobId);
+                      // Delete the job itself
+                      const { error } = await supabase.from("cab_jobs").delete().eq("id", jobId);
+                      if (error) throw error;
+                      toast({ title: "Job deleted" });
+                      navigate("/admin/leads");
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                    } finally { setDeleteLoading(false); }
+                  }}
+                >
+                  {deleteLoading ? "Deleting…" : "Delete Job"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
 
     </div>
   );
