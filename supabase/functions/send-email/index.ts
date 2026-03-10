@@ -15,6 +15,7 @@ serve(async (req) => {
 
   try {
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    console.log("RESEND_API_KEY present:", !!RESEND_API_KEY);
     if (!RESEND_API_KEY) {
       throw new Error("RESEND_API_KEY is not configured");
     }
