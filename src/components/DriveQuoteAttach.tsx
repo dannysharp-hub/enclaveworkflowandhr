@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import {
-  FileText, Send, HardDrive, CheckCircle2, RefreshCw, Loader2, X,
+  FileText, Send, HardDrive, CheckCircle2, RefreshCw, Loader2, X, Mail,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -35,6 +35,41 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
   const [selectedFile, setSelectedFile] = useState<DriveFile | null>(null);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const handleResendEmail = async () => {
+    if (!customer?.email) {
+      toast({ title: "No email on file", description: "This customer has no email address.", variant: "destructive" });
+      return;
+    }
+    setResending(true);
+    try {
+      const firstName = customer.first_name || "there";
+      const portalUrl = `${window.location.origin}/portal/jobs/${job.id}`;
+      const htmlBody = `<p>Hi ${firstName},</p>
+<p>Please find your quote attached via the link below.</p>
+<p><a href="${portalUrl}" style="display:inline-block;padding:10px 20px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:4px;">View Your Quote</a></p>
+<p>If you have any questions, please reply to this email or call us.</p>
+<p>Kind regards,<br/>Enclave Cabinetry</p>`;
+
+      const { error: emailError } = await supabase.functions.invoke("send-email", {
+        body: {
+          to: customer.email,
+          subject: `Your quote from Enclave Cabinetry — ${job.job_ref}`,
+          html: htmlBody,
+          replyTo: "danny@enclavecabinetry.com",
+        },
+      });
+      if (emailError) throw emailError;
+      const customerName = `${customer.first_name} ${customer.last_name}`;
+      toast({ title: `Quote re-sent to ${customerName}` });
+    } catch (err: any) {
+      console.error("Resend email failed:", err);
+      toast({ title: "Failed to re-send email", description: err.message, variant: "destructive" });
+    } finally {
+      setResending(false);
+    }
+  };
 
   const loadQuote = useCallback(async () => {
     // Clean up old draft quotes with no drive file (leftovers from old builder)
@@ -306,6 +341,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             </Button>
             <Button size="sm" variant="outline" onClick={handleSendQuote} disabled={sending}>
               <RefreshCw size={12} /> {sending ? "Sending…" : "Send Again"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleResendEmail} disabled={resending}>
+              <Mail size={12} /> {resending ? "Sending…" : "Re-send Email"}
             </Button>
           </div>
         </div>
