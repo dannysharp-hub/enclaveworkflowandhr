@@ -339,9 +339,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })()}
 
-          {/* Self-service */}
-          {!collapsed && <p className="text-[10px] font-mono font-bold text-muted-foreground uppercase px-3 pt-3 pb-1">Self Service</p>}
-          {selfServiceItems.filter(item => canRoleAccessRoute(userRole, item.to)).map(item => {
+          {/* Top-level nav items */}
+          {topLevelItems.filter(item => canRoleAccessRoute(userRole, item.to)).map(item => {
             const isActive = location.pathname === item.to;
             return (
               <NavLink
