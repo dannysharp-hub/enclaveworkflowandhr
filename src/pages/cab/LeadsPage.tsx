@@ -42,6 +42,7 @@ export default function LeadsPage() {
   const [allActiveJobs, setAllActiveJobs] = useState<LeadJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
