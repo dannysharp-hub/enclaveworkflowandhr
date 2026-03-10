@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { getCabCompanyId, getCabCompany, insertCabEvent, estimatePostcodeDistance } from "@/lib/cabHelpers";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
