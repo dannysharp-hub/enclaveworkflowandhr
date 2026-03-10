@@ -1021,8 +1021,9 @@ Deno.serve(async (req) => {
       const parseRegex = /^(\d{3})_(.+)$/;
 
       let created = 0;
-      let skipped = 0;
+      const skippedDetails: { folder: string; reason: string }[] = [];
       const conflicts: string[] = [];
+      const allFolderNames = folders.map((f: any) => f.name);
 
       // Load existing cab_jobs for this company to check for duplicates
       const { data: existingJobs } = await supabaseAdmin
@@ -1033,32 +1034,34 @@ Deno.serve(async (req) => {
 
       for (const folder of folders) {
         if (!pattern.test(folder.name)) {
-          skipped++;
+          skippedDetails.push({ folder: folder.name, reason: "wrong_format" });
           continue;
         }
 
         const match = folder.name.match(parseRegex);
-        if (!match) { skipped++; continue; }
+        if (!match) {
+          skippedDetails.push({ folder: folder.name, reason: "parse_failed" });
+          continue;
+        }
 
         const jobNumber = match[1];
-        // Convert folder name part to a readable title: underscores/hyphens → spaces
         const rawName = match[2]?.trim() || folder.name;
         const jobTitle = rawName.replace(/[_-]/g, " ").replace(/\s+/g, " ").trim();
-
-        // Build the job_ref as the system expects: 001_firstnamelastname
         const namePart = rawName.toLowerCase().replace(/[^a-z0-9]/g, "");
         const jobRef = `${jobNumber}_${namePart}`;
 
         // Already exists?
         if (existingRefs.has(jobRef)) {
-          skipped++;
+          skippedDetails.push({ folder: folder.name, reason: `already_exists (${jobRef})` });
           continue;
         }
 
         // Also check by job number prefix to catch near-duplicates
-        const hasNumber = Array.from(existingRefs).some((r: string) => r.startsWith(jobNumber + "_"));
-        if (hasNumber) {
-          conflicts.push(`Job number ${jobNumber} already exists, skipping folder "${folder.name}"`);
+        const existingWithNumber = Array.from(existingRefs).find((r: string) => r.startsWith(jobNumber + "_"));
+        if (existingWithNumber) {
+          const msg = `Job number ${jobNumber} already used by ${existingWithNumber}`;
+          skippedDetails.push({ folder: folder.name, reason: `number_conflict (${msg})` });
+          conflicts.push(`${msg}, skipping folder "${folder.name}"`);
           continue;
         }
 
@@ -1110,7 +1113,14 @@ Deno.serve(async (req) => {
         created++;
       }
 
-      return new Response(JSON.stringify({ created, skipped, conflicts }), {
+      return new Response(JSON.stringify({
+        created,
+        skipped: skippedDetails.length,
+        skipped_details: skippedDetails,
+        conflicts,
+        total_folders_found: folders.length,
+        folder_names: allFolderNames,
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
