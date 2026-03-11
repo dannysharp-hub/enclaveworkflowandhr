@@ -1506,6 +1506,7 @@ export type Database = {
           job_ref: string
           job_title: string
           legacy_job_id: string | null
+          production_stage: string | null
           production_stage_key: string
           profit_last_calculated_at: string | null
           property_address_json: Json | null
@@ -1559,6 +1560,7 @@ export type Database = {
           job_ref: string
           job_title: string
           legacy_job_id?: string | null
+          production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
           property_address_json?: Json | null
@@ -1612,6 +1614,7 @@ export type Database = {
           job_ref?: string
           job_title?: string
           legacy_job_id?: string | null
+          production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
           property_address_json?: Json | null

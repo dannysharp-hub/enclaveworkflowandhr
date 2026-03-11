@@ -1,0 +1,1 @@
+ALTER TABLE public.cab_jobs ADD COLUMN IF NOT EXISTS production_stage TEXT;
