@@ -29,13 +29,8 @@ interface NavItem {
   featureFlag?: string;
 }
 
-interface NavGroup {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  roles?: string[]; // if set, only these roles see the group
-  items: NavItem[];
-}
+
+
 
 // ── Role helpers ──
 
