@@ -294,11 +294,17 @@ export default function NextActionsPanel({
           </Button>
         );
 
+      case "ready_for_install":
       case "install_booked":
         return (
-          <Button size="sm" disabled={disabled} onClick={() => navigate(`/jobs/${job.id}/install-signoff`)}>
-            <ClipboardCheck size={14} /> Complete Install + Sign Off
-          </Button>
+          <>
+            <Button size="sm" disabled={disabled} onClick={() => onMarkInstallComplete?.()}>
+              <ClipboardCheck size={14} /> Mark Install Complete
+            </Button>
+            <Button size="sm" variant="secondary" disabled={disabled} onClick={() => navigate(`/jobs/${job.id}/install-signoff`)}>
+              <Eye size={14} /> View Legacy Sign-off
+            </Button>
+          </>
         );
 
       case "install_completed":
