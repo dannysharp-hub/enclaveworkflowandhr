@@ -153,8 +153,7 @@ const AppRoutes = () => (
               <Route path="/materials" element={<MaterialsPage />} />
               <Route path="/part-library" element={<PartLibraryPage />} />
 
-              {/* Production management — admin/supervisor/office only */}
-              <Route path="/production" element={<RoleGate allowedRoles={PRODUCTION_MGMT_ROLES}><ProductionControlPage /></RoleGate>} />
+              {/* Legacy /production removed — use /admin/production instead */}
               <Route path="/drift" element={<RoleGate allowedRoles={PRODUCTION_MGMT_ROLES}><ProductionDriftPage /></RoleGate>} />
               <Route path="/capacity" element={<RoleGate allowedRoles={PRODUCTION_MGMT_ROLES}><CapacityPlannerPage /></RoleGate>} />
 
