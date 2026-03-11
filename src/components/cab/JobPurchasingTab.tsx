@@ -272,10 +272,12 @@ export default function JobPurchasingTab({ companyId, job, onRefresh }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-muted/30 border-b border-border">
-                <th className="text-left p-2 font-mono text-[10px] text-muted-foreground">Item</th>
-                <th className="text-left p-2 font-mono text-[10px] text-muted-foreground">Cat</th>
+                <th className="text-left p-2 font-mono text-[10px] text-muted-foreground">Part Number</th>
+                <th className="text-left p-2 font-mono text-[10px] text-muted-foreground">Material</th>
                 <th className="text-right p-2 font-mono text-[10px] text-muted-foreground">Qty</th>
-                <th className="text-left p-2 font-mono text-[10px] text-muted-foreground">Supplier</th>
+                <th className="text-right p-2 font-mono text-[10px] text-muted-foreground">Width</th>
+                <th className="text-right p-2 font-mono text-[10px] text-muted-foreground">Length</th>
+                <th className="text-right p-2 font-mono text-[10px] text-muted-foreground">Thickness</th>
                 <th className="text-left p-2 font-mono text-[10px] text-muted-foreground">Status</th>
                 <th className="p-2" />
               </tr>
@@ -284,12 +286,14 @@ export default function JobPurchasingTab({ companyId, job, onRefresh }: Props) {
               {filteredItems.map(item => (
                 <tr key={item.id} className="border-b border-border last:border-0">
                   <td className="p-2">
-                    <span className="font-medium text-foreground">{item.name}</span>
-                    {item.spec && <span className="block text-muted-foreground">{item.spec}</span>}
+                    <span className="font-medium text-foreground font-mono">{item.spec || "—"}</span>
+                    <span className="block text-muted-foreground text-[10px]">{item.name}</span>
                   </td>
-                  <td className="p-2"><Badge variant="secondary" className="text-[10px]">{item.category}</Badge></td>
-                  <td className="p-2 text-right font-mono">{Number(item.qty)} {item.unit}</td>
-                  <td className="p-2 text-muted-foreground">{item.chosen_supplier_id ? supplierName(item.chosen_supplier_id) : "—"}</td>
+                  <td className="p-2 text-muted-foreground">{item.category !== "general" ? item.category : "—"}</td>
+                  <td className="p-2 text-right font-mono">{Number(item.qty)}</td>
+                  <td className="p-2 text-right font-mono text-muted-foreground">{item.width ?? "—"}</td>
+                  <td className="p-2 text-right font-mono text-muted-foreground">{item.length ?? "—"}</td>
+                  <td className="p-2 text-right font-mono text-muted-foreground">{item.thickness ?? "—"}</td>
                   <td className="p-2">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-mono ${STATUS_COLORS[item.status] || STATUS_COLORS.pending}`}>
                       {item.status.replace("_", " ")}

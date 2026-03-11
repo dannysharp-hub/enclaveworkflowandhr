@@ -718,8 +718,10 @@ export type Database = {
           chosen_supplier_id: string | null
           company_id: string
           created_at: string
+          grain: string | null
           id: string
           job_id: string
+          length: number | null
           name: string
           preferred_supplier_id: string | null
           qty: number
@@ -727,16 +729,21 @@ export type Database = {
           spec: string | null
           status: string
           target_cost: number | null
+          thickness: number | null
           unit: string | null
+          unit_qty: number | null
           updated_at: string
+          width: number | null
         }
         Insert: {
           category?: string
           chosen_supplier_id?: string | null
           company_id: string
           created_at?: string
+          grain?: string | null
           id?: string
           job_id: string
+          length?: number | null
           name: string
           preferred_supplier_id?: string | null
           qty?: number
@@ -744,16 +751,21 @@ export type Database = {
           spec?: string | null
           status?: string
           target_cost?: number | null
+          thickness?: number | null
           unit?: string | null
+          unit_qty?: number | null
           updated_at?: string
+          width?: number | null
         }
         Update: {
           category?: string
           chosen_supplier_id?: string | null
           company_id?: string
           created_at?: string
+          grain?: string | null
           id?: string
           job_id?: string
+          length?: number | null
           name?: string
           preferred_supplier_id?: string | null
           qty?: number
@@ -761,8 +773,11 @@ export type Database = {
           spec?: string | null
           status?: string
           target_cost?: number | null
+          thickness?: number | null
           unit?: string | null
+          unit_qty?: number | null
           updated_at?: string
+          width?: number | null
         }
         Relationships: [
           {
