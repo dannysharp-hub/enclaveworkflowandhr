@@ -419,6 +419,27 @@ export default function JobDetailPage() {
               <div><span className="text-muted-foreground">Phone:</span> {customer?.phone || "—"}</div>
               <div><span className="text-muted-foreground">Email:</span> {customer?.email || "—"}</div>
               <div><span className="text-muted-foreground">Postcode:</span> {customer?.postcode || "—"}</div>
+              <div className="col-span-2">
+                <Label className="text-xs text-muted-foreground">Contract Value</Label>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-sm font-mono text-muted-foreground">£</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="font-mono text-xs h-8 w-40"
+                    defaultValue={job.contract_value ?? ""}
+                    placeholder="0.00"
+                    onBlur={async (e) => {
+                      const val = e.target.value ? parseFloat(e.target.value) : null;
+                      if (val !== job.contract_value) {
+                        await updateJob({ contract_value: val });
+                        setJob((prev: any) => ({ ...prev, contract_value: val }));
+                        toast({ title: "Contract value saved" });
+                      }
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
