@@ -436,6 +436,7 @@ export default function JobDetailPage() {
         stageKey={stageKey}
         onRefresh={load}
         onRequestAppointment={handleRequestAppointment}
+        onMarkInstallComplete={() => setInstallCompleteOpen(true)}
         emitting={emitting}
       />
 
