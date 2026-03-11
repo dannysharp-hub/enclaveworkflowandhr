@@ -399,6 +399,27 @@ export default function JobDetailPage() {
       </div>
 
       <StagePipeline currentStageKey={stageKey} />
+
+      {/* Add to Production Board button */}
+      {!job.production_stage && ['deposit_received', 'project_confirmed', 'materials_ordered', 'manufacturing_started', 'cabinetry_assembled', 'ready_for_installation', 'ready_for_install'].includes(stageKey) && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-foreground flex items-center gap-2"><Factory size={14} /> This job is not on the Production Board yet</p>
+            <p className="text-xs text-muted-foreground">Add it to start tracking production stages</p>
+          </div>
+          <Button size="sm" onClick={async () => {
+            await (supabase.from("cab_jobs") as any)
+              .update({ production_stage: "materials_ordered", updated_at: new Date().toISOString() })
+              .eq("id", job.id);
+            await insertCabEvent({ companyId: companyId!, eventType: "production.started", jobId: job.id, payload: { job_ref: job.job_ref } });
+            toast({ title: "Job added to Production Board" });
+            load();
+          }}>
+            <Factory size={14} className="mr-1.5" /> Add to Production Board
+          </Button>
+        </div>
+      )}
+
       <NextActionsPanel
         job={job}
         companyId={companyId!}
