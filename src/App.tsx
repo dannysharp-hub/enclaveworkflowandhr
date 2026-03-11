@@ -94,8 +94,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<LoginPage />} />
-    {/* Public enquiry form */}
+    {/* Public pages */}
     <Route path="/enquiry" element={<EnquiryPage />} />
+    <Route path="/accept-quote" element={<AcceptQuotePage />} />
     {/* Client Portal routes (legacy) */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
