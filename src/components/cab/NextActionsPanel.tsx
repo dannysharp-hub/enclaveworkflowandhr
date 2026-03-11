@@ -129,29 +129,31 @@ export default function NextActionsPanel({
       if (allLines.length < 2) { setBomSaving(false); return; }
 
       const headers = allLines[0];
-      const headersLower = headers.map(h => h.toLowerCase());
-      const partNumIdx = headersLower.findIndex(h => h.includes("part number") || h.includes("part_number") || h.includes("partno") || h === "part");
-      const nameIdx = headersLower.findIndex(h => h.includes("filename") || h.includes("file name") || h.includes("name") || h.includes("description"));
-      const qtyIdx = headersLower.findIndex(h => h.includes("qty") || h.includes("quantity"));
-      const matIdx = headersLower.findIndex(h => h.includes("material") || h.includes("mat"));
-
-      const knownIdxs = new Set([partNumIdx, nameIdx, qtyIdx, matIdx].filter(i => i >= 0));
+      const headersLower = headers.map(h => h.toLowerCase().trim());
+      const partNumIdx = headersLower.findIndex(h => h === "part number");
+      const nameIdx = headersLower.findIndex(h => h === "filename");
+      const qtyIdx = headersLower.findIndex(h => h === "qty");
+      const matIdx = headersLower.findIndex(h => h === "material");
+      const grainIdx = headersLower.findIndex(h => h === "grain");
+      const widthIdx = headersLower.findIndex(h => h === "width");
+      const lengthIdx = headersLower.findIndex(h => h === "length");
+      const thicknessIdx = headersLower.findIndex(h => h === "thickness");
+      const unitQtyIdx = headersLower.findIndex(h => h === "unit qty");
 
       const dataRows = allLines.slice(1);
       const items = dataRows.map(row => {
-        const partNumber = partNumIdx >= 0 ? row[partNumIdx] || "" : "";
-        const fileName = nameIdx >= 0 ? row[nameIdx] || "" : "";
+        const partNumber = partNumIdx >= 0 ? row[partNumIdx]?.trim() || "" : "";
+        const fileName = nameIdx >= 0 ? row[nameIdx]?.trim() || "" : "";
         const qty = qtyIdx >= 0 ? parseInt(row[qtyIdx]) || 1 : 1;
-        const material = matIdx >= 0 ? row[matIdx] || "" : "";
-
-        // Collect extra columns as metadata
-        const metadata: Record<string, string> = {};
-        headers.forEach((h, i) => {
-          if (!knownIdxs.has(i) && row[i]) metadata[h] = row[i];
-        });
+        const material = matIdx >= 0 ? row[matIdx]?.trim() || "" : "";
+        const grain = grainIdx >= 0 ? row[grainIdx]?.trim() || null : null;
+        const width = widthIdx >= 0 ? parseFloat(row[widthIdx]) || null : null;
+        const length = lengthIdx >= 0 ? parseFloat(row[lengthIdx]) || null : null;
+        const thickness = thicknessIdx >= 0 ? parseFloat(row[thicknessIdx]) || null : null;
+        const unitQty = unitQtyIdx >= 0 ? parseFloat(row[unitQtyIdx]) || null : null;
 
         const name = fileName || partNumber || "Unnamed";
-        const spec = partNumber && fileName ? partNumber : null;
+        const spec = partNumber || null;
 
         return {
           company_id: companyId,
@@ -161,6 +163,11 @@ export default function NextActionsPanel({
           category: material || "general",
           spec,
           status: "needed",
+          grain,
+          width,
+          length,
+          thickness,
+          unit_qty: unitQty,
         };
       }).filter(i => i.name && i.name !== "Unnamed");
 
