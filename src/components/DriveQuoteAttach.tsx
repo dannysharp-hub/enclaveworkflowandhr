@@ -47,6 +47,8 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       const firstName = customer.first_name || "there";
       const acceptanceToken = quote?.acceptance_token || "";
       const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
+      console.log("[DriveQuoteAttach resend] acceptanceUrl:", acceptUrl);
+      console.log("[DriveQuoteAttach resend] acceptanceToken:", acceptanceToken);
       const htmlBody = `<p>Hi ${firstName},</p>
 <p>Thank you for taking the time to meet with us. Your quote has been prepared and we'd love to get your project underway.</p>
 <p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
@@ -228,6 +230,8 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       if (customer?.email) {
         const firstName = customer.first_name || "there";
         const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
+        console.log("[DriveQuoteAttach] acceptanceUrl:", acceptUrl);
+        console.log("[DriveQuoteAttach] acceptanceToken:", acceptanceToken);
         const htmlBody = `<p>Hi ${firstName},</p>
 <p>Thank you for taking the time to meet with us. Your quote has been prepared and we'd love to get your project underway.</p>
 <p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
