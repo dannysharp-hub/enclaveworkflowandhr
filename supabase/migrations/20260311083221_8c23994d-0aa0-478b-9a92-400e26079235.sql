@@ -1,0 +1,1 @@
+ALTER TABLE public.cab_quotes ADD COLUMN IF NOT EXISTS acceptance_token uuid DEFAULT NULL;
