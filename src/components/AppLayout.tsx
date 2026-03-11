@@ -46,54 +46,19 @@ function isOperative(role: string | null): boolean {
   return OPERATIVE_ROLES.includes(role || "");
 }
 
-// ── Navigation structure ──
-
-function buildNavGroups(flags: Record<string, boolean>, userRole: string | null): NavGroup[] {
-  const groups: NavGroup[] = [];
-
-  // 🗄 Cabinetry Admin
-  groups.push({
-    id: "cab-admin",
-    label: "Cabinetry Admin",
-    icon: Briefcase,
-    roles: ["admin"],
-    items: [
-      { to: "/admin/production", label: "Production Board", icon: Factory },
-      { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
-      { to: "/admin/ghl", label: "GHL Settings", icon: Link2 },
-      { to: "/admin/team", label: "Team & Invites", icon: Users },
-    ],
-  });
-
-  // ⚙ Settings (bottom)
-  groups.push({
-    id: "system",
-    label: "Settings",
-    icon: Settings,
-    roles: ["admin"],
-    items: [
-      { to: "/settings", label: "Settings", icon: Settings },
-    ],
-  });
-
-  // Filter by role
-  return groups
-    .filter(g => {
-      if (g.roles && !g.roles.includes(userRole || "")) return false;
-      return true;
-    })
-    .map(g => ({
-      ...g,
-      items: g.items.filter(item => canRoleAccessRoute(userRole, item.to)),
-    }))
-    .filter(g => g.items.length > 0);
-}
-
 // ── Top-level nav items (always visible) ──
 const topLevelItems: NavItem[] = [
-  { to: "/admin/leads", label: "Jobs", icon: Wrench },
+  { to: "/admin/leads", label: "Jobs", icon: Briefcase },
   { to: "/workflow", label: "Workflow Board", icon: Kanban },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
+];
+
+// ── Cabinetry Admin items ──
+const cabAdminItems: NavItem[] = [
+  { to: "/admin/production", label: "Production Board", icon: Factory },
+  { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
+  { to: "/admin/ghl", label: "GHL Settings", icon: Settings },
+  { to: "/admin/team", label: "Team & Invites", icon: Users },
 ];
 
 // ── Operative bottom nav items ──
