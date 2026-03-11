@@ -120,55 +120,76 @@ export default function NextActionsPanel({
   };
 
   const handleBomSave = async () => {
-    if (!bomPreview || bomPreview.length < 2) return;
+    if (!bomPreview || bomPreview.length < 2 || !bomFile) return;
     setBomSaving(true);
     try {
-      const headers = bomPreview[0].map(h => h.toLowerCase());
-      const nameIdx = headers.findIndex(h => h.includes("name") || h.includes("description") || h.includes("part"));
-      const qtyIdx = headers.findIndex(h => h.includes("qty") || h.includes("quantity"));
-      const catIdx = headers.findIndex(h => h.includes("category") || h.includes("cat"));
-      const specIdx = headers.findIndex(h => h.includes("spec") || h.includes("specification"));
+      // Re-read full file (preview may be truncated to 20 rows)
+      const text = await bomFile.text();
+      const allLines = text.split("\n").filter(l => l.trim()).map(l => l.split(",").map(c => c.trim().replace(/^"|"$/g, "")));
+      if (allLines.length < 2) { setBomSaving(false); return; }
 
-      if (nameIdx === -1) {
-        toast({ title: "CSV must have a Name/Description column", variant: "destructive" });
+      const headers = allLines[0];
+      const headersLower = headers.map(h => h.toLowerCase());
+      const partNumIdx = headersLower.findIndex(h => h.includes("part number") || h.includes("part_number") || h.includes("partno") || h === "part");
+      const nameIdx = headersLower.findIndex(h => h.includes("filename") || h.includes("file name") || h.includes("name") || h.includes("description"));
+      const qtyIdx = headersLower.findIndex(h => h.includes("qty") || h.includes("quantity"));
+      const matIdx = headersLower.findIndex(h => h.includes("material") || h.includes("mat"));
+
+      const knownIdxs = new Set([partNumIdx, nameIdx, qtyIdx, matIdx].filter(i => i >= 0));
+
+      const dataRows = allLines.slice(1);
+      const items = dataRows.map(row => {
+        const partNumber = partNumIdx >= 0 ? row[partNumIdx] || "" : "";
+        const fileName = nameIdx >= 0 ? row[nameIdx] || "" : "";
+        const qty = qtyIdx >= 0 ? parseInt(row[qtyIdx]) || 1 : 1;
+        const material = matIdx >= 0 ? row[matIdx] || "" : "";
+
+        // Collect extra columns as metadata
+        const metadata: Record<string, string> = {};
+        headers.forEach((h, i) => {
+          if (!knownIdxs.has(i) && row[i]) metadata[h] = row[i];
+        });
+
+        const name = fileName || partNumber || "Unnamed";
+        const spec = partNumber && fileName ? partNumber : null;
+
+        return {
+          company_id: companyId,
+          job_id: job.id,
+          name,
+          qty,
+          category: material || "general",
+          spec,
+          status: "needed",
+        };
+      }).filter(i => i.name && i.name !== "Unnamed");
+
+      if (items.length === 0) {
+        toast({ title: "No valid items found in CSV", variant: "destructive" });
         setBomSaving(false);
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const text = ev.target?.result as string;
-        const allLines = text.split("\n").filter(l => l.trim()).map(l => l.split(",").map(c => c.trim().replace(/^"|"$/g, "")));
-        const dataRows = allLines.slice(1);
+      // Delete existing buylist items for this job first
+      await (supabase.from("cab_buylist_items") as any).delete().eq("job_id", job.id);
 
-        const items = dataRows.map(row => ({
-          company_id: companyId,
-          job_id: job.id,
-          name: row[nameIdx] || "Unnamed",
-          qty: qtyIdx >= 0 ? parseInt(row[qtyIdx]) || 1 : 1,
-          category: catIdx >= 0 ? row[catIdx] || "general" : "general",
-          spec: specIdx >= 0 ? row[specIdx] || null : null,
-          status: "pending",
-        })).filter(i => i.name && i.name !== "Unnamed");
+      // Insert new items
+      const { error } = await (supabase.from("cab_buylist_items") as any).insert(items);
+      if (error) throw error;
 
-        if (items.length === 0) {
-          toast({ title: "No valid items found in CSV", variant: "destructive" });
-          setBomSaving(false);
-          return;
-        }
+      // Emit bom.uploaded event
+      await insertCabEvent({
+        companyId, eventType: "bom.uploaded", jobId: job.id,
+        payload: { parts_count: items.length, filename: bomFile.name },
+      });
 
-        const { error } = await (supabase.from("cab_buylist_items") as any).insert(items);
-        if (error) throw error;
-
-        toast({ title: `${items.length} items imported to buylist` });
-        setBomDialogOpen(false);
-        setBomFile(null);
-        setBomPreview(null);
-        onRefresh();
-      };
-      reader.readAsText(bomFile!);
+      toast({ title: `BOM imported — ${items.length} parts loaded` });
+      setBomDialogOpen(false);
+      setBomFile(null);
+      setBomPreview(null);
+      onRefresh();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
     } finally {
       setBomSaving(false);
     }
