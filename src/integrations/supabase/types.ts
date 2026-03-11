@@ -2014,6 +2014,7 @@ export type Database = {
       }
       cab_quotes: {
         Row: {
+          acceptance_token: string | null
           accepted_at: string | null
           company_id: string
           created_at: string
@@ -2034,6 +2035,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          acceptance_token?: string | null
           accepted_at?: string | null
           company_id: string
           created_at?: string
@@ -2054,6 +2056,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          acceptance_token?: string | null
           accepted_at?: string | null
           company_id?: string
           created_at?: string
