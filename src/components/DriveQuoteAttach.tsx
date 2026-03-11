@@ -37,86 +37,74 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
   const [sending, setSending] = useState(false);
   const [resending, setResending] = useState(false);
 
-  const handleResendEmail = async () => {
-    if (!customer?.email) {
-      toast({ title: "No email on file", description: "This customer has no email address.", variant: "destructive" });
-      return;
+  /** Ensure a valid acceptance_token exists on the quote, returning it */
+  const ensureAcceptanceToken = async (quoteId: string): Promise<string> => {
+    // Step 1: Check existing token
+    const { data: existing, error: fetchErr } = await (supabase.from("cab_quotes") as any)
+      .select("acceptance_token")
+      .eq("id", quoteId)
+      .single();
+    if (fetchErr) throw new Error("Failed to fetch quote: " + fetchErr.message);
+
+    if (existing?.acceptance_token) {
+      console.log("[DriveQuoteAttach] Using existing token:", existing.acceptance_token);
+      return existing.acceptance_token;
     }
-    if (!quote) {
-      toast({ title: "No quote found", description: "Cannot resend — no quote record exists.", variant: "destructive" });
-      return;
-    }
-    setResending(true);
-    try {
-      // Fetch the latest quote record from DB with full diagnostics
-      console.log("[DriveQuoteAttach resend] quote.id:", quote.id);
-      console.log("[DriveQuoteAttach resend] job.id:", job.id);
-      
-      const { data: freshQuote, error: fetchErr } = await (supabase.from("cab_quotes") as any)
-        .select("id, acceptance_token, status, job_id")
-        .eq("id", quote.id)
-        .single();
-      
-      console.log("[DriveQuoteAttach resend] DB fetch result:", JSON.stringify(freshQuote));
-      console.log("[DriveQuoteAttach resend] DB fetch error:", fetchErr);
-      
-      if (fetchErr) throw fetchErr;
 
-      let acceptanceToken: string = freshQuote?.acceptance_token || "";
-      console.log("[DriveQuoteAttach resend] Existing token from DB:", acceptanceToken || "(empty)");
+    // Step 2: Generate and save new token
+    const newToken = crypto.randomUUID();
+    const { data: updated, error: updateErr } = await (supabase.from("cab_quotes") as any)
+      .update({ acceptance_token: newToken })
+      .eq("id", quoteId)
+      .select("acceptance_token")
+      .single();
 
-      // If no token exists, generate one and save it
-      if (!acceptanceToken) {
-        acceptanceToken = crypto.randomUUID();
-        console.log("[DriveQuoteAttach resend] Generated new UUID:", acceptanceToken);
-        
-        const { data: updateData, error: updateErr } = await (supabase.from("cab_quotes") as any)
-          .update({ acceptance_token: acceptanceToken })
-          .eq("id", quote.id)
-          .select("acceptance_token")
-          .single();
-        
-        console.log("[DriveQuoteAttach resend] Update result:", JSON.stringify(updateData));
-        console.log("[DriveQuoteAttach resend] Update error:", updateErr);
-        
-        if (updateErr) throw updateErr;
-        
-        // Verify the token was actually saved
-        if (!updateData?.acceptance_token) {
-          console.error("[DriveQuoteAttach resend] Token NOT saved — update returned no data. Possible RLS issue.");
-          throw new Error("Token could not be saved to database. Check RLS policies on cab_quotes.");
-        }
-        
-        // Use the token from the DB response to be sure
-        acceptanceToken = updateData.acceptance_token;
-        console.log("[DriveQuoteAttach resend] Verified saved token:", acceptanceToken);
-      }
+    console.log("[DriveQuoteAttach] Token update result:", JSON.stringify(updated), "error:", updateErr);
+    if (updateErr) throw new Error("Failed to save token: " + updateErr.message);
+    if (!updated?.acceptance_token) throw new Error("Token was not saved — possible RLS issue.");
 
-      // Safety check — never send with empty token
-      if (!acceptanceToken) {
-        throw new Error("Failed to obtain acceptance token. Email not sent.");
-      }
+    return updated.acceptance_token;
+  };
 
-      const firstName = customer.first_name || "there";
-      const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
-      console.log("[DriveQuoteAttach resend] acceptanceUrl:", acceptUrl);
-      console.log("[DriveQuoteAttach resend] acceptanceToken:", acceptanceToken);
-      const htmlBody = `<p>Hi ${firstName},</p>
+  const buildQuoteEmailHtml = (firstName: string, acceptUrl: string) => `<p>Hi ${firstName},</p>
 <p>Thank you for taking the time to meet with us. Your quote has been prepared and we'd love to get your project underway.</p>
 <p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
 <p><a href="${acceptUrl}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">Accept Quote</a></p>
 <p>If you have any questions please reply to this email or call us on 07944608098.</p>
 <p>Kind regards,<br/>Enclave Cabinetry</p>`;
 
-      const { error: emailError } = await supabase.functions.invoke("send-email", {
-        body: {
-          to: customer.email,
-          subject: `Your quote from Enclave Cabinetry — ${job.job_ref}`,
-          html: htmlBody,
-          replyTo: "danny@enclavecabinetry.com",
-        },
-      });
-      if (emailError) throw emailError;
+  const sendQuoteEmail = async (token: string) => {
+    if (!customer?.email) throw new Error("No customer email on file.");
+    if (!token) throw new Error("Cannot send email without acceptance token.");
+
+    const firstName = customer.first_name || "there";
+    const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${token}`;
+    console.log("[DriveQuoteAttach] Sending email with acceptUrl:", acceptUrl);
+
+    const { error } = await supabase.functions.invoke("send-email", {
+      body: {
+        to: customer.email,
+        subject: `Your quote from Enclave Cabinetry — ${job.job_ref}`,
+        html: buildQuoteEmailHtml(firstName, acceptUrl),
+        replyTo: "danny@enclavecabinetry.com",
+      },
+    });
+    if (error) throw error;
+  };
+
+  const handleResendEmail = async () => {
+    if (!customer?.email) {
+      toast({ title: "No email on file", description: "This customer has no email address.", variant: "destructive" });
+      return;
+    }
+    if (!quote) {
+      toast({ title: "No quote found", variant: "destructive" });
+      return;
+    }
+    setResending(true);
+    try {
+      const token = await ensureAcceptanceToken(quote.id);
+      await sendQuoteEmail(token);
       const customerName = `${customer.first_name} ${customer.last_name}`;
       toast({ title: `Quote re-sent to ${customerName}` });
       loadQuote();
@@ -223,12 +211,11 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
     if (!selectedFile) return;
     setSending(true);
     try {
-      // Generate acceptance token
       const acceptanceToken = crypto.randomUUID();
 
-      // Upsert quote record and verify token was saved
+      // Save quote record with token
       if (quote) {
-        const { error: updateErr } = await (supabase.from("cab_quotes") as any)
+        const { data: updated, error: updateErr } = await (supabase.from("cab_quotes") as any)
           .update({
             drive_file_id: selectedFile.id,
             drive_filename: selectedFile.file_name,
@@ -236,10 +223,14 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             sent_at: new Date().toISOString(),
             acceptance_token: acceptanceToken,
           })
-          .eq("id", quote.id);
-        if (updateErr) throw updateErr;
+          .eq("id", quote.id)
+          .select("acceptance_token")
+          .single();
+        if (updateErr) throw new Error("Quote update failed: " + updateErr.message);
+        if (!updated?.acceptance_token) throw new Error("Token not saved after update.");
+        console.log("[DriveQuoteAttach send] Updated token:", updated.acceptance_token);
       } else {
-        const { error: insertErr } = await (supabase.from("cab_quotes") as any)
+        const { data: inserted, error: insertErr } = await (supabase.from("cab_quotes") as any)
           .insert({
             company_id: companyId,
             job_id: job.id,
@@ -250,22 +241,13 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             sent_at: new Date().toISOString(),
             currency: job.ballpark_currency || "GBP",
             acceptance_token: acceptanceToken,
-          });
-        if (insertErr) throw insertErr;
+          })
+          .select("acceptance_token")
+          .single();
+        if (insertErr) throw new Error("Quote insert failed: " + insertErr.message);
+        if (!inserted?.acceptance_token) throw new Error("Token not saved after insert.");
+        console.log("[DriveQuoteAttach send] Inserted token:", inserted.acceptance_token);
       }
-
-      // Verify token was persisted before sending email
-      const { data: verifyQuote, error: verifyErr } = await (supabase.from("cab_quotes") as any)
-        .select("acceptance_token")
-        .eq("job_id", job.id)
-        .order("version", { ascending: false })
-        .limit(1)
-        .single();
-      if (verifyErr) throw verifyErr;
-      if (!verifyQuote?.acceptance_token) {
-        throw new Error("Acceptance token was not saved to the database. Email not sent.");
-      }
-      console.log("[DriveQuoteAttach send] Verified token in DB:", verifyQuote.acceptance_token);
 
       // Emit event
       await insertCabEvent({
@@ -294,29 +276,10 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
         ? `${customer.first_name} ${customer.last_name}`
         : "customer";
 
-      // Send email to customer with Accept button
+      // Send email
       if (customer?.email) {
-        const firstName = customer.first_name || "there";
-        const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
-        console.log("[DriveQuoteAttach] acceptanceUrl:", acceptUrl);
-        console.log("[DriveQuoteAttach] acceptanceToken:", acceptanceToken);
-        const htmlBody = `<p>Hi ${firstName},</p>
-<p>Thank you for taking the time to meet with us. Your quote has been prepared and we'd love to get your project underway.</p>
-<p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
-<p><a href="${acceptUrl}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">Accept Quote</a></p>
-<p>If you have any questions please reply to this email or call us on 07944608098.</p>
-<p>Kind regards,<br/>Enclave Cabinetry</p>`;
-
         try {
-          const { error: emailError } = await supabase.functions.invoke("send-email", {
-            body: {
-              to: customer.email,
-              subject: `Your quote from Enclave Cabinetry — ${job.job_ref}`,
-              html: htmlBody,
-              replyTo: "danny@enclavecabinetry.com",
-            },
-          });
-          if (emailError) throw emailError;
+          await sendQuoteEmail(acceptanceToken);
           toast({ title: `Quote emailed to ${customerName}` });
         } catch (emailErr: any) {
           console.error("Email send failed:", emailErr);
