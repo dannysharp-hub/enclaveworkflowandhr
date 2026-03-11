@@ -45,14 +45,13 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
     setResending(true);
     try {
       const firstName = customer.first_name || "there";
-      const driveFileId = quote?.drive_file_id || selectedFile?.id;
-      const quoteUrl = driveFileId
-        ? `https://drive.google.com/file/d/${driveFileId}/view`
-        : `${window.location.origin}/portal/jobs/${job.id}`;
+      const acceptanceToken = quote?.acceptance_token || "";
+      const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
       const htmlBody = `<p>Hi ${firstName},</p>
-<p>Please find your quote attached via the link below.</p>
-<p><a href="${quoteUrl}" style="display:inline-block;padding:10px 20px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:4px;">View Your Quote</a></p>
-<p>If you have any questions, please reply to this email or call us.</p>
+<p>Thank you for taking the time to meet with us. Your quote has been prepared and we'd love to get your project underway.</p>
+<p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
+<p><a href="${acceptUrl}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">Accept Quote</a></p>
+<p>If you have any questions please reply to this email or call us on 07944608098.</p>
 <p>Kind regards,<br/>Enclave Cabinetry</p>`;
 
       const { error: emailError } = await supabase.functions.invoke("send-email", {
@@ -230,9 +229,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
         const firstName = customer.first_name || "there";
         const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
         const htmlBody = `<p>Hi ${firstName},</p>
-<p>Thank you for taking the time to meet with us. Please find your quote attached separately as discussed.</p>
+<p>Thank you for taking the time to meet with us. Your quote has been prepared and we'd love to get your project underway.</p>
 <p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
-<p><a href="${acceptUrl}" style="display:inline-block;padding:10px 20px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:4px;">Accept Quote</a></p>
+<p><a href="${acceptUrl}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">Accept Quote</a></p>
 <p>If you have any questions please reply to this email or call us on 07944608098.</p>
 <p>Kind regards,<br/>Enclave Cabinetry</p>`;
 
