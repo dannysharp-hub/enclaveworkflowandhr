@@ -424,6 +424,51 @@ export default function NextActionsPanel({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Order Materials Confirmation Dialog */}
+      <Dialog open={orderMaterialsOpen} onOpenChange={setOrderMaterialsOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Order Materials</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Mark all materials as ordered? This will move the job to the Materials Ordered stage.
+          </p>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="outline" size="sm" onClick={() => setOrderMaterialsOpen(false)} disabled={orderMaterialsSaving}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={orderMaterialsSaving} onClick={async () => {
+              setOrderMaterialsSaving(true);
+              try {
+                await (supabase.from("cab_jobs") as any).update({
+                  current_stage_key: "materials_ordered",
+                  updated_at: new Date().toISOString(),
+                }).eq("id", job.id);
+
+                await (supabase.from("cab_buylist_items") as any)
+                  .update({ status: "ordered", updated_at: new Date().toISOString() })
+                  .eq("job_id", job.id);
+
+                await insertCabEvent({
+                  companyId, eventType: "materials.ordered", jobId: job.id,
+                  payload: { job_ref: job.job_ref },
+                });
+
+                toast({ title: "Materials marked as ordered" });
+                setOrderMaterialsOpen(false);
+                onRefresh();
+              } catch (err: any) {
+                toast({ title: "Error", description: err.message, variant: "destructive" });
+              } finally {
+                setOrderMaterialsSaving(false);
+              }
+            }}>
+              {orderMaterialsSaving ? "Saving…" : "Confirm"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
