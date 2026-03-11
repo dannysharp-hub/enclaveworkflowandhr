@@ -89,28 +89,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const displayName = profile?.full_name || "Loading...";
   const displayRole = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "";
 
-  const navGroups = useMemo(() => buildNavGroups(flags, userRole), [flags, userRole]);
 
-  // Auto-open group containing active route
-  const activeGroupId = useMemo(() => {
-    for (const g of navGroups) {
-      if (g.items.some(item => location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to)))) {
-        return g.id;
-      }
-    }
-    return null;
-  }, [navGroups, location.pathname]);
 
-  const toggleGroup = (id: string) => {
-    setOpenGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const isGroupOpen = (id: string) => openGroups.has(id) || activeGroupId === id;
 
   // ── Operative on mobile → bottom nav layout ──
   if (isMobile && isOperative(userRole)) {
