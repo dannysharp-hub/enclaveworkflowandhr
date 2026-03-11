@@ -139,7 +139,7 @@ Reference: ${jobData.job_ref}</p>
 
       await supabase.functions.invoke("send-email", {
         body: {
-          to: "alistair@enclavecabinetry.com",
+          to: "danny@enclavecabinetry.com",
           subject: `Quote Accepted — ${jobData.job_ref} — ${customerName}`,
           html: `<p>${customerName} has accepted their quote for ${jobData.job_ref}.</p>
 <p>The job has moved to Awaiting Deposit stage.</p>
