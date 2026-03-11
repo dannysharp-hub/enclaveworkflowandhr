@@ -36,6 +36,8 @@ export default function NextActionsPanel({
   const [bomSaving, setBomSaving] = useState(false);
   const [bomDialogOpen, setBomDialogOpen] = useState(false);
   const [acting, setActing] = useState(false);
+  const [orderMaterialsOpen, setOrderMaterialsOpen] = useState(false);
+  const [orderMaterialsSaving, setOrderMaterialsSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const scrollTo = (selector: string) => {
