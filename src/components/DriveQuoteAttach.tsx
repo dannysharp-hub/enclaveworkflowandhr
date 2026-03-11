@@ -42,10 +42,37 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       toast({ title: "No email on file", description: "This customer has no email address.", variant: "destructive" });
       return;
     }
+    if (!quote) {
+      toast({ title: "No quote found", description: "Cannot resend — no quote record exists.", variant: "destructive" });
+      return;
+    }
     setResending(true);
     try {
+      // Fetch the latest acceptance_token from DB
+      const { data: freshQuote, error: fetchErr } = await (supabase.from("cab_quotes") as any)
+        .select("acceptance_token")
+        .eq("id", quote.id)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      let acceptanceToken: string = freshQuote?.acceptance_token || "";
+
+      // If no token exists, generate one and save it
+      if (!acceptanceToken) {
+        acceptanceToken = crypto.randomUUID();
+        const { error: updateErr } = await (supabase.from("cab_quotes") as any)
+          .update({ acceptance_token: acceptanceToken })
+          .eq("id", quote.id);
+        if (updateErr) throw updateErr;
+        console.log("[DriveQuoteAttach resend] Generated new token:", acceptanceToken);
+      }
+
+      // Safety check — never send with empty token
+      if (!acceptanceToken) {
+        throw new Error("Failed to obtain acceptance token. Email not sent.");
+      }
+
       const firstName = customer.first_name || "there";
-      const acceptanceToken = quote?.acceptance_token || "";
       const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
       console.log("[DriveQuoteAttach resend] acceptanceUrl:", acceptUrl);
       console.log("[DriveQuoteAttach resend] acceptanceToken:", acceptanceToken);
@@ -67,6 +94,7 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       if (emailError) throw emailError;
       const customerName = `${customer.first_name} ${customer.last_name}`;
       toast({ title: `Quote re-sent to ${customerName}` });
+      loadQuote();
     } catch (err: any) {
       console.error("Resend email failed:", err);
       toast({ title: "Failed to re-send email", description: err.message, variant: "destructive" });
