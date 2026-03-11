@@ -29,13 +29,8 @@ interface NavItem {
   featureFlag?: string;
 }
 
-interface NavGroup {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  roles?: string[]; // if set, only these roles see the group
-  items: NavItem[];
-}
+
+
 
 // ── Role helpers ──
 
@@ -46,54 +41,19 @@ function isOperative(role: string | null): boolean {
   return OPERATIVE_ROLES.includes(role || "");
 }
 
-// ── Navigation structure ──
-
-function buildNavGroups(flags: Record<string, boolean>, userRole: string | null): NavGroup[] {
-  const groups: NavGroup[] = [];
-
-  // 🗄 Cabinetry Admin
-  groups.push({
-    id: "cab-admin",
-    label: "Cabinetry Admin",
-    icon: Briefcase,
-    roles: ["admin"],
-    items: [
-      { to: "/admin/production", label: "Production Board", icon: Factory },
-      { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
-      { to: "/admin/ghl", label: "GHL Settings", icon: Link2 },
-      { to: "/admin/team", label: "Team & Invites", icon: Users },
-    ],
-  });
-
-  // ⚙ Settings (bottom)
-  groups.push({
-    id: "system",
-    label: "Settings",
-    icon: Settings,
-    roles: ["admin"],
-    items: [
-      { to: "/settings", label: "Settings", icon: Settings },
-    ],
-  });
-
-  // Filter by role
-  return groups
-    .filter(g => {
-      if (g.roles && !g.roles.includes(userRole || "")) return false;
-      return true;
-    })
-    .map(g => ({
-      ...g,
-      items: g.items.filter(item => canRoleAccessRoute(userRole, item.to)),
-    }))
-    .filter(g => g.items.length > 0);
-}
-
 // ── Top-level nav items (always visible) ──
 const topLevelItems: NavItem[] = [
-  { to: "/admin/leads", label: "Jobs", icon: Wrench },
+  { to: "/admin/leads", label: "Jobs", icon: Briefcase },
   { to: "/workflow", label: "Workflow Board", icon: Kanban },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
+];
+
+// ── Cabinetry Admin items ──
+const cabAdminItems: NavItem[] = [
+  { to: "/admin/production", label: "Production Board", icon: Factory },
+  { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
+  { to: "/admin/ghl", label: "GHL Settings", icon: Settings },
+  { to: "/admin/team", label: "Team & Invites", icon: Users },
 ];
 
 // ── Operative bottom nav items ──
@@ -111,7 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  
   const location = useLocation();
   const { profile, userRole, signOut } = useAuth();
   const { flags } = useFeatureFlags();
@@ -124,28 +84,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const displayName = profile?.full_name || "Loading...";
   const displayRole = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "";
 
-  const navGroups = useMemo(() => buildNavGroups(flags, userRole), [flags, userRole]);
 
-  // Auto-open group containing active route
-  const activeGroupId = useMemo(() => {
-    for (const g of navGroups) {
-      if (g.items.some(item => location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to)))) {
-        return g.id;
-      }
-    }
-    return null;
-  }, [navGroups, location.pathname]);
 
-  const toggleGroup = (id: string) => {
-    setOpenGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const isGroupOpen = (id: string) => openGroups.has(id) || activeGroupId === id;
 
   // ── Operative on mobile → bottom nav layout ──
   if (isMobile && isOperative(userRole)) {
@@ -247,7 +187,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // ── Desktop / Manager sidebar layout ──
   // Determine page title from navGroups + self-service
-  const allItems = [...topLevelItems, ...navGroups.flatMap(g => g.items)];
+  const allItems = [...topLevelItems, ...cabAdminItems, { to: "/settings", label: "Settings", icon: Settings }];
   const currentTitle = (() => {
     if (location.pathname === "/") {
       return isOperative(userRole) ? "My Day" : "Business Overview";
@@ -358,54 +298,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {/* Collapsible groups */}
-          {navGroups.map(group => {
-            const open = isGroupOpen(group.id);
-            return (
-              <div key={group.id} className="mt-1">
-                <button
-                  onClick={() => toggleGroup(group.id)}
+          {/* Cabinetry Admin section */}
+          <div className="mt-4">
+            <p className="px-3 text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider mb-1">Cabinetry Admin</p>
+            <div className="space-y-0.5">
+              {cabAdminItems.map(item => {
+                const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                      isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <item.icon size={18} className={isActive ? "text-primary" : ""} />
+                    {!collapsed && <span>{item.label}</span>}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Settings */}
+          <div className="mt-4">
+            {(() => {
+              const isActive = location.pathname === "/settings";
+              return (
+                <NavLink
+                  to="/settings"
+                  onClick={() => setMobileOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all w-full",
-                    activeGroupId === group.id
-                      ? "text-primary"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
-                  <group.icon size={18} className={activeGroupId === group.id ? "text-primary" : "text-muted-foreground"} />
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-left text-xs font-mono font-bold uppercase">{group.label}</span>
-                      <ChevronDown size={12} className={cn("transition-transform text-muted-foreground", open && "rotate-180")} />
-                    </>
-                  )}
-                </button>
-                {open && !collapsed && (
-                  <div className="ml-3 pl-3 border-l border-border/50 space-y-0.5 mt-0.5">
-                    {group.items.map(item => {
-                      const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
-                      return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          onClick={() => setMobileOpen(false)}
-                          className={cn(
-                            "flex items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
-                            isActive
-                              ? "bg-primary/10 text-primary"
-                              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          )}
-                        >
-                          <item.icon size={14} className={isActive ? "text-primary" : ""} />
-                          <span>{item.label}</span>
-                        </NavLink>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  <Settings size={18} className={isActive ? "text-primary" : ""} />
+                  {!collapsed && <span>Settings</span>}
+                </NavLink>
+              );
+            })()}
+          </div>
         </nav>
 
         {/* Footer */}
