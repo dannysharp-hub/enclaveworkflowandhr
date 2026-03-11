@@ -48,11 +48,10 @@ export default function ProductionBoardPage() {
     const cid = await getCabCompanyId();
     if (!cid) return;
 
-    const stageKeys = PRODUCTION_COLUMNS.map(s => s.key);
     const { data } = await (supabase.from("cab_jobs") as any)
       .select("id, job_ref, job_title, production_stage, contract_value, company_id, customer_id, room_type, updated_at")
       .eq("company_id", cid)
-      .in("production_stage", stageKeys)
+      .not("production_stage", "is", null)
       .order("updated_at", { ascending: false });
 
     if (!data || data.length === 0) {
