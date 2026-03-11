@@ -5,12 +5,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const PIPELINE_STAGES = [
   { label: "Enquiry", keys: ["lead_captured"] },
   { label: "Ballpark", keys: ["ballpark_sent"] },
-  { label: "Survey", keys: ["appointment_booked"] },
-  { label: "Final Quote", keys: ["quote_sent", "quote_viewed"] },
+  { label: "Survey", keys: ["appointment_booked", "appointment_requested"] },
+  { label: "Final Quote", keys: ["quote_sent", "quote_viewed", "survey_complete"] },
   { label: "Deposit", keys: ["awaiting_deposit"] },
-  { label: "Production", keys: ["project_confirmed", "in_production"] },
-  { label: "Install", keys: ["install_booked", "install_completed"] },
-  { label: "Complete", keys: ["job.practical_completed", "closed"] },
+  { label: "Production", keys: ["project_confirmed", "in_production", "materials_ordered"] },
+  { label: "Install", keys: ["install_booked", "ready_for_installation", "ready_for_install", "manufacturing_started", "cabinetry_assembled"] },
+  { label: "Complete", keys: ["practical_completed", "job.practical_completed", "awaiting_signoff", "installation_complete", "install_complete", "install_completed", "invoiced", "closed", "closed_paid"] },
 ] as const;
 
 function resolveStepIndex(stageKey: string | null | undefined): number {
