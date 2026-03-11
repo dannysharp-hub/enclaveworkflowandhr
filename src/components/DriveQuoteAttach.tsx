@@ -169,6 +169,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
     if (!selectedFile) return;
     setSending(true);
     try {
+      // Generate acceptance token
+      const acceptanceToken = crypto.randomUUID();
+
       // Upsert quote record
       if (quote) {
         await (supabase.from("cab_quotes") as any)
@@ -177,6 +180,7 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             drive_filename: selectedFile.file_name,
             status: "sent",
             sent_at: new Date().toISOString(),
+            acceptance_token: acceptanceToken,
           })
           .eq("id", quote.id);
       } else {
@@ -190,6 +194,7 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             drive_filename: selectedFile.file_name,
             sent_at: new Date().toISOString(),
             currency: job.ballpark_currency || "GBP",
+            acceptance_token: acceptanceToken,
           });
       }
 
@@ -220,13 +225,16 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
         ? `${customer.first_name} ${customer.last_name}`
         : "customer";
 
-      // Send email to customer
+      // Send email to customer with Accept button
       if (customer?.email) {
         const firstName = customer.first_name || "there";
         const quoteUrl = `https://drive.google.com/file/d/${selectedFile.id}/view`;
+        const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
         const htmlBody = `<p>Hi ${firstName},</p>
 <p>Please find your quote attached via the link below.</p>
 <p><a href="${quoteUrl}" style="display:inline-block;padding:10px 20px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:4px;">View Your Quote</a></p>
+<p>Once you've reviewed your quote, click the button below to accept and we'll send your deposit invoice.</p>
+<p><a href="${acceptUrl}" style="display:inline-block;padding:10px 20px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:4px;">Accept Quote</a></p>
 <p>If you have any questions, please reply to this email or call us.</p>
 <p>Kind regards,<br/>Enclave Cabinetry</p>`;
 
