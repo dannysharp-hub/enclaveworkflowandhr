@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 
 export default function AcceptQuotePage() {
+  console.log("[AcceptQuotePage] Component mounted — this page is PUBLIC, no auth required");
   const [params] = useSearchParams();
   const jobRef = params.get("job_ref");
   const token = params.get("token");
+  console.log("[AcceptQuotePage] jobRef:", jobRef, "token:", token);
 
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
