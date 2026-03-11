@@ -65,8 +65,16 @@ export const MODULE_VISIBILITY: Record<string, AppRole[]> = {
   // Purchasing
   "/purchasing": [...ADMIN_ROLES, "finance"],
 
-  // Cabinetry admin
-  "/admin": SETTINGS_ROLES,
+  // Cabinetry admin — leads/jobs visible to all manager roles; other admin pages admin-only
+  "/admin/leads": [...ADMIN_ROLES, "finance"],
+  "/admin/jobs": [...ADMIN_ROLES, "finance"],
+  "/admin/bootstrap": SETTINGS_ROLES,
+  "/admin/ghl": SETTINGS_ROLES,
+  "/admin/webhooks": SETTINGS_ROLES,
+  "/admin/test-cleanup": SETTINGS_ROLES,
+  "/admin/team": SETTINGS_ROLES,
+  "/admin/production": PRODUCTION_MGMT_ROLES,
+  "/admin/suppliers": [...ADMIN_ROLES, "finance"],
 };
 
 /**
