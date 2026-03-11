@@ -73,6 +73,7 @@ import InstallerJobsPage from "./pages/cab/InstallerJobsPage";
 import ProfitWatchPage from "./pages/cab/ProfitWatchPage";
 import TestCleanupPage from "./pages/cab/TestCleanupPage";
 import AcceptQuotePage from "./pages/AcceptQuotePage";
+import PublicSignOffPage from "./pages/cab/PublicSignOffPage";
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
 const queryClient = new QueryClient();
