@@ -228,14 +228,12 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       // Send email to customer with Accept button
       if (customer?.email) {
         const firstName = customer.first_name || "there";
-        const quoteUrl = `https://drive.google.com/file/d/${selectedFile.id}/view`;
         const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
         const htmlBody = `<p>Hi ${firstName},</p>
-<p>Please find your quote attached via the link below.</p>
-<p><a href="${quoteUrl}" style="display:inline-block;padding:10px 20px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:4px;">View Your Quote</a></p>
-<p>Once you've reviewed your quote, click the button below to accept and we'll send your deposit invoice.</p>
+<p>Thank you for taking the time to meet with us. Please find your quote attached separately as discussed.</p>
+<p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
 <p><a href="${acceptUrl}" style="display:inline-block;padding:10px 20px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:4px;">Accept Quote</a></p>
-<p>If you have any questions, please reply to this email or call us.</p>
+<p>If you have any questions please reply to this email or call us on 07944608098.</p>
 <p>Kind regards,<br/>Enclave Cabinetry</p>`;
 
         try {
