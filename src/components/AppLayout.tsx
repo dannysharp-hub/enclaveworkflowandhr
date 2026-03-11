@@ -303,54 +303,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {/* Collapsible groups */}
-          {navGroups.map(group => {
-            const open = isGroupOpen(group.id);
-            return (
-              <div key={group.id} className="mt-1">
-                <button
-                  onClick={() => toggleGroup(group.id)}
+          {/* Cabinetry Admin section */}
+          <div className="mt-4">
+            <p className="px-3 text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider mb-1">Cabinetry Admin</p>
+            <div className="space-y-0.5">
+              {cabAdminItems.map(item => {
+                const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                      isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <item.icon size={18} className={isActive ? "text-primary" : ""} />
+                    {!collapsed && <span>{item.label}</span>}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Settings */}
+          <div className="mt-4">
+            {(() => {
+              const isActive = location.pathname === "/settings";
+              return (
+                <NavLink
+                  to="/settings"
+                  onClick={() => setMobileOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all w-full",
-                    activeGroupId === group.id
-                      ? "text-primary"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
-                  <group.icon size={18} className={activeGroupId === group.id ? "text-primary" : "text-muted-foreground"} />
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-left text-xs font-mono font-bold uppercase">{group.label}</span>
-                      <ChevronDown size={12} className={cn("transition-transform text-muted-foreground", open && "rotate-180")} />
-                    </>
-                  )}
-                </button>
-                {open && !collapsed && (
-                  <div className="ml-3 pl-3 border-l border-border/50 space-y-0.5 mt-0.5">
-                    {group.items.map(item => {
-                      const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
-                      return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          onClick={() => setMobileOpen(false)}
-                          className={cn(
-                            "flex items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
-                            isActive
-                              ? "bg-primary/10 text-primary"
-                              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                          )}
-                        >
-                          <item.icon size={14} className={isActive ? "text-primary" : ""} />
-                          <span>{item.label}</span>
-                        </NavLink>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  <Settings size={18} className={isActive ? "text-primary" : ""} />
+                  {!collapsed && <span>Settings</span>}
+                </NavLink>
+              );
+            })()}
+          </div>
         </nav>
 
         {/* Footer */}
