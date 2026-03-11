@@ -412,7 +412,7 @@ export default function NextActionsPanel({
                   Cancel
                 </Button>
                 <Button size="sm" disabled={bomSaving} onClick={handleBomSave}>
-                  {bomSaving ? "Importing…" : `Import ${bomFile?.name}`}
+                  {bomSaving ? "Importing…" : "Import BOM"}
                 </Button>
               </div>
             </div>
