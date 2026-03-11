@@ -192,7 +192,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // ── Desktop / Manager sidebar layout ──
   // Determine page title from navGroups + self-service
-  const allItems = [...topLevelItems, ...navGroups.flatMap(g => g.items)];
+  const allItems = [...topLevelItems, ...cabAdminItems, { to: "/settings", label: "Settings", icon: Settings }];
   const currentTitle = (() => {
     if (location.pathname === "/") {
       return isOperative(userRole) ? "My Day" : "Business Overview";
