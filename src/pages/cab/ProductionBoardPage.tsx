@@ -48,11 +48,22 @@ export default function ProductionBoardPage() {
     const cid = await getCabCompanyId();
     if (!cid) return;
 
-    const { data } = await (supabase.from("cab_jobs") as any)
+    console.log("[ProductionBoard] company_id:", cid);
+
+    const { data, error } = await (supabase.from("cab_jobs") as any)
       .select("id, job_ref, job_title, production_stage, contract_value, company_id, customer_id, room_type, updated_at")
       .eq("company_id", cid)
       .not("production_stage", "is", null)
       .order("updated_at", { ascending: false });
+
+    console.log("[ProductionBoard] board query result:", { data, error });
+
+    const { data: stageRows, error: stageRowsError } = await (supabase.from("cab_jobs") as any)
+      .select("job_ref, current_stage_key, production_stage")
+      .eq("company_id", cid)
+      .order("updated_at", { ascending: false });
+
+    console.log("[ProductionBoard] stage snapshot by company:", { data: stageRows, error: stageRowsError });
 
     if (!data || data.length === 0) {
       setJobs([]);
