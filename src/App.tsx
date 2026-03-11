@@ -98,6 +98,7 @@ const AppRoutes = () => (
     {/* Public pages */}
     <Route path="/enquiry" element={<EnquiryPage />} />
     <Route path="/accept-quote" element={<AcceptQuotePage />} />
+    <Route path="/sign-off" element={<PublicSignOffPage />} />
     {/* Client Portal routes (legacy) */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
