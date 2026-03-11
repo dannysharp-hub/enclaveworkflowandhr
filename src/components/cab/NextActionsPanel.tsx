@@ -26,7 +26,7 @@ interface NextActionsPanelProps {
 }
 
 export default function NextActionsPanel({
-  job, companyId, stageKey, onRefresh, onRequestAppointment, emitting,
+  job, companyId, stageKey, onRefresh, onRequestAppointment, onMarkInstallComplete, emitting,
 }: NextActionsPanelProps) {
   const navigate = useNavigate();
   const [depositOpen, setDepositOpen] = useState(false);
