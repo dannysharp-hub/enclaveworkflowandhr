@@ -211,12 +211,11 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
     if (!selectedFile) return;
     setSending(true);
     try {
-      // Generate acceptance token
       const acceptanceToken = crypto.randomUUID();
 
-      // Upsert quote record and verify token was saved
+      // Save quote record with token
       if (quote) {
-        const { error: updateErr } = await (supabase.from("cab_quotes") as any)
+        const { data: updated, error: updateErr } = await (supabase.from("cab_quotes") as any)
           .update({
             drive_file_id: selectedFile.id,
             drive_filename: selectedFile.file_name,
@@ -224,10 +223,14 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             sent_at: new Date().toISOString(),
             acceptance_token: acceptanceToken,
           })
-          .eq("id", quote.id);
-        if (updateErr) throw updateErr;
+          .eq("id", quote.id)
+          .select("acceptance_token")
+          .single();
+        if (updateErr) throw new Error("Quote update failed: " + updateErr.message);
+        if (!updated?.acceptance_token) throw new Error("Token not saved after update.");
+        console.log("[DriveQuoteAttach send] Updated token:", updated.acceptance_token);
       } else {
-        const { error: insertErr } = await (supabase.from("cab_quotes") as any)
+        const { data: inserted, error: insertErr } = await (supabase.from("cab_quotes") as any)
           .insert({
             company_id: companyId,
             job_id: job.id,
@@ -238,22 +241,13 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             sent_at: new Date().toISOString(),
             currency: job.ballpark_currency || "GBP",
             acceptance_token: acceptanceToken,
-          });
-        if (insertErr) throw insertErr;
+          })
+          .select("acceptance_token")
+          .single();
+        if (insertErr) throw new Error("Quote insert failed: " + insertErr.message);
+        if (!inserted?.acceptance_token) throw new Error("Token not saved after insert.");
+        console.log("[DriveQuoteAttach send] Inserted token:", inserted.acceptance_token);
       }
-
-      // Verify token was persisted before sending email
-      const { data: verifyQuote, error: verifyErr } = await (supabase.from("cab_quotes") as any)
-        .select("acceptance_token")
-        .eq("job_id", job.id)
-        .order("version", { ascending: false })
-        .limit(1)
-        .single();
-      if (verifyErr) throw verifyErr;
-      if (!verifyQuote?.acceptance_token) {
-        throw new Error("Acceptance token was not saved to the database. Email not sent.");
-      }
-      console.log("[DriveQuoteAttach send] Verified token in DB:", verifyQuote.acceptance_token);
 
       // Emit event
       await insertCabEvent({
@@ -282,29 +276,10 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
         ? `${customer.first_name} ${customer.last_name}`
         : "customer";
 
-      // Send email to customer with Accept button
+      // Send email
       if (customer?.email) {
-        const firstName = customer.first_name || "there";
-        const acceptUrl = `https://enclaveworkflowandhr.lovable.app/accept-quote?job_ref=${encodeURIComponent(job.job_ref)}&token=${acceptanceToken}`;
-        console.log("[DriveQuoteAttach] acceptanceUrl:", acceptUrl);
-        console.log("[DriveQuoteAttach] acceptanceToken:", acceptanceToken);
-        const htmlBody = `<p>Hi ${firstName},</p>
-<p>Thank you for taking the time to meet with us. Your quote has been prepared and we'd love to get your project underway.</p>
-<p>When you are ready to proceed, click the button below to accept your quote and we will be in touch to confirm your project start date.</p>
-<p><a href="${acceptUrl}" style="display:inline-block;background:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;">Accept Quote</a></p>
-<p>If you have any questions please reply to this email or call us on 07944608098.</p>
-<p>Kind regards,<br/>Enclave Cabinetry</p>`;
-
         try {
-          const { error: emailError } = await supabase.functions.invoke("send-email", {
-            body: {
-              to: customer.email,
-              subject: `Your quote from Enclave Cabinetry — ${job.job_ref}`,
-              html: htmlBody,
-              replyTo: "danny@enclavecabinetry.com",
-            },
-          });
-          if (emailError) throw emailError;
+          await sendQuoteEmail(acceptanceToken);
           toast({ title: `Quote emailed to ${customerName}` });
         } catch (emailErr: any) {
           console.error("Email send failed:", emailErr);
