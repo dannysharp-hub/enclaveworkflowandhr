@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import DriveQuoteAttach from "@/components/DriveQuoteAttach";
+import CompletionPhotos from "@/components/cab/CompletionPhotos";
 import QuoteBuilder from "@/components/QuoteBuilder";
 import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
 import JobProfitabilityTab from "@/components/cab/JobProfitabilityTab";
@@ -50,6 +51,8 @@ export default function JobDetailPage() {
   const [installAssigning, setInstallAssigning] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [installCompleteOpen, setInstallCompleteOpen] = useState(false);
+  const [installCompleteSending, setInstallCompleteSending] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -434,6 +437,7 @@ export default function JobDetailPage() {
         stageKey={stageKey}
         onRefresh={load}
         onRequestAppointment={handleRequestAppointment}
+        onMarkInstallComplete={() => setInstallCompleteOpen(true)}
         emitting={emitting}
       />
 
@@ -1098,6 +1102,91 @@ export default function JobDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Completion Photos */}
+      {["awaiting_signoff", "complete", "closed", "closed_paid", "installation_complete", "practical_completed"].includes(stageKey || "") && companyId && (
+        <CompletionPhotos jobId={job.id} companyId={companyId} />
+      )}
+
+      {/* Install Complete Confirmation Dialog */}
+      <Dialog open={installCompleteOpen} onOpenChange={setInstallCompleteOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mark Install Complete</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Send sign-off request to <span className="font-medium text-foreground">{customer?.email || "customer"}</span>?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            The customer will receive an email with a link to digitally sign off the installation.
+          </p>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="outline" size="sm" onClick={() => setInstallCompleteOpen(false)} disabled={installCompleteSending}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={installCompleteSending || !customer?.email} onClick={async () => {
+              setInstallCompleteSending(true);
+              try {
+                const signOffToken = crypto.randomUUID();
+
+                // Save token and update stage
+                await (supabase.from("cab_jobs") as any).update({
+                  sign_off_token: signOffToken,
+                  current_stage_key: "awaiting_signoff",
+                  state: "installed_pending_signoff",
+                  updated_at: new Date().toISOString(),
+                }).eq("id", job.id);
+
+                // Insert event
+                await insertCabEvent({
+                  companyId: companyId!,
+                  eventType: "install.complete_requested",
+                  jobId: job.id,
+                  payload: { job_ref: job.job_ref, customer_email: customer?.email },
+                });
+
+                // Send sign-off email
+                const signOffUrl = `https://enclaveworkflowandhr.lovable.app/sign-off?job_ref=${encodeURIComponent(job.job_ref)}&token=${signOffToken}`;
+
+                await supabase.functions.invoke("send-email", {
+                  body: {
+                    to: customer.email,
+                    subject: `Installation Complete — Please Sign Off — ${job.job_ref}`,
+                    replyTo: "danny@enclavecabinetry.com",
+                    html: `
+                      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #1a1a1a;">Installation Complete</h2>
+                        <p>Hi ${customer.first_name},</p>
+                        <p>Your installation is now complete. Please take a moment to sign off your project using the link below.</p>
+                        <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0;">
+                          <p style="margin: 4px 0;"><strong>Job:</strong> ${job.job_ref} — ${job.job_title}</p>
+                        </div>
+                        <div style="text-align: center; margin: 30px 0;">
+                          <a href="${signOffUrl}" style="background: #2563eb; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
+                            Sign Off Installation
+                          </a>
+                        </div>
+                        <p>If you have any questions please call us on 07944608098.</p>
+                        <p>Kind regards,<br/>Enclave Cabinetry</p>
+                      </div>
+                    `,
+                  },
+                });
+
+                toast({ title: "Sign-off request sent", description: `Email sent to ${customer.email}` });
+                setInstallCompleteOpen(false);
+                load();
+              } catch (err: any) {
+                toast({ title: "Error", description: err.message, variant: "destructive" });
+              } finally {
+                setInstallCompleteSending(false);
+              }
+            }}>
+              {installCompleteSending ? "Sending…" : "Send Sign-Off Request"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Job - admin only */}
       {userRole === "admin" && job && (

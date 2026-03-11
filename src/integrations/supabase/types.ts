@@ -1511,6 +1511,9 @@ export type Database = {
           profit_last_calculated_at: string | null
           property_address_json: Json | null
           room_type: string | null
+          sign_off_completed_at: string | null
+          sign_off_signature_url: string | null
+          sign_off_token: string | null
           state: string | null
           status: string
           target_margin_pct: number | null
@@ -1565,6 +1568,9 @@ export type Database = {
           profit_last_calculated_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
+          sign_off_completed_at?: string | null
+          sign_off_signature_url?: string | null
+          sign_off_token?: string | null
           state?: string | null
           status?: string
           target_margin_pct?: number | null
@@ -1619,6 +1625,9 @@ export type Database = {
           profit_last_calculated_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
+          sign_off_completed_at?: string | null
+          sign_off_signature_url?: string | null
+          sign_off_token?: string | null
           state?: string | null
           status?: string
           target_margin_pct?: number | null
