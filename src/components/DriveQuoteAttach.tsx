@@ -48,23 +48,48 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
     }
     setResending(true);
     try {
-      // Fetch the latest acceptance_token from DB
+      // Fetch the latest quote record from DB with full diagnostics
+      console.log("[DriveQuoteAttach resend] quote.id:", quote.id);
+      console.log("[DriveQuoteAttach resend] job.id:", job.id);
+      
       const { data: freshQuote, error: fetchErr } = await (supabase.from("cab_quotes") as any)
-        .select("acceptance_token")
+        .select("id, acceptance_token, status, job_id")
         .eq("id", quote.id)
         .single();
+      
+      console.log("[DriveQuoteAttach resend] DB fetch result:", JSON.stringify(freshQuote));
+      console.log("[DriveQuoteAttach resend] DB fetch error:", fetchErr);
+      
       if (fetchErr) throw fetchErr;
 
       let acceptanceToken: string = freshQuote?.acceptance_token || "";
+      console.log("[DriveQuoteAttach resend] Existing token from DB:", acceptanceToken || "(empty)");
 
       // If no token exists, generate one and save it
       if (!acceptanceToken) {
         acceptanceToken = crypto.randomUUID();
-        const { error: updateErr } = await (supabase.from("cab_quotes") as any)
+        console.log("[DriveQuoteAttach resend] Generated new UUID:", acceptanceToken);
+        
+        const { data: updateData, error: updateErr } = await (supabase.from("cab_quotes") as any)
           .update({ acceptance_token: acceptanceToken })
-          .eq("id", quote.id);
+          .eq("id", quote.id)
+          .select("acceptance_token")
+          .single();
+        
+        console.log("[DriveQuoteAttach resend] Update result:", JSON.stringify(updateData));
+        console.log("[DriveQuoteAttach resend] Update error:", updateErr);
+        
         if (updateErr) throw updateErr;
-        console.log("[DriveQuoteAttach resend] Generated new token:", acceptanceToken);
+        
+        // Verify the token was actually saved
+        if (!updateData?.acceptance_token) {
+          console.error("[DriveQuoteAttach resend] Token NOT saved — update returned no data. Possible RLS issue.");
+          throw new Error("Token could not be saved to database. Check RLS policies on cab_quotes.");
+        }
+        
+        // Use the token from the DB response to be sure
+        acceptanceToken = updateData.acceptance_token;
+        console.log("[DriveQuoteAttach resend] Verified saved token:", acceptanceToken);
       }
 
       // Safety check — never send with empty token
