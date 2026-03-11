@@ -50,10 +50,23 @@ export default function ProductionBoardPage() {
 
     console.log("[ProductionBoard] company_id:", cid);
 
+    const stageKeys = [
+      "materials_ordered",
+      "materials_received",
+      "cnc_prep",
+      "cnc_ready",
+      "assembly",
+      "qc_check",
+      "ready_for_install",
+    ];
+
+    const queryDebug = `SELECT id, job_ref, job_title, production_stage, contract_value, company_id, customer_id, room_type, updated_at FROM cab_jobs WHERE company_id = '${cid}' AND (production_stage IS NOT NULL OR current_stage_key IN ('${stageKeys.join("', '")}')) ORDER BY updated_at DESC`;
+    console.log("[ProductionBoard] exact query:", queryDebug);
+
     const { data, error } = await (supabase.from("cab_jobs") as any)
       .select("id, job_ref, job_title, production_stage, contract_value, company_id, customer_id, room_type, updated_at")
       .eq("company_id", cid)
-      .not("production_stage", "is", null)
+      .or(`production_stage.not.is.null,current_stage_key.in.(${stageKeys.join(",")})`)
       .order("updated_at", { ascending: false });
 
     console.log("[ProductionBoard] board query result:", { data, error });
@@ -64,6 +77,8 @@ export default function ProductionBoardPage() {
       .order("updated_at", { ascending: false });
 
     console.log("[ProductionBoard] stage snapshot by company:", { data: stageRows, error: stageRowsError });
+    const debugJob = (stageRows ?? []).find((row: any) => row.job_ref === "009_alistairwood");
+    console.log("[ProductionBoard] 009_alistairwood stage values:", debugJob ?? "not found");
 
     if (!data || data.length === 0) {
       setJobs([]);
