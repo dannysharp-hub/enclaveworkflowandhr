@@ -408,9 +408,17 @@ export default function JobDetailPage() {
             <p className="text-xs text-muted-foreground">Add it to start tracking production stages</p>
           </div>
           <Button size="sm" onClick={async () => {
-            await (supabase.from("cab_jobs") as any)
+            console.log("[ProductionBoard] Adding job to board:", { jobId: job.id, companyId, job_ref: job.job_ref });
+            const { data: updateData, error: updateError } = await (supabase.from("cab_jobs") as any)
               .update({ production_stage: "materials_ordered", updated_at: new Date().toISOString() })
-              .eq("id", job.id);
+              .eq("id", job.id)
+              .eq("company_id", companyId)
+              .select();
+            console.log("[ProductionBoard] Update result:", { data: updateData, error: updateError });
+            if (updateError) {
+              toast({ title: "Error", description: updateError.message, variant: "destructive" });
+              return;
+            }
             await insertCabEvent({ companyId: companyId!, eventType: "production.started", jobId: job.id, payload: { job_ref: job.job_ref } });
             toast({ title: "Job added to Production Board" });
             load();
