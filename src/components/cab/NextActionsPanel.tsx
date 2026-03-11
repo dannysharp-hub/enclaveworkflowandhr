@@ -21,6 +21,7 @@ interface NextActionsPanelProps {
   stageKey: string | null;
   onRefresh: () => void;
   onRequestAppointment: () => void;
+  onMarkInstallComplete?: () => void;
   emitting: string | null;
 }
 
