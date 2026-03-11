@@ -273,11 +273,7 @@ export default function NextActionsPanel({
               <Upload size={14} /> Upload BOM / Parts List
             </Button>
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleBomFileSelect} />
-            <Button size="sm" variant="secondary" disabled={disabled} onClick={() => emitAndRefresh(
-              "materials.ordered",
-              { job_ref: job.job_ref },
-              { current_stage_key: "in_production", state: "in_production", updated_at: new Date().toISOString() }
-            )}>
+            <Button size="sm" variant="secondary" disabled={disabled} onClick={() => setOrderMaterialsOpen(true)}>
               <Package size={14} /> Order Materials
             </Button>
           </>
