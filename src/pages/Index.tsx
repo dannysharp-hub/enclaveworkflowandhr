@@ -1,19 +1,16 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Wrench, CalendarDays, Recycle, AlertTriangle, ShieldCheck, GraduationCap,
-  Clock, TrendingDown, ClipboardCheck, Receipt, Activity, ArrowRight,
-  BarChart3, Kanban, Package, Users, Bug,
+  Wrench, CalendarDays, AlertTriangle,
+  Activity, ArrowRight,
+  BarChart3, Kanban,
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
-import JobStatusBadge from "@/components/JobStatusBadge";
 import { Link, Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
-import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useAuth } from "@/contexts/AuthContext";
-import { format, differenceInDays } from "date-fns";
-import type { JobStatus } from "@/types";
+import { format } from "date-fns";
+import { getCabCompanyId } from "@/lib/cabHelpers";
 
 /**
  * Role-based landing router:
