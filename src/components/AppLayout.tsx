@@ -71,7 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  
   const location = useLocation();
   const { profile, userRole, signOut } = useAuth();
   const { flags } = useFeatureFlags();
