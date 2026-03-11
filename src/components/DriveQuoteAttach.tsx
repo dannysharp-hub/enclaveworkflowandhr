@@ -201,9 +201,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       // Generate acceptance token
       const acceptanceToken = crypto.randomUUID();
 
-      // Upsert quote record
+      // Upsert quote record and verify token was saved
       if (quote) {
-        await (supabase.from("cab_quotes") as any)
+        const { error: updateErr } = await (supabase.from("cab_quotes") as any)
           .update({
             drive_file_id: selectedFile.id,
             drive_filename: selectedFile.file_name,
@@ -212,8 +212,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             acceptance_token: acceptanceToken,
           })
           .eq("id", quote.id);
+        if (updateErr) throw updateErr;
       } else {
-        await (supabase.from("cab_quotes") as any)
+        const { error: insertErr } = await (supabase.from("cab_quotes") as any)
           .insert({
             company_id: companyId,
             job_id: job.id,
@@ -225,7 +226,21 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             currency: job.ballpark_currency || "GBP",
             acceptance_token: acceptanceToken,
           });
+        if (insertErr) throw insertErr;
       }
+
+      // Verify token was persisted before sending email
+      const { data: verifyQuote, error: verifyErr } = await (supabase.from("cab_quotes") as any)
+        .select("acceptance_token")
+        .eq("job_id", job.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .single();
+      if (verifyErr) throw verifyErr;
+      if (!verifyQuote?.acceptance_token) {
+        throw new Error("Acceptance token was not saved to the database. Email not sent.");
+      }
+      console.log("[DriveQuoteAttach send] Verified token in DB:", verifyQuote.acceptance_token);
 
       // Emit event
       await insertCabEvent({
