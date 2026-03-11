@@ -44,83 +44,35 @@ function DashboardRouter() {
 export default DashboardRouter;
 
 function DashboardContent() {
-  const { flags } = useFeatureFlags();
   const { profile, userRole } = useAuth();
-  const [stats, setStats] = useState({ activeJobs: 0, inProgressStages: 0, pendingHolidays: 0, availableRemnants: 0 });
   const [jobs, setJobs] = useState<any[]>([]);
-  const [allStages, setAllStages] = useState<any[]>([]);
-  const [holidays, setHolidays] = useState<any[]>([]);
-  const [files, setFiles] = useState<any[]>([]);
-  const [profiles, setProfiles] = useState<any[]>([]);
-  const [receipts, setReceipts] = useState<any[]>([]);
-  const [training, setTraining] = useState<any[]>([]);
-  const [reviewsData, setReviewsData] = useState<any[]>([]);
-  const [overdueInvoices, setOverdueInvoices] = useState<any[]>([]);
-  const [overdueBills, setOverdueBills] = useState<any[]>([]);
-  const [openIssues, setOpenIssues] = useState(0);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [recentEvents, setRecentEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      const baseFetches = await Promise.all([
-        supabase.from("jobs").select("*").neq("status", "complete").order("created_date", { ascending: false }),
-        supabase.from("job_stages").select("*"),
-        supabase.from("holiday_requests").select("*").order("created_at", { ascending: false }),
-        supabase.from("remnants").select("id").eq("status", "available"),
-        supabase.from("file_assets").select("*").eq("status", "active").eq("requires_acknowledgement", true),
-        supabase.from("profiles").select("user_id, full_name, department, active").eq("active", true),
-        supabase.from("file_read_receipts").select("*"),
-        supabase.from("training_records").select("*"),
-        supabase.from("reviews").select("*"),
-        supabase.from("job_issues").select("id").eq("status", "open"),
+      const companyId = await getCabCompanyId();
+      if (!companyId) { setLoading(false); return; }
+
+      const [jobsRes, eventsRes] = await Promise.all([
+        (supabase.from("cab_jobs") as any)
+          .select("*, cab_customers(first_name, last_name)")
+          .eq("company_id", companyId)
+          .neq("status", "closed")
+          .order("created_at", { ascending: false }),
+        (supabase.from("cab_events") as any)
+          .select("id, event_type, created_at, job_id, payload_json")
+          .eq("company_id", companyId)
+          .order("created_at", { ascending: false })
+          .limit(8),
       ]);
-      const [jobsRes, stagesRes, holidaysRes, remnantsRes, filesRes, profilesRes, receiptsRes, trainingRes, reviewsRes, issuesRes] = baseFetches;
-
-      const today = new Date().toISOString().split("T")[0];
-      if (flags.enable_finance) {
-        const [invRes, billRes] = await Promise.all([
-          supabase.from("invoices").select("id, invoice_number, amount_ex_vat, vat_amount, amount_paid, status, due_date").neq("status", "paid").neq("status", "cancelled"),
-          supabase.from("bills").select("id, bill_reference, amount_ex_vat, vat_amount, amount_paid, status, due_date").neq("status", "paid").neq("status", "cancelled"),
-        ]);
-        setOverdueInvoices((invRes.data ?? []).filter((i: any) => i.due_date < today));
-        setOverdueBills((billRes.data ?? []).filter((b: any) => b.due_date < today));
-      }
-
-      // Recent activity: last 10 stage updates
-      const recentStages = (stagesRes.data ?? [])
-        .filter((s: any) => s.status === "Done")
-        .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-        .slice(0, 8);
-
-      const jobMap = new Map((jobsRes.data ?? []).map((j: any) => [j.id, j]));
-
-      setRecentActivity(recentStages.map((s: any) => {
-        const job = jobMap.get(s.job_id);
-        return { ...s, job_code: job?.job_id || "", job_name: job?.job_name || "" };
-      }));
 
       setJobs(jobsRes.data ?? []);
-      setAllStages(stagesRes.data ?? []);
-      setHolidays(holidaysRes.data ?? []);
-      setFiles(filesRes.data ?? []);
-      setProfiles(profilesRes.data ?? []);
-      setReceipts(receiptsRes.data ?? []);
-      setTraining(trainingRes.data ?? []);
-      setReviewsData(reviewsRes.data ?? []);
-      setOpenIssues((issuesRes.data ?? []).length);
-
-      const inProgressStages = (stagesRes.data ?? []).filter((s: any) => s.status === "In Progress");
-      setStats({
-        activeJobs: jobsRes.data?.length ?? 0,
-        inProgressStages: inProgressStages.length,
-        pendingHolidays: (holidaysRes.data ?? []).filter((h: any) => h.status === "Pending").length,
-        availableRemnants: remnantsRes.data?.length ?? 0,
-      });
+      setRecentEvents(eventsRes.data ?? []);
       setLoading(false);
     };
     load();
-  }, [flags.enable_finance]);
+  }, []);
 
   // === HR Metrics ===
   const hrMetrics = useMemo(() => {
