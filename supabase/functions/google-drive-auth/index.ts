@@ -1041,9 +1041,8 @@ Deno.serve(async (req) => {
       const conflicts: string[] = [];
 
       for (const folder of allFolders) {
-        // Extract job_ref = everything before the first space
-        const spaceIdx = folder.name.indexOf(" ");
-        const extractedRef = spaceIdx > 0 ? folder.name.substring(0, spaceIdx) : folder.name;
+        // Use full folder name as job_ref (format: 009_alistairwood)
+        const extractedRef = folder.name.trim();
 
         if (!extractedRef) {
           skippedDetails.push({ folder: folder.name, reason: "empty_ref" });
