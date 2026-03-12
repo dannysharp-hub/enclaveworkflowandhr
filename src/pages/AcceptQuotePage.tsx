@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 
 export default function AcceptQuotePage() {
   console.log("[AcceptQuotePage] Component mounted — this page is PUBLIC, no auth required");
