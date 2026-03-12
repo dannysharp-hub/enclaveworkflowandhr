@@ -6,9 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, X, Check, Search, Truck } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Pencil, X, Check, Search, Truck, ChevronDown, ChevronRight, Phone, MapPin } from "lucide-react";
 
 const CATEGORIES = ["panels", "hardware", "lighting", "fixings", "handles", "legs", "spray", "consumables", "other"];
+
+interface SupplierProduct {
+  id: string;
+  category: string;
+  name: string;
+  size: string;
+  thickness: string;
+  pack_rate: number | null;
+  mixed_rate: number | null;
+  loose_rate: number | null;
+  pieces_per_pack: number | null;
+}
 
 export default function CabSuppliersPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -19,6 +32,9 @@ export default function CabSuppliersPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "", categories: [] as string[] });
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [products, setProducts] = useState<Record<string, SupplierProduct[]>>({});
+  const [loadingProducts, setLoadingProducts] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -31,6 +47,24 @@ export default function CabSuppliersPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadProducts = async (supplierId: string) => {
+    if (products[supplierId]) return;
+    setLoadingProducts(supplierId);
+    const { data } = await (supabase.from("cab_supplier_products") as any)
+      .select("*").eq("supplier_id", supplierId).order("category").order("thickness");
+    setProducts(prev => ({ ...prev, [supplierId]: data ?? [] }));
+    setLoadingProducts(null);
+  };
+
+  const toggleExpand = (id: string) => {
+    if (expandedId === id) {
+      setExpandedId(null);
+    } else {
+      setExpandedId(id);
+      loadProducts(id);
+    }
+  };
 
   const resetForm = () => setForm({ name: "", email: "", phone: "", address: "", notes: "", categories: [] });
 
@@ -62,6 +96,16 @@ export default function CabSuppliersPage() {
   const filtered = suppliers.filter(s =>
     !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.email || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  const groupProductsByCategory = (items: SupplierProduct[]) => {
+    const groups: Record<string, SupplierProduct[]> = {};
+    items.forEach(p => {
+      const cat = p.category || "Other";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(p);
+    });
+    return groups;
+  };
 
   if (loading) {
     return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
@@ -108,24 +152,88 @@ export default function CabSuppliersPage() {
       )}
 
       <div className="space-y-2">
-        {filtered.map(s => (
-          <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
-            <div>
-              <span className="font-medium text-foreground">{s.name}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{s.email}</span>
-              {s.phone && <span className="ml-2 text-xs text-muted-foreground">{s.phone}</span>}
-              <div className="flex gap-1 mt-1">
-                {(s.categories || []).map((c: string) => (
-                  <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
-                ))}
+        {filtered.map(s => {
+          const isExpanded = expandedId === s.id;
+          const supplierProducts = products[s.id] || [];
+          const grouped = groupProductsByCategory(supplierProducts);
+
+          return (
+            <div key={s.id} className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => toggleExpand(s.id)}>
+                <div className="flex items-center gap-3">
+                  <span className="text-muted-foreground">
+                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </span>
+                  <div>
+                    <span className="font-medium text-foreground">{s.name}</span>
+                    {s.contact_phone && (
+                      <span className="ml-3 text-xs text-muted-foreground inline-flex items-center gap-1"><Phone size={10} />{s.contact_phone}</span>
+                    )}
+                    {s.phone && !s.contact_phone && (
+                      <span className="ml-3 text-xs text-muted-foreground inline-flex items-center gap-1"><Phone size={10} />{s.phone}</span>
+                    )}
+                    {s.address && (
+                      <span className="ml-3 text-xs text-muted-foreground inline-flex items-center gap-1"><MapPin size={10} />{s.address}</span>
+                    )}
+                    <div className="flex gap-1 mt-1">
+                      {(s.categories || []).map((c: string) => (
+                        <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
+                      ))}
+                    </div>
+                    {s.notes && <p className="text-xs text-muted-foreground mt-1 italic">{s.notes}</p>}
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" onClick={(e) => {
+                  e.stopPropagation();
+                  setEditId(s.id); setAdding(true);
+                  setForm({ name: s.name, email: s.email || s.contact_email || "", phone: s.phone || s.contact_phone || "", address: s.address || "", notes: s.notes || "", categories: s.categories || [] });
+                }}><Pencil size={14} /></Button>
               </div>
+
+              {isExpanded && (
+                <div className="border-t border-border px-3 pb-3">
+                  {loadingProducts === s.id ? (
+                    <div className="flex justify-center py-6"><div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
+                  ) : supplierProducts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No products listed for this supplier.</p>
+                  ) : (
+                    Object.entries(grouped).map(([cat, items]) => (
+                      <div key={cat} className="mt-3">
+                        <h4 className="text-xs font-bold text-foreground font-mono mb-1.5 uppercase tracking-wider">{cat}</h4>
+                        <div className="rounded-md border border-border overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="text-xs h-8 px-2">Size</TableHead>
+                                <TableHead className="text-xs h-8 px-2">Thickness</TableHead>
+                                <TableHead className="text-xs h-8 px-2 text-right">Pack</TableHead>
+                                <TableHead className="text-xs h-8 px-2 text-right">Mixed</TableHead>
+                                <TableHead className="text-xs h-8 px-2 text-right">Loose</TableHead>
+                                <TableHead className="text-xs h-8 px-2 text-right">Pcs/Pack</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {items.map(p => (
+                                <TableRow key={p.id}>
+                                  <TableCell className="text-xs px-2 py-1.5">{p.size}</TableCell>
+                                  <TableCell className="text-xs px-2 py-1.5 font-medium">{p.thickness}</TableCell>
+                                  <TableCell className="text-xs px-2 py-1.5 text-right font-mono">{p.pack_rate != null ? `£${p.pack_rate.toFixed(2)}` : "—"}</TableCell>
+                                  <TableCell className="text-xs px-2 py-1.5 text-right font-mono">{p.mixed_rate != null ? `£${p.mixed_rate.toFixed(2)}` : "—"}</TableCell>
+                                  <TableCell className="text-xs px-2 py-1.5 text-right font-mono">{p.loose_rate != null ? `£${p.loose_rate.toFixed(2)}` : "—"}</TableCell>
+                                  <TableCell className="text-xs px-2 py-1.5 text-right">{p.pieces_per_pack ?? "—"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
-            <Button size="sm" variant="ghost" onClick={() => {
-              setEditId(s.id); setAdding(true);
-              setForm({ name: s.name, email: s.email || "", phone: s.phone || "", address: s.address || "", notes: s.notes || "", categories: s.categories || [] });
-            }}><Pencil size={14} /></Button>
-          </div>
-        ))}
+          );
+        })}
         {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No suppliers yet.</p>}
       </div>
     </div>
