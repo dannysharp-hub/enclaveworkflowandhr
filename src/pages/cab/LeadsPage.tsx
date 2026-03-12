@@ -106,34 +106,92 @@ export default function LeadsPage() {
     if (!companyId) return;
     setImporting(true);
     try {
-      // Log all job_refs from DB before import
-      const { data: dbJobs } = await (supabase.from("cab_jobs") as any)
-        .select("job_ref")
-        .eq("company_id", companyId);
-      const dbRefs = (dbJobs || []).map((j: any) => j.job_ref);
-      console.log("[Drive Import] job_refs in DB:", dbRefs);
-
-      const { data, error } = await supabase.functions.invoke("google-drive-auth", {
-        body: { action: "scan_root_cab", company_id: companyId },
+      // Step 1: Find the _Jobs folder via edge function (single call, no pagination)
+      const { data: jobsFolderData, error: findErr } = await supabase.functions.invoke("google-drive-auth", {
+        body: { action: "find_jobs_folder" },
       });
-      if (error) throw error;
-      const { matched = 0, created = 0, skipped = 0, skipped_details = [], conflicts = [], total_folders_found = 0, folder_names = [] } = data || {};
-      const totalLinked = matched || created;
-      // Log each folder name individually
-      for (const name of folder_names) {
-        console.log(`[Drive Import] Trying: ${name}`);
+      if (findErr) throw findErr;
+      if (jobsFolderData?.error) throw new Error(jobsFolderData.error);
+
+      const jobsFolderId = jobsFolderData.folder_id;
+      console.log(`[Drive Import] Found _Jobs folder: ${jobsFolderId}`);
+
+      // Step 2: Paginate ALL subfolders client-side
+      const allFolders: { id: string; name: string; webViewLink?: string }[] = [];
+      let pageToken: string | null = null;
+      let pageNum = 0;
+      do {
+        pageNum++;
+        console.log(`[Drive Import] Fetching page ${pageNum}, pageToken=${pageToken || "START"}`);
+        const { data: pageData, error: pageErr } = await supabase.functions.invoke("google-drive-auth", {
+          body: { action: "list_drive_folders_page", parent_id: jobsFolderId, page_token: pageToken },
+        });
+        if (pageErr) throw pageErr;
+        if (pageData?.error) throw new Error(pageData.error);
+
+        const files = pageData.files || [];
+        console.log(`[Drive Import] Page ${pageNum}: ${files.length} folders, hasNext: ${!!pageData.next_page_token}`);
+        allFolders.push(...files);
+        pageToken = pageData.next_page_token || null;
+      } while (pageToken);
+
+      console.log(`[Drive Import] Total folders found: ${allFolders.length}`);
+
+      // Step 3: Load existing cab_jobs and do matching client-side
+      const { data: dbJobs } = await (supabase.from("cab_jobs") as any)
+        .select("id, job_ref")
+        .eq("company_id", companyId);
+      const jobsByRef = new Map<string, string>();
+      for (const j of (dbJobs || [])) {
+        jobsByRef.set(j.job_ref.toLowerCase(), j.id);
       }
-      console.log("[Drive Import] Summary:", { totalLinked, skipped, conflicts });
-      if (totalLinked === 0 && conflicts.length === 0) {
-        const skipReasons = skipped_details.map((s: any) => `• ${s.folder}: ${s.reason}`).join("\n");
+      console.log(`[Drive Import] job_refs in DB (${jobsByRef.size}):`, Array.from(jobsByRef.keys()));
+
+      // Step 4: Match and link
+      let matched = 0;
+      const skippedDetails: { folder: string; reason: string }[] = [];
+      const conflicts: string[] = [];
+
+      for (const folder of allFolders) {
+        const ref = folder.name.trim();
+        if (!ref) {
+          skippedDetails.push({ folder: folder.name, reason: "empty_ref" });
+          continue;
+        }
+        const jobId = jobsByRef.get(ref.toLowerCase());
+        if (!jobId) {
+          skippedDetails.push({ folder: folder.name, reason: `no_matching_job (${ref})` });
+          continue;
+        }
+
+        // Insert link
+        const { error: linkErr } = await (supabase.from("cab_job_files") as any).insert({
+          company_id: companyId,
+          job_id: jobId,
+          url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
+          file_type: "drive_folder",
+        });
+
+        if (linkErr) {
+          conflicts.push(`Failed to link "${folder.name}": ${linkErr.message}`);
+          continue;
+        }
+        matched++;
+        console.log(`[Drive Import] Matched "${folder.name}" → ${ref} (${jobId})`);
+      }
+
+      console.log(`[Drive Import] Summary: ${matched} matched, ${skippedDetails.length} skipped`);
+
+      if (matched === 0 && conflicts.length === 0) {
+        const skipReasons = skippedDetails.slice(0, 10).map((s) => `• ${s.folder}: ${s.reason}`).join("\n");
         toast({
           title: "No folders matched",
-          description: `Found ${total_folders_found} folder(s) in Drive root. ${skipped} skipped:\n${skipReasons || "None"}${conflicts.length ? `\nConflicts: ${conflicts.join(", ")}` : ""}`,
+          description: `Found ${allFolders.length} folder(s) in _Jobs. ${skippedDetails.length} skipped:\n${skipReasons || "None"}`,
         });
       } else {
         toast({
-          title: `${totalLinked} folder${totalLinked !== 1 ? "s" : ""} matched, ${skipped} skipped`,
-          description: `${total_folders_found} total folders scanned.${conflicts.length > 0 ? ` ${conflicts.length} conflict(s): ${conflicts[0]}` : ""}`,
+          title: `${matched} folder${matched !== 1 ? "s" : ""} matched, ${skippedDetails.length} skipped`,
+          description: `${allFolders.length} total folders scanned.${conflicts.length > 0 ? ` ${conflicts.length} conflict(s)` : ""}`,
         });
         load();
       }
