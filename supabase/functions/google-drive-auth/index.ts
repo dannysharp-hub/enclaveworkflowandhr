@@ -1071,7 +1071,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const jobId = jobsByRef.get(extractedRef);
+        const jobId = jobsByRef.get(extractedRef.toLowerCase());
         if (!jobId) {
           skippedDetails.push({ folder: folder.name, reason: `no_matching_job (${extractedRef})` });
           console.log(`[Drive Import] No matching job for folder: ${folder.name}`);
