@@ -1009,11 +1009,28 @@ Deno.serve(async (req) => {
       const accessToken = await getAccessToken();
       const rootId = settings.projects_root_folder_id;
 
-      // Paginate through ALL subfolders (no fixed limit)
+      // Step 1: Find the _Jobs folder inside the root
+      const jobsFolderQuery = `'${rootId}' in parents and name='_Jobs' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const jobsFolderUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(jobsFolderQuery)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const jobsFolderRes = await fetch(jobsFolderUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const jobsFolderData = await jobsFolderRes.json();
+      if (!jobsFolderRes.ok) throw new Error(`Drive API error: ${jobsFolderData.error?.message}`);
+
+      const jobsFolder = jobsFolderData.files?.[0];
+      if (!jobsFolder) {
+        console.log("[Drive Import] No '_Jobs' folder found in root. Root folders:", JSON.stringify((jobsFolderData.files || []).map((f: any) => f.name)));
+        return new Response(JSON.stringify({ error: "No '_Jobs' folder found in Drive root" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      console.log(`[Drive Import] Found _Jobs folder: ${jobsFolder.id}`);
+
+      // Step 2: Paginate through ALL subfolders inside _Jobs
+      const scanFolderId = jobsFolder.id;
       let allFolders: any[] = [];
       let pageToken: string | null = null;
       do {
-        const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+        const query = `'${scanFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
         let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink),nextPageToken&orderBy=name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
         if (pageToken) listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
         const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
@@ -1024,7 +1041,7 @@ Deno.serve(async (req) => {
       } while (pageToken);
 
       const allFolderNames = allFolders.map((f: any) => f.name);
-      console.log("[Drive Import] All folders found in Drive root:", JSON.stringify(allFolderNames));
+      console.log("[Drive Import] All folders found in _Jobs:", JSON.stringify(allFolderNames));
 
       // Load ALL existing cab_jobs for this company
       const { data: existingJobs } = await supabaseAdmin
