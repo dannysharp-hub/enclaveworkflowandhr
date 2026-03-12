@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   Factory, ChevronRight, ChevronLeft, RefreshCw,
 } from "lucide-react";
+import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -168,21 +169,18 @@ export default function ProductionBoardPage() {
 
         // Send customer email
         const paymentDue = job.contract_value ? (job.contract_value * 0.40).toFixed(2) : "0.00";
-        const customerHtml = `
-<p>Hi ${job.customer_first_name},</p>
-<p>Your cabinetry is complete and we are ready to book your installation.</p>
-<p>Please find your pre-install payment details below.</p>
-<p><strong>Job Reference:</strong> ${job.job_ref}<br/>
-<strong>Payment Due:</strong> 40% of contract value = £${paymentDue}</p>
-<p><strong>Payment Details:</strong><br/>
-Account Name: Enclave Cabinetry<br/>
-Bank: Monzo<br/>
-Sort Code: 04-00-03<br/>
-Account Number: 75471656<br/>
-Reference: ${job.job_ref}-INSTALL</p>
-<p>Once payment is received we will confirm your installation date.</p>
-<p>If you have any questions please reply to this email or call us on 07944608098.</p>
-<p>Kind regards,<br/>Enclave Cabinetry<br/>Company Reg: 16671033</p>`;
+        const custFullName = `${job.customer_first_name} ${job.customer_last_name}`.trim();
+
+        const customerHtml = buildInvoiceEmailHtml({
+          invoiceNumber: `INS-${job.job_ref}`,
+          customerName: custFullName,
+          customerFirstName: job.customer_first_name,
+          jobRef: job.job_ref,
+          jobTitle: job.job_title || job.job_ref,
+          milestone: "preinstall",
+          amount: Number(paymentDue).toLocaleString("en-GB", { minimumFractionDigits: 2 }),
+          paymentReference: `${job.job_ref}-INSTALL`,
+        });
 
         if (job.customer_email) {
           await supabase.functions.invoke("send-email", {

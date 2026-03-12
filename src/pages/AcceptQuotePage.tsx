@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 
 export default function AcceptQuotePage() {
   console.log("[AcceptQuotePage] Component mounted — this page is PUBLIC, no auth required");
@@ -106,21 +107,22 @@ export default function AcceptQuotePage() {
 
       // 4. Send deposit invoice email
       if (customerData?.email) {
-        const firstName = customerData.first_name || "there";
-        const depositHtml = `<p>Hi ${firstName},</p>
-<p>Thank you for accepting your quote. Please find your deposit invoice details below.</p>
-<p><strong>Job Reference:</strong> ${jobData.job_ref}<br/>
-<strong>Deposit Amount:</strong> 50% of total project value</p>
-<p><strong>Payment Details:</strong><br/>
-Account Name: Enclave Cabinetry<br/>
-Bank: Monzo<br/>
-Sort Code: 04-00-03<br/>
-Account Number: 75471656<br/>
-Reference: ${jobData.job_ref}</p>
-<p>Please use your job reference as the payment reference so we can allocate your payment quickly.</p>
-<p>Once your deposit is received we will confirm your project start date.</p>
-<p>If you have any questions please reply to this email or call us on 07944608098.</p>
-<p>Kind regards,<br/>Enclave Cabinetry<br/>Company Reg: 16671033</p>`;
+        const contractValue = jobData.contract_value || 0;
+        const depositAmount = (contractValue * 0.50).toFixed(2);
+        const customerFullName = customerData
+          ? `${customerData.first_name} ${customerData.last_name}`.trim()
+          : "Customer";
+
+        const depositHtml = buildInvoiceEmailHtml({
+          invoiceNumber: `DEP-${jobData.job_ref}`,
+          customerName: customerFullName,
+          customerFirstName: customerData.first_name || "there",
+          jobRef: jobData.job_ref,
+          jobTitle: jobData.job_title || jobData.job_ref,
+          milestone: "deposit",
+          amount: Number(depositAmount).toLocaleString("en-GB", { minimumFractionDigits: 2 }),
+          paymentReference: jobData.job_ref,
+        });
 
         await supabase.functions.invoke("send-email", {
           body: {

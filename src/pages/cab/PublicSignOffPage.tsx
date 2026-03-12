@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/SignaturePad";
 import { ClipboardCheck, Loader2, CheckCircle2 } from "lucide-react";
+import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 
 export default function PublicSignOffPage() {
   console.log("[PublicSignOffPage] Component mounted — this page is PUBLIC, no auth required");
@@ -94,33 +95,23 @@ export default function PublicSignOffPage() {
       const customerName = customer ? `${customer.first_name} ${customer.last_name}` : "Customer";
 
       if (customer?.email) {
+        const finalHtml = buildInvoiceEmailHtml({
+          invoiceNumber: `FIN-${job.job_ref}`,
+          customerName,
+          customerFirstName: customer.first_name || "there",
+          jobRef: job.job_ref,
+          jobTitle: job.job_title || job.job_ref,
+          milestone: "final",
+          amount: Number(finalAmount).toLocaleString("en-GB", { minimumFractionDigits: 2 }),
+          paymentReference: `${job.job_ref}-FINAL`,
+        });
+
         await supabase.functions.invoke("send-email", {
           body: {
             to: customer.email,
             subject: `Final Invoice — Enclave Cabinetry — ${job.job_ref}`,
             replyTo: "danny@enclavecabinetry.com",
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #1a1a1a;">Final Invoice</h2>
-                <p>Hi ${customer.first_name},</p>
-                <p>Thank you for signing off your installation. It has been a pleasure working with you.</p>
-                <p>Please find your final payment details below.</p>
-                <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0;">
-                  <p style="margin: 4px 0;"><strong>Job Reference:</strong> ${job.job_ref}</p>
-                  <p style="margin: 4px 0;"><strong>Final Payment Due:</strong> 10% of contract value = £${finalAmount}</p>
-                </div>
-                <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin: 20px 0;">
-                  <p style="margin: 4px 0; font-weight: bold;">Payment Details:</p>
-                  <p style="margin: 4px 0;">Account Name: Enclave Cabinetry</p>
-                  <p style="margin: 4px 0;">Bank: Monzo</p>
-                  <p style="margin: 4px 0;">Sort Code: 04-00-03</p>
-                  <p style="margin: 4px 0;">Account Number: 75471656</p>
-                  <p style="margin: 4px 0;">Reference: ${job.job_ref}-FINAL</p>
-                </div>
-                <p>If you have any questions please reply to this email or call us on 07944608098.</p>
-                <p>Kind regards,<br/>Enclave Cabinetry<br/><span style="font-size: 12px; color: #888;">Company Reg: 16671033</span></p>
-              </div>
-            `,
+            html: finalHtml,
           },
         });
       }
