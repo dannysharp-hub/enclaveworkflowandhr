@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search, Hammer, Trash2 } from "lucide-react";
+import { Plus, Search, Hammer, Trash2, Wrench } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -60,6 +60,29 @@ export default function JobsPage() {
     } finally { setDeleting(false); }
   }, [deleteJob, fetchJobs]);
 
+  const handleCreateTestJob = useCallback(async () => {
+    if (!cabCompanyId) return;
+    try {
+      const { error } = await (supabase.from("cab_jobs") as any).insert({
+        company_id: cabCompanyId,
+        job_ref: "060_test",
+        job_title: "Test Job",
+        customer_id: cabCompanyId,
+        status: "lead",
+        current_stage_key: "lead_captured",
+        production_stage_key: "lead",
+        contract_value: 0,
+        ballpark_min: 0,
+        ballpark_max: 0,
+      });
+      if (error) throw error;
+      toast({ title: "Test job created", description: "060_test created successfully" });
+      fetchJobs();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  }, [cabCompanyId, fetchJobs]);
+
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
   const filtered = useMemo(() => {
@@ -90,9 +113,14 @@ export default function JobsPage() {
         </div>
         <div className="flex gap-2">
           {canManage && (
-            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-              <Plus size={16} /> New Job
-            </button>
+            <>
+              <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                <Plus size={16} /> New Job
+              </button>
+              <button onClick={handleCreateTestJob} className="flex items-center gap-2 rounded-md bg-secondary px-4 py-2.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
+                <Wrench size={16} /> Create Test Job
+              </button>
+            </>
           )}
         </div>
       </div>
