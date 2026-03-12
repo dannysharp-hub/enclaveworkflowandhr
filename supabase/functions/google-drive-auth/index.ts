@@ -666,15 +666,20 @@ Deno.serve(async (req) => {
         console.log(`Found _Jobs subfolder, using it as import root: ${rootId}`);
       }
 
-      // List all subfolders in root (or _Jobs)
-      const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,webViewLink)&orderBy=name&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const data = await res.json();
-      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
-
-      const folders = data.files || [];
-      console.log(`Found ${folders.length} folders in root`);
+      // List all subfolders in root (or _Jobs) with full pagination
+      const folders: any[] = [];
+      let importPageToken: string | null = null;
+      do {
+        const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,mimeType,webViewLink)&orderBy=name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        if (importPageToken) listUrl += `&pageToken=${encodeURIComponent(importPageToken)}`;
+        const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+        folders.push(...(data.files || []));
+        importPageToken = data.nextPageToken || null;
+      } while (importPageToken);
+      console.log(`[Drive Import] Total folders found: ${folders.length}`);
 
       // Get existing job_drive_links to avoid duplicates
       const { data: existingLinks } = await supabaseAdmin
