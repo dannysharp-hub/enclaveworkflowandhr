@@ -1050,7 +1050,7 @@ Deno.serve(async (req) => {
         .eq("company_id", companyId);
       const jobsByRef = new Map<string, string>();
       for (const j of (existingJobs || [])) {
-        jobsByRef.set((j as any).job_ref, (j as any).id);
+        jobsByRef.set((j as any).job_ref.toLowerCase(), (j as any).id);
       }
 
       const allJobRefs = Array.from(jobsByRef.keys());
