@@ -3,7 +3,7 @@
  * Used for deposit, pre-install, and final invoice emails.
  */
 
-const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/pwa-192.png";
+const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/ec-logo.svg";
 
 interface InvoiceEmailParams {
   invoiceNumber: string;
@@ -32,9 +32,11 @@ const MILESTONE_LABELS: Record<string, { description: string; paymentDueLabel: s
 };
 
 // Extract numeric prefix from job_ref (e.g., "031_StevensonBrosDoors" -> "031")
-function extractNumericPrefix(jobRef: string): string {
-  const match = jobRef.match(/^(\d+)/);
-  return match ? match[1] : jobRef;
+// Also handles invoice numbers like "DEP-031_StevensonBrosDoors" -> "DEP-031"
+function extractNumericPrefix(value: string): string {
+  // Match pattern like "DEP-031" or just "031" at the start, stopping at underscore
+  const match = value.match(/^([A-Z]*-?\d+)/);
+  return match ? match[1] : value;
 }
 
 export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
