@@ -1128,14 +1128,34 @@ export default function JobDetailPage() {
               setInstallCompleteSending(true);
               try {
                 const signOffToken = crypto.randomUUID();
+                console.log("[InstallComplete] Generated sign_off_token:", signOffToken);
+                console.log("[InstallComplete] Job ID:", job.id, "Company ID:", companyId);
 
                 // Save token and update stage
-                await (supabase.from("cab_jobs") as any).update({
+                const { data: updateData, error: updateError } = await (supabase.from("cab_jobs") as any).update({
                   sign_off_token: signOffToken,
                   current_stage_key: "awaiting_signoff",
                   state: "installed_pending_signoff",
                   updated_at: new Date().toISOString(),
-                }).eq("id", job.id);
+                }).eq("id", job.id).eq("company_id", companyId).select("id, sign_off_token");
+
+                console.log("[InstallComplete] Update result:", { data: updateData, error: updateError });
+
+                if (updateError) throw new Error(`Failed to save token: ${updateError.message}`);
+
+                // Verify token was saved
+                const { data: verifyData } = await (supabase.from("cab_jobs") as any)
+                  .select("sign_off_token").eq("id", job.id).single();
+                console.log("[InstallComplete] Verified token in DB:", verifyData?.sign_off_token);
+
+                const savedToken = verifyData?.sign_off_token;
+                if (!savedToken) {
+                  throw new Error("sign_off_token was not saved to the database — aborting email send");
+                }
+
+                // Build URL with the verified token
+                const signOffUrl = `https://enclaveworkflowandhr.lovable.app/sign-off?job_ref=${encodeURIComponent(job.job_ref)}&token=${savedToken}`;
+                console.log("[InstallComplete] Sign-off URL:", signOffUrl);
 
                 // Insert event
                 await insertCabEvent({
@@ -1146,8 +1166,6 @@ export default function JobDetailPage() {
                 });
 
                 // Send sign-off email
-                const signOffUrl = `https://enclaveworkflowandhr.lovable.app/sign-off?job_ref=${encodeURIComponent(job.job_ref)}&token=${signOffToken}`;
-
                 await supabase.functions.invoke("send-email", {
                   body: {
                     to: customer.email,
