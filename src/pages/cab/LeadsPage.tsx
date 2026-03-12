@@ -158,6 +158,7 @@ export default function LeadsPage() {
           skippedDetails.push({ folder: folder.name, reason: "empty_ref" });
           continue;
         }
+        console.log('[Drive Import] Comparing:', JSON.stringify(ref.toLowerCase()), 'vs closest job_refs:', JSON.stringify(Array.from(jobsByRef.keys()).filter(k => k.startsWith(ref.toLowerCase().substring(0, 3)))));
         const jobId = jobsByRef.get(ref.toLowerCase());
         if (!jobId) {
           skippedDetails.push({ folder: folder.name, reason: `no_matching_job (${ref})` });
