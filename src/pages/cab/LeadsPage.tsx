@@ -141,34 +141,33 @@ export default function LeadsPage() {
       const { data: dbJobs } = await (supabase.from("cab_jobs") as any)
         .select("id, job_ref")
         .eq("company_id", companyId);
-      const jobsByRef = new Map<string, string>();
-      for (const j of (dbJobs || [])) {
-        jobsByRef.set(j.job_ref.toLowerCase(), j.id);
-      }
-      console.log(`[Drive Import] job_refs in DB (${jobsByRef.size}):`, Array.from(jobsByRef.keys()));
+      const jobs = (dbJobs || []) as { id: string; job_ref: string }[];
+      console.log(`[Drive Import] job_refs in DB (${jobs.length}):`, jobs.map(j => j.job_ref));
 
-      // Step 4: Match and link
+      // Step 4: Match and link — simple case-insensitive equality
       let matched = 0;
       const skippedDetails: { folder: string; reason: string }[] = [];
       const conflicts: string[] = [];
 
       for (const folder of allFolders) {
-        const ref = folder.name.trim();
-        if (!ref) {
+        const folderName = folder.name.trim();
+        if (!folderName) {
           skippedDetails.push({ folder: folder.name, reason: "empty_ref" });
           continue;
         }
-        console.log('[Drive Import] Comparing:', JSON.stringify(ref.toLowerCase()), 'vs closest job_refs:', JSON.stringify(Array.from(jobsByRef.keys()).filter(k => k.startsWith(ref.toLowerCase().substring(0, 3)))));
-        const jobId = jobsByRef.get(ref.toLowerCase());
-        if (!jobId) {
-          skippedDetails.push({ folder: folder.name, reason: `no_matching_job (${ref})` });
+
+        const match = jobs.find(j => j.job_ref.toLowerCase() === folderName.toLowerCase());
+        console.log(`[Drive Import] "${folderName.toLowerCase()}" === job_ref? ${match ? match.job_ref : "NO MATCH"}`);
+
+        if (!match) {
+          skippedDetails.push({ folder: folder.name, reason: `no_matching_job` });
           continue;
         }
 
         // Insert link
         const { error: linkErr } = await (supabase.from("cab_job_files") as any).insert({
           company_id: companyId,
-          job_id: jobId,
+          job_id: match.id,
           url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
           file_type: "drive_folder",
         });
@@ -178,7 +177,7 @@ export default function LeadsPage() {
           continue;
         }
         matched++;
-        console.log(`[Drive Import] Matched "${folder.name}" → ${ref} (${jobId})`);
+        console.log(`[Drive Import] Matched "${folder.name}" → ${match.job_ref} (${match.id})`);
       }
 
       console.log(`[Drive Import] Summary: ${matched} matched, ${skippedDetails.length} skipped`);
