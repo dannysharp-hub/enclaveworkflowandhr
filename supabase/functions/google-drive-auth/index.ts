@@ -1131,6 +1131,69 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── LIST DRIVE FOLDERS PAGE (single page, client handles pagination) ───
+    if (action === "list_drive_folders_page") {
+      const parentId = body.parent_id as string;
+      const pageToken = body.page_token as string | undefined;
+
+      if (!parentId) {
+        return new Response(JSON.stringify({ error: "parent_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,webViewLink)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      if (pageToken) listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
+
+      const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+
+      return new Response(JSON.stringify({
+        files: data.files || [],
+        next_page_token: data.nextPageToken || null,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── FIND _JOBS FOLDER ───
+    if (action === "find_jobs_folder") {
+      const { data: settings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("is_connected, projects_root_folder_id")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!settings?.is_connected || !settings.projects_root_folder_id) {
+        return new Response(JSON.stringify({ error: "Drive not connected or no root folder set" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const rootId = settings.projects_root_folder_id;
+
+      const jobsFolderQuery = `'${rootId}' in parents and name='_Jobs' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const jobsFolderUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(jobsFolderQuery)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const jobsFolderRes = await fetch(jobsFolderUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const jobsFolderData = await jobsFolderRes.json();
+      if (!jobsFolderRes.ok) throw new Error(`Drive API error: ${jobsFolderData.error?.message}`);
+
+      const jobsFolder = jobsFolderData.files?.[0];
+      if (!jobsFolder) {
+        return new Response(JSON.stringify({ error: "No '_Jobs' folder found in Drive root", root_id: rootId }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ folder_id: jobsFolder.id, folder_name: jobsFolder.name }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ─── CREATE JOB FOLDER ───
     if (action === "create_job_folder") {
       const jobId = body.job_id as string;
