@@ -1210,9 +1210,46 @@ export default function JobDetailPage() {
       {/* Delete Job - admin only */}
       {userRole === "admin" && job && (
         <>
-          <div className="border-t border-border pt-8 mt-8">
+           <div className="border-t border-border pt-8 mt-8 space-y-3">
             <Button variant="destructive" onClick={() => setDeleteOpen(true)} className="flex items-center gap-2">
               <Trash2 size={16} /> Delete Job
+            </Button>
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 border-amber-500 text-amber-700"
+              onClick={async () => {
+                try {
+                  const contractValue = job.contract_value || 0;
+                  const depositAmount = (contractValue * 0.50).toFixed(2);
+                  const custName = customer ? `${customer.first_name} ${customer.last_name}`.trim() : "Test Customer";
+
+                  const html = buildInvoiceEmailHtml({
+                    invoiceNumber: `DEP-${job.job_ref}`,
+                    customerName: custName,
+                    customerFirstName: customer?.first_name || "Test",
+                    jobRef: job.job_ref,
+                    jobTitle: job.job_title || job.job_ref,
+                    milestone: "deposit",
+                    amount: Number(depositAmount).toLocaleString("en-GB", { minimumFractionDigits: 2 }),
+                    paymentReference: job.job_ref,
+                  });
+
+                  const { error: sendErr } = await supabase.functions.invoke("send-email", {
+                    body: {
+                      to: "danny@enclavecabinetry.com",
+                      subject: `[TEST] Deposit Invoice — Enclave Cabinetry — ${job.job_ref}`,
+                      html,
+                      replyTo: "danny@enclavecabinetry.com",
+                    },
+                  });
+                  if (sendErr) throw sendErr;
+                  toast({ title: "Test deposit invoice sent", description: "Sent to danny@enclavecabinetry.com" });
+                } catch (err: any) {
+                  toast({ title: "Send failed", description: err.message, variant: "destructive" });
+                }
+              }}
+            >
+              ⚠️ TEST: Send Deposit Invoice
             </Button>
           </div>
 
