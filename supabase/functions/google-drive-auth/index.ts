@@ -1038,13 +1038,16 @@ Deno.serve(async (req) => {
       const scanFolderId = jobsFolder.id;
       let allFolders: any[] = [];
       let pageToken: string | null = null;
+      let cabPageNum = 0;
       do {
+        cabPageNum++;
         const query = `'${scanFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink),nextPageToken&orderBy=name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink),nextPageToken&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
         if (pageToken) listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
         const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         const pageData = await res.json();
         if (!res.ok) throw new Error(`Drive API error: ${pageData.error?.message}`);
+        console.log(`[Drive Import][scan_root_cab] Page ${cabPageNum}: got ${(pageData.files || []).length} folders, nextPageToken=${!!pageData.nextPageToken}`);
         allFolders = allFolders.concat(pageData.files || []);
         pageToken = pageData.nextPageToken || null;
       } while (pageToken);
