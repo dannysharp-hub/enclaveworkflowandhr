@@ -668,20 +668,27 @@ Deno.serve(async (req) => {
 
       // List all subfolders in root (or _Jobs) with full pagination
       const folders: any[] = [];
-      let importPageToken: string | null = null;
-      let pageNum = 0;
+      let pageToken: string | null = null;
       do {
-        pageNum++;
+        console.log('[Drive Import] Fetching page with pageSize=1000, pageToken=', pageToken || 'START');
+
         const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
         let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,mimeType,webViewLink)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-        if (importPageToken) listUrl += `&pageToken=${encodeURIComponent(importPageToken)}`;
+        if (pageToken) listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
+
         const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         const data = await res.json();
         if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
-        console.log(`[Drive Import][import_jobs] Page ${pageNum}: got ${(data.files || []).length} folders, nextPageToken=${!!data.nextPageToken}`);
-        folders.push(...(data.files || []));
-        importPageToken = data.nextPageToken || null;
-      } while (importPageToken);
+
+        const files = Array.isArray(data.files) ? data.files : [];
+        const nextPageToken = data.nextPageToken || null;
+
+        console.log('[Drive Import] Page returned:', files.length, 'folders, hasNextPage:', !!nextPageToken);
+
+        folders.push(...files);
+        pageToken = nextPageToken;
+      } while (pageToken);
+
       console.log(`[Drive Import] Total folders found: ${folders.length}`);
       console.log(`[Drive Import] Folder names: ${JSON.stringify(folders.map((f: any) => f.name).sort())}`);
 
