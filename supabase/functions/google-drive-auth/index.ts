@@ -985,7 +985,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── SCAN ROOT CAB (find project folders + auto-create cab_jobs) ───
+    // ─── SCAN ROOT CAB (match Drive folders to existing cab_jobs by job_ref) ───
     if (action === "scan_root_cab") {
       const companyId = body.company_id as string;
       if (!companyId) {
@@ -1009,112 +1009,82 @@ Deno.serve(async (req) => {
       const accessToken = await getAccessToken();
       const rootId = settings.projects_root_folder_id;
 
-      // List immediate subfolders
-      const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&orderBy=name&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const data = await res.json();
-      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message}`);
+      // Paginate through ALL subfolders (no fixed limit)
+      let allFolders: any[] = [];
+      let pageToken: string | null = null;
+      do {
+        const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink),nextPageToken&orderBy=name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        if (pageToken) listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
+        const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const pageData = await res.json();
+        if (!res.ok) throw new Error(`Drive API error: ${pageData.error?.message}`);
+        allFolders = allFolders.concat(pageData.files || []);
+        pageToken = pageData.nextPageToken || null;
+      } while (pageToken);
 
-      const folders = data.files || [];
-      const pattern = /^\d{3}_.+$/;
-      const parseRegex = /^(\d{3})_(.+)$/;
+      const allFolderNames = allFolders.map((f: any) => f.name);
+      console.log("[Drive Import] All folders found in Drive root:", JSON.stringify(allFolderNames));
 
-      let created = 0;
-      let highestNumber = 0;
-      const skippedDetails: { folder: string; reason: string }[] = [];
-      const conflicts: string[] = [];
-      const allFolderNames = folders.map((f: any) => f.name);
-
-      // Load existing cab_jobs for this company to check for duplicates by exact job_ref
+      // Load ALL existing cab_jobs for this company
       const { data: existingJobs } = await supabaseAdmin
         .from("cab_jobs")
         .select("id, job_ref")
         .eq("company_id", companyId);
-      const existingRefs = new Set((existingJobs || []).map((j: any) => j.job_ref));
+      const jobsByRef = new Map<string, string>();
+      for (const j of (existingJobs || [])) {
+        jobsByRef.set((j as any).job_ref, (j as any).id);
+      }
 
-      for (const folder of folders) {
-        if (!pattern.test(folder.name)) {
-          skippedDetails.push({ folder: folder.name, reason: "wrong_format" });
+      let matched = 0;
+      const skippedDetails: { folder: string; reason: string }[] = [];
+      const conflicts: string[] = [];
+
+      for (const folder of allFolders) {
+        // Extract job_ref = everything before the first space
+        const spaceIdx = folder.name.indexOf(" ");
+        const extractedRef = spaceIdx > 0 ? folder.name.substring(0, spaceIdx) : folder.name;
+
+        if (!extractedRef) {
+          skippedDetails.push({ folder: folder.name, reason: "empty_ref" });
+          console.log(`[Drive Import] Skipped empty folder name`);
           continue;
         }
 
-        const match = folder.name.match(parseRegex);
-        if (!match) {
-          skippedDetails.push({ folder: folder.name, reason: "parse_failed" });
+        const jobId = jobsByRef.get(extractedRef);
+        if (!jobId) {
+          skippedDetails.push({ folder: folder.name, reason: `no_matching_job (${extractedRef})` });
+          console.log(`[Drive Import] No matching job for folder: ${folder.name}`);
           continue;
         }
 
-        const jobNumber = match[1];
-        const num = parseInt(jobNumber, 10);
-        if (num > highestNumber) highestNumber = num;
-
-        const rawName = match[2]?.trim() || folder.name;
-        const jobTitle = rawName.replace(/[_-]/g, " ").replace(/\s+/g, " ").trim();
-        const namePart = rawName.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const jobRef = `${jobNumber}_${namePart}`;
-
-        // Only skip if this exact job_ref already exists
-        if (existingRefs.has(jobRef)) {
-          skippedDetails.push({ folder: folder.name, reason: `already_exists (${jobRef})` });
-          continue;
-        }
-
-        // Create a placeholder customer from the folder name
-        const nameParts = jobTitle.split(" ");
-        const firstName = nameParts[0] || "Unknown";
-        const lastName = nameParts.slice(1).join(" ") || "Customer";
-
-        const { data: newCustomer, error: custErr } = await supabaseAdmin
-          .from("cab_customers")
+        // Link the Drive folder to the matched job (upsert to avoid duplicates)
+        const { error: linkErr } = await supabaseAdmin
+          .from("cab_job_files")
           .insert({
             company_id: companyId,
-            first_name: firstName,
-            last_name: lastName,
-          })
-          .select("id")
-          .single();
-
-        if (custErr) {
-          conflicts.push(`Failed to create customer for "${folder.name}": ${custErr.message}`);
-          continue;
-        }
-
-        // Create cab_job
-        const { error: jobErr } = await supabaseAdmin
-          .from("cab_jobs")
-          .insert({
-            company_id: companyId,
-            customer_id: newCustomer!.id,
-            job_ref: jobRef,
-            job_title: jobTitle,
-            status: "lead",
-            current_stage_key: "lead_captured",
-            state: "new_lead",
+            job_id: jobId,
+            url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
+            file_type: "drive_folder",
           });
 
-        if (jobErr) {
-          conflicts.push(`Failed to create job for "${folder.name}": ${jobErr.message}`);
+        if (linkErr) {
+          conflicts.push(`Failed to link folder "${folder.name}" to job ${extractedRef}: ${linkErr.message}`);
           continue;
         }
 
-        existingRefs.add(jobRef);
-        created++;
+        matched++;
+        console.log(`[Drive Import] Matched folder "${folder.name}" → job_ref="${extractedRef}" (id=${jobId})`);
       }
 
-      // Update job sequence counter to highest number found + 1
-      if (highestNumber > 0) {
-        await supabaseAdmin
-          .from("cab_job_sequences")
-          .upsert({ company_id: companyId, next_number: highestNumber + 1 }, { onConflict: "company_id" });
-      }
+      console.log(`[Drive Import] Summary: ${matched} matched, ${skippedDetails.length} skipped out of ${allFolders.length} total folders`);
 
       return new Response(JSON.stringify({
-        created,
+        matched,
         skipped: skippedDetails.length,
         skipped_details: skippedDetails,
         conflicts,
-        total_folders_found: folders.length,
+        total_folders_found: allFolders.length,
         folder_names: allFolderNames,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
