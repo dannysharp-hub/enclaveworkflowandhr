@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/SignaturePad";
 import { ClipboardCheck, Loader2, CheckCircle2 } from "lucide-react";
+import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 
 export default function PublicSignOffPage() {
   console.log("[PublicSignOffPage] Component mounted — this page is PUBLIC, no auth required");
