@@ -1046,7 +1046,7 @@ Deno.serve(async (req) => {
       } while (pageToken);
 
       const allFolderNames = allFolders.map((f: any) => f.name);
-      console.log("[Drive Import] All folders found in _Jobs:", JSON.stringify(allFolderNames));
+      console.log(`[Drive Import] Total folders found: ${allFolders.length}`);
 
       // Load ALL existing cab_jobs for this company
       const { data: existingJobs } = await supabaseAdmin
