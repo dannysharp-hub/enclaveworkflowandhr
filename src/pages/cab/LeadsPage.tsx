@@ -105,13 +105,23 @@ export default function LeadsPage() {
     if (!companyId) return;
     setImporting(true);
     try {
+      // Log all job_refs from DB before import
+      const { data: dbJobs } = await (supabase.from("cab_jobs") as any)
+        .select("job_ref")
+        .eq("company_id", companyId);
+      const dbRefs = (dbJobs || []).map((j: any) => j.job_ref);
+      console.log("[Drive Import] job_refs in DB:", dbRefs);
+
       const { data, error } = await supabase.functions.invoke("google-drive-auth", {
         body: { action: "scan_root_cab", company_id: companyId },
       });
       if (error) throw error;
       const { matched = 0, created = 0, skipped = 0, skipped_details = [], conflicts = [], total_folders_found = 0, folder_names = [] } = data || {};
       const totalLinked = matched || created;
-      console.log("[Drive Import] All folder names from Drive:", folder_names);
+      // Log each folder name individually
+      for (const name of folder_names) {
+        console.log(`[Drive Import] Trying: ${name}`);
+      }
       console.log("[Drive Import] Summary:", { totalLinked, skipped, conflicts });
       if (totalLinked === 0 && conflicts.length === 0) {
         const skipReasons = skipped_details.map((s: any) => `• ${s.folder}: ${s.reason}`).join("\n");
