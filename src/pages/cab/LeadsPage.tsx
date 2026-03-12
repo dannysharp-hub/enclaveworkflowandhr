@@ -237,7 +237,7 @@ export default function LeadsPage() {
               if (!custId) { toast({ title: "Error", description: "No customers found — create one first", variant: "destructive" }); return; }
               const { error } = await (supabase.from("cab_jobs") as any).insert({
                 company_id: companyId,
-                job_ref: "059_SpacemakerDevelopments-SycamoreHouse",
+                job_ref: "031_StevensonBrosDoors",
                 job_title: "Test Job",
                 customer_id: custId,
                 status: "lead",
@@ -248,7 +248,7 @@ export default function LeadsPage() {
                 ballpark_max: 0,
               });
               if (error) throw error;
-              toast({ title: "Test job created", description: "059_SpacemakerDevelopments-SycamoreHouse created" });
+              toast({ title: "Test job created", description: "031_StevensonBrosDoors created" });
               load();
             } catch (err: any) {
               toast({ title: "Error", description: err.message, variant: "destructive" });
