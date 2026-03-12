@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
   }
 
   // Actions that require at least supervisor
-  const supervisorActions = ["scan_root", "scan_root_cab", "index_job_files", "index_all_jobs"];
+  const supervisorActions = ["scan_root", "scan_root_cab", "index_job_files", "index_all_jobs", "list_drive_folders_page", "find_jobs_folder"];
   if (supervisorActions.includes(action) && !["admin", "supervisor"].includes(userRole)) {
     return new Response(JSON.stringify({ error: "Supervisor or admin required" }), {
       status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
