@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { getCabCompanyId, generateJobRef, insertCabEvent } from "@/lib/cabHelpers";
@@ -168,6 +169,28 @@ export default function LeadsPage() {
             {importing ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
             {importing ? "Importing…" : "Import from Drive"}
           </Button>
+          <Button variant="secondary" onClick={async () => {
+            if (!companyId) return;
+            try {
+              const { error } = await (supabase.from("cab_jobs") as any).insert({
+                company_id: companyId,
+                job_ref: "060_test",
+                job_title: "Test Job",
+                customer_id: companyId,
+                status: "lead",
+                current_stage_key: "lead_captured",
+                production_stage_key: "lead",
+                contract_value: 0,
+                ballpark_min: 0,
+                ballpark_max: 0,
+              });
+              if (error) throw error;
+              toast({ title: "Test job created", description: "060_test created" });
+              load();
+            } catch (err: any) {
+              toast({ title: "Error", description: err.message, variant: "destructive" });
+            }
+          }}><Wrench size={16} /> Create Test Job</Button>
           <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> New Job</Button>
         </div>
       </div>
