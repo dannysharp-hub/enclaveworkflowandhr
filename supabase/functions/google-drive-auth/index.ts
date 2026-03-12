@@ -1053,11 +1053,15 @@ Deno.serve(async (req) => {
         jobsByRef.set((j as any).job_ref, (j as any).id);
       }
 
+      const allJobRefs = Array.from(jobsByRef.keys());
+      console.log(`[Drive Import] All job_refs in cab_jobs (${allJobRefs.length}):`, JSON.stringify(allJobRefs));
+
       let matched = 0;
       const skippedDetails: { folder: string; reason: string }[] = [];
       const conflicts: string[] = [];
 
       for (const folder of allFolders) {
+        console.log(`[Drive Import] Trying to match folder: "${folder.name}" against all job_refs in cab_jobs`);
         // Use full folder name as job_ref (format: 009_alistairwood)
         const extractedRef = folder.name.trim();
 
