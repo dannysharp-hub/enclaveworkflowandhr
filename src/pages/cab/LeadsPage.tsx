@@ -136,6 +136,7 @@ export default function LeadsPage() {
       } while (pageToken);
 
       console.log(`[Drive Import] Total folders found: ${allFolders.length}`);
+      console.log('[Drive Import] All folder names collected:', allFolders.map(f => f.name));
 
       // Step 3: Load existing cab_jobs and do matching client-side
       const { data: dbJobs } = await (supabase.from("cab_jobs") as any)
