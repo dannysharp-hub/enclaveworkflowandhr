@@ -113,7 +113,7 @@ export default function AcceptQuotePage() {
           ? `${customerData.first_name} ${customerData.last_name}`.trim()
           : "Customer";
 
-        const depositHtml = buildInvoiceEmailHtml({
+        const depositHtml = await buildInvoiceEmailHtml({
           invoiceNumber: `DEP-${jobData.job_ref}`,
           customerName: customerFullName,
           customerFirstName: customerData.first_name || "there",

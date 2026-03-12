@@ -95,7 +95,7 @@ export default function PublicSignOffPage() {
       const customerName = customer ? `${customer.first_name} ${customer.last_name}` : "Customer";
 
       if (customer?.email) {
-        const finalHtml = buildInvoiceEmailHtml({
+        const finalHtml = await buildInvoiceEmailHtml({
           invoiceNumber: `FIN-${job.job_ref}`,
           customerName,
           customerFirstName: customer.first_name || "there",

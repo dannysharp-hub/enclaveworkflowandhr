@@ -3,8 +3,40 @@
  * Used for deposit, pre-install, and final invoice emails.
  */
 
-const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><rect width="48" height="48" rx="8" fill="#2E5FA3"/><text x="24" y="33" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" fill="#ffffff">EC</text></svg>`;
-const LOGO_URL = `data:image/svg+xml;base64,${btoa(LOGO_SVG)}`;
+const LOGO_PNG_PUBLIC_PATH = "/ec-logo.png";
+const LOGO_URL_FALLBACK = "https://enclaveworkflowandhr.lovable.app/ec-logo.png";
+
+let logoPngDataUrlPromise: Promise<string> | null = null;
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result.startsWith("data:image/png;base64,")) {
+        reject(new Error("Logo conversion did not produce a PNG data URI"));
+        return;
+      }
+      resolve(result);
+    };
+    reader.onerror = () => reject(new Error("Failed to read logo PNG as base64"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getInlineLogoPngDataUrl(): Promise<string> {
+  if (!logoPngDataUrlPromise) {
+    logoPngDataUrlPromise = fetch(LOGO_PNG_PUBLIC_PATH, { cache: "force-cache" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Failed to load logo PNG: ${response.status}`);
+        const blob = await response.blob();
+        return blobToDataUrl(blob);
+      })
+      .catch(() => LOGO_URL_FALLBACK);
+  }
+
+  return logoPngDataUrlPromise;
+}
 
 interface InvoiceEmailParams {
   invoiceNumber: string;
@@ -34,23 +66,34 @@ const MILESTONE_LABELS: Record<string, { description: string; paymentDueLabel: s
 
 // Extract short invoice number: "DEP-031_StevensonBrosDoors" -> "DEP-031"
 function shortenInvoiceNumber(invoiceNumber: string, jobRef: string): string {
-  const prefixMatch = invoiceNumber.match(/^([A-Za-z]+-)/);
-  const numericPrefix = jobRef.split("_")[0]?.match(/^(\d+)/)?.[1];
-
-  if (prefixMatch?.[1] && numericPrefix) {
-    return `${prefixMatch[1]}${numericPrefix}`;
+  const invoiceSegment = invoiceNumber.split("_")[0]?.trim() || invoiceNumber.trim();
+  const strictMatch = invoiceSegment.match(/^([A-Za-z]+-)?(\d+)$/);
+  if (strictMatch) {
+    const [, prefix = "", digits] = strictMatch;
+    return `${prefix}${digits}`;
   }
 
-  const underscoreIdx = invoiceNumber.indexOf("_");
-  if (underscoreIdx > 0) return invoiceNumber.slice(0, underscoreIdx);
-  return invoiceNumber;
+  const leadingMatch = invoiceNumber.match(/^([A-Za-z]+-)?(\d+)/);
+  if (leadingMatch) {
+    const [, prefix = "", digits] = leadingMatch;
+    return `${prefix}${digits}`;
+  }
+
+  const invoicePrefix = invoiceNumber.match(/^([A-Za-z]+-)/)?.[1] || "";
+  const jobNumericPrefix = jobRef.split("_")[0]?.match(/(\d+)/)?.[1];
+  if (invoicePrefix && jobNumericPrefix) {
+    return `${invoicePrefix}${jobNumericPrefix}`;
+  }
+
+  return invoiceSegment;
 }
 
-export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
+export async function buildInvoiceEmailHtml(params: InvoiceEmailParams): Promise<string> {
   const { invoiceNumber, customerName, customerFirstName, jobRef, jobTitle, milestone, amount, paymentReference } = params;
   const labels = MILESTONE_LABELS[milestone];
   const lineDescription = `${labels.description} — ${jobTitle}`;
   const shortInvoiceNumber = shortenInvoiceNumber(invoiceNumber, jobRef);
+  const logoUrl = await getInlineLogoPngDataUrl();
 
   return `<!DOCTYPE html>
 <html>
@@ -65,7 +108,7 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="vertical-align:top;">
-          <img src="${LOGO_URL}" alt="Enclave Cabinetry" width="48" height="48" style="display:block;border-radius:8px;" />
+          <img src="${logoUrl}" alt="Enclave Cabinetry" width="48" height="48" style="display:block;border-radius:8px;" />
         </td>
         <td style="text-align:right;vertical-align:top;">
           <span style="font-size:12px;color:#666;">Enclave Cabinetry Invoice</span>
@@ -140,7 +183,7 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   <!-- FOOTER -->
   <tr><td style="padding:0 32px 28px 32px;text-align:center;">
     <p style="margin:0 0 16px 0;font-size:14px;color:#1a1a1a;font-weight:500;">Thank you for your business.</p>
-    <img src="${LOGO_URL}" alt="EC" width="32" height="32" style="display:block;margin:0 auto;border-radius:6px;opacity:0.6;" />
+    <img src="${logoUrl}" alt="EC" width="32" height="32" style="display:block;margin:0 auto;border-radius:6px;opacity:0.6;" />
   </td></tr>
 
 </table>

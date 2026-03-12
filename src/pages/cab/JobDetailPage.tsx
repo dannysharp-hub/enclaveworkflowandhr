@@ -1223,7 +1223,7 @@ export default function JobDetailPage() {
                   const depositAmount = (contractValue * 0.50).toFixed(2);
                   const custName = customer ? `${customer.first_name} ${customer.last_name}`.trim() : "Test Customer";
 
-                  const html = buildInvoiceEmailHtml({
+                  const html = await buildInvoiceEmailHtml({
                     invoiceNumber: `DEP-${job.job_ref}`,
                     customerName: custName,
                     customerFirstName: customer?.first_name || "Test",
