@@ -3,7 +3,9 @@
  * Used for deposit, pre-install, and final invoice emails.
  */
 
-const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/ec-logo.png";
+// HTML-based logo that renders in all email clients without external images
+const LOGO_48 = `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr><td style="width:48px;height:48px;background:#2E5FA3;border-radius:8px;text-align:center;vertical-align:middle;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;color:#ffffff;line-height:48px;">EC</td></tr></table>`;
+const LOGO_32 = `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 auto;"><tr><td style="width:32px;height:32px;background:#2E5FA3;border-radius:6px;text-align:center;vertical-align:middle;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;line-height:32px;opacity:0.6;">EC</td></tr></table>`;
 
 interface InvoiceEmailParams {
   invoiceNumber: string;
@@ -31,19 +33,18 @@ const MILESTONE_LABELS: Record<string, { description: string; paymentDueLabel: s
   },
 };
 
-// Extract numeric prefix from job_ref (e.g., "031_StevensonBrosDoors" -> "031")
-// Also handles invoice numbers like "DEP-031_StevensonBrosDoors" -> "DEP-031"
-function extractNumericPrefix(value: string): string {
-  // Match pattern like "DEP-031" or just "031" at the start, stopping at underscore
-  const match = value.match(/^([A-Z]*-?\d+)/);
-  return match ? match[1] : value;
+// Extract short invoice number: "DEP-031_StevensonBrosDoors" -> "DEP-031"
+function shortenInvoiceNumber(invoiceNumber: string): string {
+  const underscoreIdx = invoiceNumber.indexOf("_");
+  if (underscoreIdx > 0) return invoiceNumber.slice(0, underscoreIdx);
+  return invoiceNumber;
 }
 
 export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   const { invoiceNumber, customerName, customerFirstName, jobRef, jobTitle, milestone, amount, paymentReference } = params;
   const labels = MILESTONE_LABELS[milestone];
   const lineDescription = `${labels.description} — ${jobTitle}`;
-  const shortInvoiceNumber = extractNumericPrefix(invoiceNumber);
+  const shortInvoiceNumber = shortenInvoiceNumber(invoiceNumber);
 
   return `<!DOCTYPE html>
 <html>
@@ -58,7 +59,7 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="vertical-align:top;">
-          <img src="${LOGO_URL}" alt="Enclave Cabinetry" width="48" height="48" style="display:block;border-radius:8px;" />
+          ${LOGO_48}
         </td>
         <td style="text-align:right;vertical-align:top;">
           <span style="font-size:12px;color:#666;">Enclave Cabinetry Invoice</span>
@@ -133,7 +134,7 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   <!-- FOOTER -->
   <tr><td style="padding:0 32px 28px 32px;text-align:center;">
     <p style="margin:0 0 16px 0;font-size:14px;color:#1a1a1a;font-weight:500;">Thank you for your business.</p>
-    <img src="${LOGO_URL}" alt="EC" width="32" height="32" style="display:block;margin:0 auto;border-radius:6px;opacity:0.6;" />
+    ${LOGO_32}
   </td></tr>
 
 </table>
