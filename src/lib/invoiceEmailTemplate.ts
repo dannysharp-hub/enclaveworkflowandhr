@@ -3,7 +3,7 @@
  * Used for deposit, pre-install, and final invoice emails.
  */
 
-const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/ec-logo.svg";
+const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/ec-logo.png";
 
 interface InvoiceEmailParams {
   invoiceNumber: string;
