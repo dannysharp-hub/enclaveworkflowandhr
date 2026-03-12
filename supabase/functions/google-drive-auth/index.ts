@@ -669,17 +669,21 @@ Deno.serve(async (req) => {
       // List all subfolders in root (or _Jobs) with full pagination
       const folders: any[] = [];
       let importPageToken: string | null = null;
+      let pageNum = 0;
       do {
+        pageNum++;
         const query = `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,mimeType,webViewLink)&orderBy=name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,mimeType,webViewLink)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
         if (importPageToken) listUrl += `&pageToken=${encodeURIComponent(importPageToken)}`;
         const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         const data = await res.json();
         if (!res.ok) throw new Error(`Drive API error: ${data.error?.message || JSON.stringify(data)}`);
+        console.log(`[Drive Import][import_jobs] Page ${pageNum}: got ${(data.files || []).length} folders, nextPageToken=${!!data.nextPageToken}`);
         folders.push(...(data.files || []));
         importPageToken = data.nextPageToken || null;
       } while (importPageToken);
       console.log(`[Drive Import] Total folders found: ${folders.length}`);
+      console.log(`[Drive Import] Folder names: ${JSON.stringify(folders.map((f: any) => f.name).sort())}`);
 
       // Get existing job_drive_links to avoid duplicates
       const { data: existingLinks } = await supabaseAdmin
@@ -1034,13 +1038,16 @@ Deno.serve(async (req) => {
       const scanFolderId = jobsFolder.id;
       let allFolders: any[] = [];
       let pageToken: string | null = null;
+      let cabPageNum = 0;
       do {
+        cabPageNum++;
         const query = `'${scanFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink),nextPageToken&orderBy=name&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink),nextPageToken&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
         if (pageToken) listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
         const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         const pageData = await res.json();
         if (!res.ok) throw new Error(`Drive API error: ${pageData.error?.message}`);
+        console.log(`[Drive Import][scan_root_cab] Page ${cabPageNum}: got ${(pageData.files || []).length} folders, nextPageToken=${!!pageData.nextPageToken}`);
         allFolders = allFolders.concat(pageData.files || []);
         pageToken = pageData.nextPageToken || null;
       } while (pageToken);
