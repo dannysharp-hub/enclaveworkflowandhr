@@ -65,7 +65,7 @@ export default function JobsPage() {
     try {
       const { error } = await (supabase.from("cab_jobs") as any).insert({
         company_id: cabCompanyId,
-        job_ref: "060_test",
+        job_ref: "059_SpacemakerDevelopments-SycamoreHouse",
         job_title: "Test Job",
         customer_id: cabCompanyId,
         status: "lead",
@@ -76,7 +76,7 @@ export default function JobsPage() {
         ballpark_max: 0,
       });
       if (error) throw error;
-      toast({ title: "Test job created", description: "060_test created successfully" });
+      toast({ title: "Test job created", description: "059_SpacemakerDevelopments-SycamoreHouse created successfully" });
       fetchJobs();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
