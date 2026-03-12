@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import JobStatusBadge from "@/components/JobStatusBadge";
 import JobDialog from "@/components/JobDialog";
-import { Plus, Search, Hammer, Trash2 } from "lucide-react";
+import { Plus, Search, Hammer, Trash2, Wrench } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
