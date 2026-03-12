@@ -171,7 +171,7 @@ export default function ProductionBoardPage() {
         const paymentDue = job.contract_value ? (job.contract_value * 0.40).toFixed(2) : "0.00";
         const custFullName = `${job.customer_first_name} ${job.customer_last_name}`.trim();
 
-        const customerHtml = buildInvoiceEmailHtml({
+        const customerHtml = await buildInvoiceEmailHtml({
           invoiceNumber: `INS-${job.job_ref}`,
           customerName: custFullName,
           customerFirstName: job.customer_first_name,
