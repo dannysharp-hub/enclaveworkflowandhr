@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   Factory, ChevronRight, ChevronLeft, RefreshCw,
 } from "lucide-react";
+import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
