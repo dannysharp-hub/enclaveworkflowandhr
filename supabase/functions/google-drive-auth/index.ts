@@ -1050,7 +1050,7 @@ Deno.serve(async (req) => {
         .eq("company_id", companyId);
       const jobsByRef = new Map<string, string>();
       for (const j of (existingJobs || [])) {
-        jobsByRef.set((j as any).job_ref, (j as any).id);
+        jobsByRef.set((j as any).job_ref.toLowerCase(), (j as any).id);
       }
 
       const allJobRefs = Array.from(jobsByRef.keys());
@@ -1071,7 +1071,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const jobId = jobsByRef.get(extractedRef);
+        const jobId = jobsByRef.get(extractedRef.toLowerCase());
         if (!jobId) {
           skippedDetails.push({ folder: folder.name, reason: `no_matching_job (${extractedRef})` });
           console.log(`[Drive Import] No matching job for folder: ${folder.name}`);
