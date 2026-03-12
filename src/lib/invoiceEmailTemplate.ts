@@ -31,10 +31,17 @@ const MILESTONE_LABELS: Record<string, { description: string; paymentDueLabel: s
   },
 };
 
+// Extract numeric prefix from job_ref (e.g., "031_StevensonBrosDoors" -> "031")
+function extractNumericPrefix(jobRef: string): string {
+  const match = jobRef.match(/^(\d+)/);
+  return match ? match[1] : jobRef;
+}
+
 export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   const { invoiceNumber, customerName, customerFirstName, jobRef, jobTitle, milestone, amount, paymentReference } = params;
   const labels = MILESTONE_LABELS[milestone];
   const lineDescription = `${labels.description} — ${jobTitle}`;
+  const shortInvoiceNumber = extractNumericPrefix(invoiceNumber);
 
   return `<!DOCTYPE html>
 <html>
@@ -57,7 +64,7 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
       </tr>
     </table>
     <h1 style="margin:20px 0 8px 0;font-size:22px;color:#1a1a1a;border-bottom:3px solid #2E5FA3;padding-bottom:10px;">
-      Invoice — ${invoiceNumber}
+      Invoice — ${shortInvoiceNumber}
     </h1>
     <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#444;line-height:1.6;">
       <tr><td>
@@ -124,7 +131,7 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   <!-- FOOTER -->
   <tr><td style="padding:0 32px 28px 32px;text-align:center;">
     <p style="margin:0 0 16px 0;font-size:14px;color:#1a1a1a;font-weight:500;">Thank you for your business.</p>
-    <img src="${LOGO_URL}" alt="EC" width="32" height="32" style="display:inline-block;border-radius:6px;opacity:0.6;" />
+    <img src="${LOGO_URL}" alt="EC" width="32" height="32" style="display:block;margin:0 auto;border-radius:6px;opacity:0.6;" />
   </td></tr>
 
 </table>
