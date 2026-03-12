@@ -1144,7 +1144,7 @@ Deno.serve(async (req) => {
 
       const accessToken = await getAccessToken();
       const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,webViewLink)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(id,name,webViewLink)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`;
       if (pageToken) listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
 
       const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
