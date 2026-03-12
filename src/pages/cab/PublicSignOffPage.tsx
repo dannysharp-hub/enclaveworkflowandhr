@@ -5,6 +5,7 @@ import SignaturePad from "@/components/SignaturePad";
 import { ClipboardCheck, Loader2, CheckCircle2 } from "lucide-react";
 
 export default function PublicSignOffPage() {
+  console.log("[PublicSignOffPage] Component mounted — this page is PUBLIC, no auth required");
   const [params] = useSearchParams();
   const jobRef = params.get("job_ref");
   const token = params.get("token");
