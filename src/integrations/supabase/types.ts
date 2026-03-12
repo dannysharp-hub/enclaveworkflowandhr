@@ -2236,6 +2236,66 @@ export type Database = {
           },
         ]
       }
+      cab_supplier_products: {
+        Row: {
+          category: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          loose_rate: number | null
+          mixed_rate: number | null
+          name: string
+          pack_rate: number | null
+          pieces_per_pack: number | null
+          size: string | null
+          supplier_id: string | null
+          thickness: string | null
+        }
+        Insert: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          loose_rate?: number | null
+          mixed_rate?: number | null
+          name: string
+          pack_rate?: number | null
+          pieces_per_pack?: number | null
+          size?: string | null
+          supplier_id?: string | null
+          thickness?: string | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          loose_rate?: number | null
+          mixed_rate?: number | null
+          name?: string
+          pack_rate?: number | null
+          pieces_per_pack?: number | null
+          size?: string | null
+          supplier_id?: string | null
+          thickness?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_supplier_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_supplier_products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "cab_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_supplier_quotes: {
         Row: {
           attachment_url: string | null
@@ -2308,6 +2368,8 @@ export type Database = {
           address: string | null
           categories: string[] | null
           company_id: string
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string
           email: string | null
           id: string
@@ -2321,6 +2383,8 @@ export type Database = {
           address?: string | null
           categories?: string[] | null
           company_id: string
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -2334,6 +2398,8 @@ export type Database = {
           address?: string | null
           categories?: string[] | null
           company_id?: string
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           email?: string | null
           id?: string
