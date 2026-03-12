@@ -109,20 +109,21 @@ export default function LeadsPage() {
         body: { action: "scan_root_cab", company_id: companyId },
       });
       if (error) throw error;
-      const { created = 0, skipped = 0, skipped_details = [], conflicts = [], total_folders_found = 0, folder_names = [] } = data || {};
-      if (created === 0 && conflicts.length === 0) {
+      const { matched = 0, created = 0, skipped = 0, skipped_details = [], conflicts = [], total_folders_found = 0, folder_names = [] } = data || {};
+      const totalLinked = matched || created;
+      console.log("[Drive Import] All folder names from Drive:", folder_names);
+      console.log("[Drive Import] Summary:", { totalLinked, skipped, conflicts });
+      if (totalLinked === 0 && conflicts.length === 0) {
         const skipReasons = skipped_details.map((s: any) => `• ${s.folder}: ${s.reason}`).join("\n");
         toast({
-          title: "No new projects found",
-          description: `Found ${total_folders_found} folder(s) in Drive root.\n${skipped} skipped:\n${skipReasons || "None"}${conflicts.length ? `\nConflicts: ${conflicts.join(", ")}` : ""}`,
+          title: "No folders matched",
+          description: `Found ${total_folders_found} folder(s) in Drive root. ${skipped} skipped:\n${skipReasons || "None"}${conflicts.length ? `\nConflicts: ${conflicts.join(", ")}` : ""}`,
         });
-        console.log("[Drive Import] Details:", { total_folders_found, folder_names, skipped_details, conflicts });
       } else {
         toast({
-          title: `Imported ${created} project${created !== 1 ? "s" : ""} from Drive`,
-          description: `${total_folders_found} folders found, ${skipped} skipped.${conflicts.length > 0 ? ` ${conflicts.length} conflict(s): ${conflicts[0]}` : ""}`,
+          title: `${totalLinked} folder${totalLinked !== 1 ? "s" : ""} matched, ${skipped} skipped`,
+          description: `${total_folders_found} total folders scanned.${conflicts.length > 0 ? ` ${conflicts.length} conflict(s): ${conflicts[0]}` : ""}`,
         });
-        console.log("[Drive Import] Details:", { total_folders_found, folder_names, skipped_details, conflicts });
         load();
       }
     } catch (err: any) {
