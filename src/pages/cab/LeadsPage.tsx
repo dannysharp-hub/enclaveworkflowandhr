@@ -172,11 +172,15 @@ export default function LeadsPage() {
           <Button variant="secondary" onClick={async () => {
             if (!companyId) return;
             try {
+              const { data: customers } = await (supabase.from("cab_customers") as any)
+                .select("id").eq("company_id", companyId).limit(1);
+              const custId = customers?.[0]?.id;
+              if (!custId) { toast({ title: "Error", description: "No customers found — create one first", variant: "destructive" }); return; }
               const { error } = await (supabase.from("cab_jobs") as any).insert({
                 company_id: companyId,
                 job_ref: "060_test",
                 job_title: "Test Job",
-                customer_id: companyId,
+                customer_id: custId,
                 status: "lead",
                 current_stage_key: "lead_captured",
                 production_stage_key: "lead",
