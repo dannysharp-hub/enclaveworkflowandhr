@@ -56,12 +56,12 @@ function shortenInvoiceNumber(invoiceNumber: string, jobRef: string): string {
   return invoiceSegment;
 }
 
-export async function buildInvoiceEmailHtml(params: InvoiceEmailParams): Promise<string> {
+export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   const { invoiceNumber, customerName, customerFirstName, jobRef, jobTitle, milestone, amount, paymentReference } = params;
   const labels = MILESTONE_LABELS[milestone];
   const lineDescription = `${labels.description} — ${jobTitle}`;
   const shortInvoiceNumber = shortenInvoiceNumber(invoiceNumber, jobRef);
-  const logoUrl = await getInlineLogoPngDataUrl();
+  const logoUrl = LOGO_URL;
 
   return `<!DOCTYPE html>
 <html>
