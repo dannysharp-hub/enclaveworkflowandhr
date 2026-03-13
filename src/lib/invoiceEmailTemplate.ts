@@ -3,40 +3,8 @@
  * Used for deposit, pre-install, and final invoice emails.
  */
 
-const LOGO_PNG_PUBLIC_PATH = "/ec-logo.png";
-const LOGO_URL_FALLBACK = "https://enclaveworkflowandhr.lovable.app/ec-logo.png";
-
-let logoPngDataUrlPromise: Promise<string> | null = null;
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result.startsWith("data:image/png;base64,")) {
-        reject(new Error("Logo conversion did not produce a PNG data URI"));
-        return;
-      }
-      resolve(result);
-    };
-    reader.onerror = () => reject(new Error("Failed to read logo PNG as base64"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function getInlineLogoPngDataUrl(): Promise<string> {
-  if (!logoPngDataUrlPromise) {
-    logoPngDataUrlPromise = fetch(LOGO_PNG_PUBLIC_PATH, { cache: "force-cache" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Failed to load logo PNG: ${response.status}`);
-        const blob = await response.blob();
-        return blobToDataUrl(blob);
-      })
-      .catch(() => LOGO_URL_FALLBACK);
-  }
-
-  return logoPngDataUrlPromise;
-}
+/** Absolute HTTPS URL — Gmail proxies external images reliably */
+const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/ec-logo.png";
 
 interface InvoiceEmailParams {
   invoiceNumber: string;
@@ -88,12 +56,12 @@ function shortenInvoiceNumber(invoiceNumber: string, jobRef: string): string {
   return invoiceSegment;
 }
 
-export async function buildInvoiceEmailHtml(params: InvoiceEmailParams): Promise<string> {
+export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   const { invoiceNumber, customerName, customerFirstName, jobRef, jobTitle, milestone, amount, paymentReference } = params;
   const labels = MILESTONE_LABELS[milestone];
   const lineDescription = `${labels.description} — ${jobTitle}`;
   const shortInvoiceNumber = shortenInvoiceNumber(invoiceNumber, jobRef);
-  const logoUrl = await getInlineLogoPngDataUrl();
+  const logoUrl = LOGO_URL;
 
   return `<!DOCTYPE html>
 <html>
