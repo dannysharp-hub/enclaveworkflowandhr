@@ -102,6 +102,8 @@ const AppRoutes = () => (
     <Route path="/enquiry" element={<EnquiryPage />} />
     <Route path="/accept-quote" element={<AcceptQuotePage />} />
     <Route path="/sign-off" element={<PublicSignOffPage />} />
+    <Route path="/request-install-dates" element={<RequestInstallDatesPage />} />
+    <Route path="/confirm-install-date" element={<ConfirmInstallDatePage />} />
     {/* Client Portal routes (legacy) */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
