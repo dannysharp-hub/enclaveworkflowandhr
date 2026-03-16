@@ -74,6 +74,8 @@ import ProfitWatchPage from "./pages/cab/ProfitWatchPage";
 import TestCleanupPage from "./pages/cab/TestCleanupPage";
 import AcceptQuotePage from "./pages/AcceptQuotePage";
 import PublicSignOffPage from "./pages/cab/PublicSignOffPage";
+import RequestInstallDatesPage from "./pages/cab/RequestInstallDatesPage";
+import ConfirmInstallDatePage from "./pages/cab/ConfirmInstallDatePage";
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
 const queryClient = new QueryClient();
