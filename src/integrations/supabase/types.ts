@@ -1501,6 +1501,11 @@ export type Database = {
           id: string
           install_assigned_to: string | null
           install_completed_at: string | null
+          install_date: string | null
+          install_date_option_1: string | null
+          install_date_option_2: string | null
+          install_date_option_3: string | null
+          install_date_token: string | null
           install_window_end: string | null
           install_window_start: string | null
           job_ref: string
@@ -1558,6 +1563,11 @@ export type Database = {
           id?: string
           install_assigned_to?: string | null
           install_completed_at?: string | null
+          install_date?: string | null
+          install_date_option_1?: string | null
+          install_date_option_2?: string | null
+          install_date_option_3?: string | null
+          install_date_token?: string | null
           install_window_end?: string | null
           install_window_start?: string | null
           job_ref: string
@@ -1615,6 +1625,11 @@ export type Database = {
           id?: string
           install_assigned_to?: string | null
           install_completed_at?: string | null
+          install_date?: string | null
+          install_date_option_1?: string | null
+          install_date_option_2?: string | null
+          install_date_option_3?: string | null
+          install_date_token?: string | null
           install_window_end?: string | null
           install_window_start?: string | null
           job_ref?: string
