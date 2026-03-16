@@ -74,6 +74,8 @@ import ProfitWatchPage from "./pages/cab/ProfitWatchPage";
 import TestCleanupPage from "./pages/cab/TestCleanupPage";
 import AcceptQuotePage from "./pages/AcceptQuotePage";
 import PublicSignOffPage from "./pages/cab/PublicSignOffPage";
+import RequestInstallDatesPage from "./pages/cab/RequestInstallDatesPage";
+import ConfirmInstallDatePage from "./pages/cab/ConfirmInstallDatePage";
 import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
 
 const queryClient = new QueryClient();
@@ -100,6 +102,8 @@ const AppRoutes = () => (
     <Route path="/enquiry" element={<EnquiryPage />} />
     <Route path="/accept-quote" element={<AcceptQuotePage />} />
     <Route path="/sign-off" element={<PublicSignOffPage />} />
+    <Route path="/request-install-dates" element={<RequestInstallDatesPage />} />
+    <Route path="/confirm-install-date" element={<ConfirmInstallDatePage />} />
     {/* Client Portal routes (legacy) */}
     <Route path="/portal/login" element={<ClientPortalLoginPage />} />
     <Route path="/portal/dashboard" element={<ClientPortalDashboardPage />} />
