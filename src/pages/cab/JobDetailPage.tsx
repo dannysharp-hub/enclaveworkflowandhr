@@ -731,11 +731,12 @@ export default function JobDetailPage() {
                 <h4 className="text-xs font-bold text-foreground flex items-center gap-1">
                   <CalendarDays size={12} /> Install Date Booking
                 </h4>
-                {job.install_date ? (
+                {job.install_date && (
                   <p className="text-xs text-emerald-600 font-medium">
                     ✔ Install confirmed: {format(new Date(job.install_date + "T00:00:00"), "EEEE, d MMMM yyyy")}
                   </p>
-                ) : job.install_date_option_1 ? (
+                )}
+                {!job.install_date && job.install_date_option_1 && (
                   <div className="space-y-1">
                     <p className="text-xs text-amber-600 font-medium">⏳ Customer submitted dates – awaiting confirmation</p>
                     <div className="text-[10px] text-muted-foreground space-y-0.5">
@@ -744,25 +745,23 @@ export default function JobDetailPage() {
                       <p>3rd: {job.install_date_option_3}</p>
                     </div>
                   </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs"
-                    disabled={emitting === "install_dates"}
-                    onClick={async () => {
-                      setEmitting("install_dates");
-                      try {
-                        // Generate token
-                        const installToken = crypto.randomUUID();
-                        await (supabase.from("cab_jobs") as any).update({
-                          install_date_token: installToken,
-                        }).eq("id", job.id);
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  disabled={emitting === "install_dates"}
+                  onClick={async () => {
+                    setEmitting("install_dates");
+                    try {
+                      const installToken = crypto.randomUUID();
+                      await (supabase.from("cab_jobs") as any).update({
+                        install_date_token: installToken,
+                      }).eq("id", job.id);
 
-                        // Send email to customer
-                        const pageUrl = `${window.location.origin}/request-install-dates?job_ref=${encodeURIComponent(job.job_ref)}&token=${encodeURIComponent(installToken)}`;
+                      const pageUrl = `${window.location.origin}/request-install-dates?job_ref=${encodeURIComponent(job.job_ref)}&token=${encodeURIComponent(installToken)}`;
 
-                        const html = `
+                      const html = `
 <!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f4f4f4;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
@@ -787,37 +786,36 @@ export default function JobDetailPage() {
 </table>
 </td></tr></table></body></html>`;
 
-                        if (customer?.email) {
-                          await supabase.functions.invoke("send-email", {
-                            body: {
-                              to: customer.email,
-                              subject: `Choose Your Install Dates – ${job.job_ref}`,
-                              html,
-                              replyTo: "danny@enclavecabinetry.com",
-                            },
-                          });
-                        }
-
-                        await insertCabEvent({
-                          companyId: companyId!,
-                          eventType: "install.dates_requested",
-                          jobId: job.id,
-                          payload: { token: installToken },
+                      if (customer?.email) {
+                        await supabase.functions.invoke("send-email", {
+                          body: {
+                            to: customer.email,
+                            subject: `Choose Your Install Dates – ${job.job_ref}`,
+                            html,
+                            replyTo: "danny@enclavecabinetry.com",
+                          },
                         });
-
-                        toast({ title: "Install date request sent to customer" });
-                        load();
-                      } catch (err: any) {
-                        toast({ title: "Error", description: err.message, variant: "destructive" });
-                      } finally {
-                        setEmitting(null);
                       }
-                    }}
-                  >
-                    <Send size={12} />
-                    {emitting === "install_dates" ? "Sending…" : "Request Install Dates"}
-                  </Button>
-                )}
+
+                      await insertCabEvent({
+                        companyId: companyId!,
+                        eventType: "install.dates_requested",
+                        jobId: job.id,
+                        payload: { token: installToken },
+                      });
+
+                      toast({ title: "Install date request sent to customer" });
+                      load();
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                    } finally {
+                      setEmitting(null);
+                    }
+                  }}
+                >
+                  <Send size={12} />
+                  {emitting === "install_dates" ? "Sending…" : "Request Install Dates"}
+                </Button>
               </div>
 
               {/* Assign Installer */}
