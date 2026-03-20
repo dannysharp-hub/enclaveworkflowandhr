@@ -957,6 +957,85 @@ export default function JobDetailPage() {
             );
           })()}
 
+          {/* Install Date Booking */}
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <CalendarDays size={14} className="text-primary" /> Install Date Booking
+            </h3>
+            {job.install_date && (
+              <p className="text-xs text-green-700 font-medium">
+                ✔ Install confirmed: {new Date(job.install_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            )}
+            {!job.install_date && job.install_date_option_1 && (
+              <p className="text-xs text-amber-700 font-medium">⏳ Customer submitted dates – awaiting confirmation</p>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={emitting === "install_dates"}
+              className="text-xs"
+              onClick={async () => {
+                if (!customer?.email) {
+                  toast({ title: "No customer email", description: "Add an email to the customer record first.", variant: "destructive" });
+                  return;
+                }
+                setEmitting("install_dates");
+                try {
+                  const installToken = crypto.randomUUID();
+                  await (supabase.from("cab_jobs") as any).update({ install_date_token: installToken, updated_at: new Date().toISOString() }).eq("id", job.id);
+
+                  const publicUrl = `${window.location.origin}/request-install-dates?job_ref=${encodeURIComponent(job.job_ref)}&token=${encodeURIComponent(installToken)}`;
+
+                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;">
+<tr><td style="background:#1a1a2e;padding:24px;text-align:center;"><img src="https://enclaveworkflowandhr.lovable.app/ec-logo.png" alt="Enclave Cabinetry" height="40" style="height:40px;"/></td></tr>
+<tr><td style="padding:32px;">
+<h1 style="color:#1a1a2e;font-size:22px;margin:0 0 16px;">Choose Your Install Dates</h1>
+<p style="color:#333;font-size:15px;line-height:1.6;">Hi ${customer.first_name},</p>
+<p style="color:#333;font-size:15px;line-height:1.6;">Great news – your cabinetry for <strong>${job.job_ref}</strong> (${job.job_title}) is ready for installation!</p>
+<p style="color:#333;font-size:15px;line-height:1.6;">Please click below to choose 3 preferred install dates:</p>
+<div style="text-align:center;margin:24px 0;">
+<a href="${publicUrl}" style="display:inline-block;background:#16a34a;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;">Choose Install Dates</a>
+</div>
+<p style="color:#666;font-size:13px;">Or copy this link: ${publicUrl}</p>
+<p style="color:#333;font-size:15px;line-height:1.6;">Questions? Call us on <strong>07944 608098</strong>.</p>
+<p style="color:#333;font-size:15px;">Kind regards,<br/><strong>The Enclave Cabinetry Team</strong></p>
+</td></tr>
+<tr><td style="background:#f9fafb;padding:16px;text-align:center;"><p style="color:#999;font-size:12px;margin:0;">Enclave Cabinetry | 07944 608098</p></td></tr>
+</table></td></tr></table></body></html>`;
+
+                  await supabase.functions.invoke("send-email", {
+                    body: { to: customer.email, subject: `Choose Your Install Dates – ${job.job_ref}`, html },
+                  });
+
+                  await (supabase.from("cab_events") as any).insert({
+                    company_id: job.company_id,
+                    event_type: "install.dates_requested",
+                    job_id: job.id,
+                    payload_json: { token: installToken },
+                    status: "pending",
+                  });
+
+                  toast({ title: "Install date request sent", description: `Email sent to ${customer.email}` });
+                  fetchJob();
+                } catch (err: any) {
+                  toast({ title: "Error", description: err.message, variant: "destructive" });
+                } finally {
+                  setEmitting(null);
+                }
+              }}
+            >
+              <Send size={12} />
+              {emitting === "install_dates" ? "Sending…" : "Request Install Dates"}
+            </Button>
+            <p className="text-[10px] text-muted-foreground">
+              Emails the customer a link to choose 3 preferred install dates.
+            </p>
+          </div>
+
 
           {/* Quotes */}
           {quotes.length > 0 && (
