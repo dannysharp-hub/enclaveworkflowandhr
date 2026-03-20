@@ -1020,7 +1020,7 @@ export default function JobDetailPage() {
                   });
 
                   toast({ title: "Install date request sent", description: `Email sent to ${customer.email}` });
-                  fetchJob();
+                  load();
                 } catch (err: any) {
                   toast({ title: "Error", description: err.message, variant: "destructive" });
                 } finally {
