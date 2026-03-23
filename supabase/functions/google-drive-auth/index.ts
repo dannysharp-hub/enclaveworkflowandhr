@@ -2566,3 +2566,23 @@ function mapColumnsInline(headers: string[]): Record<string, number> {
   }
   return map;
 }
+
+// Extract raw Google Drive folder/file ID from a URL or return as-is
+function extractDriveFolderId(input: string): string {
+  if (!input) return input;
+  const trimmed = input.trim();
+  // If it looks like a URL, extract the ID
+  if (trimmed.startsWith("http")) {
+    // Handle https://drive.google.com/drive/folders/FOLDER_ID or /file/d/FILE_ID/...
+    const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if (folderMatch) return folderMatch[1];
+    const fileMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileMatch) return fileMatch[1];
+    // Fallback: take everything after the last /
+    const parts = trimmed.split("/").filter(Boolean);
+    const last = parts[parts.length - 1];
+    // Strip query params
+    return last.split("?")[0];
+  }
+  return trimmed;
+}
