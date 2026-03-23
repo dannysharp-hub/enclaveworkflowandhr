@@ -619,11 +619,8 @@ export default function JobDetailPage() {
                   <CalendarPlus size={14} /> {emitting === "appointment_request" ? "Requesting…" : "Request Appointment"}
                 </Button>
               )}
+              <RfqGenerator companyId={companyId!} job={job} onRefresh={load} />
               <Button
-                size="sm"
-                variant="outline"
-                disabled={ghlSyncing}
-                onClick={async () => {
                   setGhlSyncing(true);
                   try {
                     const res = await supabase.functions.invoke("ghl-worker", {
