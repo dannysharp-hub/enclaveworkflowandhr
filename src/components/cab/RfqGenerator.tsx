@@ -199,7 +199,7 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
         const parsed = Papa.parse(dlData.content.trim(), { header: true, skipEmptyLines: true });
         parsedData = parsed.data as Record<string, string>[];
       }
-      const rows: BomRow[] = parsed.data.map((row: any) => {
+      const rows: BomRow[] = parsedData.map((row: any) => {
         const get = (keys: string[]) => {
           for (const k of keys) {
             const val = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
