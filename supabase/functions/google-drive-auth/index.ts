@@ -1,4 +1,4 @@
-// Force redeploy v6 - 2026-03-23 - XLSX binary download support
+// Force redeploy v7 - 2026-03-23 - recursive subfolder search for list_job_folder_files
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
