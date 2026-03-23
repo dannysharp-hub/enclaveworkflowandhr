@@ -1,4 +1,4 @@
-// Force redeploy v2 - 2026-03-12
+// Force redeploy v3 - 2026-03-23 - improved error logging
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -2382,35 +2382,57 @@ Deno.serve(async (req) => {
 
       // Get the linked Drive folder for this job (try cab_job_files first, then job_drive_links)
       let driveFolderId: string | null = null;
-      const { data: cabFile } = await supabaseAdmin
+      let lookupSource = "none";
+      const { data: cabFile, error: cabFileErr } = await supabaseAdmin
         .from("cab_job_files")
         .select("url")
         .eq("job_id", jobId)
         .eq("file_type", "drive_folder")
         .maybeSingle();
+      
+      console.log(`[list_job_folder_files] job_id=${jobId}, cab_job_files result:`, JSON.stringify({ cabFile, cabFileErr }));
+      
       if (cabFile?.url) {
         driveFolderId = cabFile.url;
+        lookupSource = "cab_job_files";
       } else {
-        const { data: driveLink } = await supabaseAdmin
+        const { data: driveLink, error: driveLinkErr } = await supabaseAdmin
           .from("job_drive_links")
           .select("drive_folder_id")
           .eq("job_id", jobId)
           .maybeSingle();
-        if (driveLink) driveFolderId = driveLink.drive_folder_id;
+        console.log(`[list_job_folder_files] job_drive_links result:`, JSON.stringify({ driveLink, driveLinkErr }));
+        if (driveLink) {
+          driveFolderId = driveLink.drive_folder_id;
+          lookupSource = "job_drive_links";
+        }
       }
 
+      console.log(`[list_job_folder_files] resolved driveFolderId="${driveFolderId}", source=${lookupSource}`);
+
       if (!driveFolderId || driveFolderId.trim() === "" || driveFolderId.trim() === ".") {
-        return new Response(JSON.stringify({ error: "No Drive folder linked to this job. Please link a Drive folder first." }), {
+        return new Response(JSON.stringify({ 
+          error: "No Drive folder linked to this job. Please link a Drive folder first.",
+          debug: { job_id: jobId, lookup_source: lookupSource, raw_folder_id: driveFolderId }
+        }), {
           status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const accessToken = await getAccessToken();
       const query = `'${driveFolderId}' in parents and trashed=false`;
-      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await res.json();
-      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message}`);
+      if (!res.ok) {
+        console.error(`[list_job_folder_files] Drive API error for folder ${driveFolderId}:`, JSON.stringify(data));
+        return new Response(JSON.stringify({ 
+          error: `Drive API error: ${data.error?.message || "Unknown"}`,
+          debug: { folder_id: driveFolderId, status: res.status, drive_error: data.error }
+        }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       return new Response(JSON.stringify({ files: data.files || [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
