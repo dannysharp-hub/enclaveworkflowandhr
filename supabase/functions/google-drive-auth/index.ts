@@ -1,4 +1,4 @@
-// Force redeploy v5 - 2026-03-23 - extractDriveFolderId fix
+// Force redeploy v6 - 2026-03-23 - XLSX binary download support
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
