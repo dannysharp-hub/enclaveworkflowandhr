@@ -162,13 +162,18 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
       }
 
       const files = filesData?.files || [];
-      const bomFile = files.find((f: any) =>
-        f.name.toUpperCase().includes("BOM") &&
-        (f.name.toLowerCase().endsWith(".csv") || f.mimeType === "application/vnd.google-apps.spreadsheet" || f.mimeType === "text/csv")
-      );
+      const bomFile = files.find((f: any) => {
+        const name = (f.name || "").toUpperCase();
+        const hasBom = name.includes("BOM");
+        const isValidType = name.endsWith(".CSV") || name.endsWith(".XLSX") ||
+          f.mimeType === "application/vnd.google-apps.spreadsheet" ||
+          f.mimeType === "text/csv" ||
+          f.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return hasBom && isValidType;
+      });
 
       if (!bomFile) {
-        toast({ title: "No BOM file found", description: "Upload a CSV file containing 'BOM' in the filename to the job's Drive folder.", variant: "destructive" });
+        toast({ title: "No BOM file found", description: "Upload a CSV or XLSX file containing 'BOM' in the filename to the job's Drive folder.", variant: "destructive" });
         setLoading(false);
         setOpen(false);
         return;
