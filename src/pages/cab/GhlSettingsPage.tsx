@@ -51,6 +51,7 @@ export default function GhlSettingsPage() {
   const [testingOpp, setTestingOpp] = useState(false);
   const [testOppResult, setTestOppResult] = useState<any>(null);
   const [ghlLocationId, setGhlLocationId] = useState("");
+  const [reconnectingDrive, setReconnectingDrive] = useState(false);
 
   // Site visit fields
   const [siteVisitCalendarId, setSiteVisitCalendarId] = useState("");
