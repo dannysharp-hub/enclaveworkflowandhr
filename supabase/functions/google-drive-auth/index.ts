@@ -1194,6 +1194,83 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── SEARCH FOLDER BY EXACT NAME INSIDE _JOBS ───
+    if (action === "search_folder_by_name") {
+      const folderName = body.folder_name as string;
+      const jobId = body.job_id as string;
+      if (!folderName || !jobId) {
+        return new Response(JSON.stringify({ error: "folder_name and job_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Find _Jobs folder first
+      const { data: settings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("is_connected, projects_root_folder_id")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!settings?.is_connected || !settings.projects_root_folder_id) {
+        return new Response(JSON.stringify({ error: "Drive not connected or no root folder set" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const rootId = settings.projects_root_folder_id;
+
+      // Find _Jobs folder
+      const jobsFolderQuery = `'${rootId}' in parents and name='_Jobs' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const jobsFolderUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(jobsFolderQuery)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`;
+      const jobsFolderRes = await fetch(jobsFolderUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const jobsFolderData = await jobsFolderRes.json();
+      if (!jobsFolderRes.ok) throw new Error(`Drive API error: ${jobsFolderData.error?.message}`);
+
+      const jobsFolder = jobsFolderData.files?.[0];
+      if (!jobsFolder) {
+        return new Response(JSON.stringify({ error: "No '_Jobs' folder found" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Search for the exact folder name inside _Jobs
+      const searchQuery = `'${jobsFolder.id}' in parents and name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name,webViewLink)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`;
+      const searchRes = await fetch(searchUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const searchData = await searchRes.json();
+      if (!searchRes.ok) throw new Error(`Drive API error: ${searchData.error?.message}`);
+
+      const folder = searchData.files?.[0];
+      if (!folder) {
+        return new Response(JSON.stringify({ error: `No folder named '${folderName}' found in _Jobs` }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Upsert job_drive_links
+      await supabaseAdmin.from("job_drive_links").upsert({
+        tenant_id: tenantId,
+        job_id: jobId,
+        drive_folder_id: folder.id,
+        drive_folder_name: folder.name,
+        drive_folder_url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
+      }, { onConflict: "tenant_id,job_id" });
+
+      // Log
+      await supabaseAdmin.from("drive_audit_log").insert({
+        tenant_id: tenantId,
+        actor_staff_id: user.id,
+        action: "manual_link_folder",
+        drive_folder_id: folder.id,
+        payload_after_json: { folder_name: folder.name, job_id: jobId },
+      });
+
+      return new Response(JSON.stringify({ success: true, folder_name: folder.name, folder_id: folder.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ─── CREATE JOB FOLDER ───
     if (action === "create_job_folder") {
       const jobId = body.job_id as string;
