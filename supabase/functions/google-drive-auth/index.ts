@@ -2419,8 +2419,8 @@ Deno.serve(async (req) => {
 
     // ─── DOWNLOAD FILE CONTENT (text) ───
     if (action === "download_file_content") {
-      const fileId = body.file_id as string;
-      if (!fileId) {
+      const fileId = (body.file_id as string || "").trim();
+      if (!fileId || fileId === ".") {
         return new Response(JSON.stringify({ error: "file_id required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
