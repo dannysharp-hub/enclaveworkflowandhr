@@ -15,6 +15,7 @@ import DriveQuoteAttach from "@/components/DriveQuoteAttach";
 import CompletionPhotos from "@/components/cab/CompletionPhotos";
 import QuoteBuilder from "@/components/QuoteBuilder";
 import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
+import RfqGenerator from "@/components/cab/RfqGenerator";
 import JobProfitabilityTab from "@/components/cab/JobProfitabilityTab";
 import StagePipeline from "@/components/cab/StagePipeline";
 import NextActionsPanel from "@/components/cab/NextActionsPanel";
