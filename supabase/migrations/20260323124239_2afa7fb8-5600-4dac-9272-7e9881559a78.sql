@@ -1,0 +1,1 @@
+ALTER TABLE public.cab_suppliers ADD COLUMN IF NOT EXISTS supplier_type text DEFAULT NULL;
