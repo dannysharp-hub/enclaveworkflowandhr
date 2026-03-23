@@ -257,6 +257,45 @@ export default function GhlSettingsPage() {
         </Button>
       </div>
 
+      {/* Reconnect Google Drive */}
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+        <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+          <HardDrive size={14} className="text-destructive" /> Google Drive Token
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          If Drive cannot see recently created folders, the OAuth token may need reauthorising. This will open a Google consent screen to issue a fresh token with full Drive access.
+        </p>
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={reconnectingDrive}
+          onClick={async () => {
+            setReconnectingDrive(true);
+            try {
+              const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+                body: {
+                  action: "initiate",
+                  redirect_uri: window.location.origin + "/settings/google-drive",
+                  force_reauth: true,
+                },
+              });
+              if (error) throw error;
+              if (data?.url) {
+                window.location.href = data.url;
+              } else {
+                throw new Error("No OAuth URL returned");
+              }
+            } catch (err: any) {
+              toast({ title: "Failed to start reauth", description: err.message, variant: "destructive" });
+              setReconnectingDrive(false);
+            }
+          }}
+        >
+          <RefreshCw size={12} />
+          {reconnectingDrive ? "Redirecting…" : "Reconnect Google Drive"}
+        </Button>
+      </div>
+
       {/* Site Visit Calendar */}
       <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
         <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
