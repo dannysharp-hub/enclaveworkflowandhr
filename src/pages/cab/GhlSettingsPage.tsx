@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Zap, Send, RefreshCw, CalendarDays, Info, Copy, Globe } from "lucide-react";
+import { CheckCircle2, XCircle, Zap, Send, RefreshCw, CalendarDays, Info, Copy, Globe, HardDrive } from "lucide-react";
 
 const STAGE_KEYS = [
   "lead_captured",
@@ -51,6 +51,7 @@ export default function GhlSettingsPage() {
   const [testingOpp, setTestingOpp] = useState(false);
   const [testOppResult, setTestOppResult] = useState<any>(null);
   const [ghlLocationId, setGhlLocationId] = useState("");
+  const [reconnectingDrive, setReconnectingDrive] = useState(false);
 
   // Site visit fields
   const [siteVisitCalendarId, setSiteVisitCalendarId] = useState("");
@@ -253,6 +254,44 @@ export default function GhlSettingsPage() {
         >
           <Send size={12} />
           {testingWebhook ? "Sending…" : "Send Test Webhook"}
+        </Button>
+      </div>
+
+      {/* Reconnect Google Drive */}
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+        <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+          <HardDrive size={14} className="text-destructive" /> Google Drive Token
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          If Drive cannot see recently created folders, the OAuth token may need reauthorising. This will open a Google consent screen to issue a fresh token with full Drive access.
+        </p>
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={reconnectingDrive}
+          onClick={async () => {
+            setReconnectingDrive(true);
+            try {
+              const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
+                body: {
+                  action: "initiate",
+                  redirect_uri: "https://enclaveworkflowandhr.lovable.app/settings",
+                },
+              });
+              if (error) throw error;
+              if (data?.url) {
+                window.location.href = data.url;
+              } else {
+                throw new Error("No OAuth URL returned");
+              }
+            } catch (err: any) {
+              toast({ title: "Failed to start reauth", description: err.message, variant: "destructive" });
+              setReconnectingDrive(false);
+            }
+          }}
+        >
+          <RefreshCw size={12} />
+          {reconnectingDrive ? "Redirecting…" : "Reconnect Google Drive"}
         </Button>
       </div>
 
