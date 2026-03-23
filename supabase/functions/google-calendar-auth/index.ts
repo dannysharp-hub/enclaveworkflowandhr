@@ -24,6 +24,14 @@ const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
 ].join(" ");
 
+const DRIVE_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.metadata.readonly",
+].join(" ");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
