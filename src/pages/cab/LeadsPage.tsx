@@ -145,8 +145,9 @@ export default function LeadsPage() {
       const jobs = (dbJobs || []) as { id: string; job_ref: string }[];
       console.log(`[Drive Import] job_refs in DB (${jobs.length}):`, jobs.map(j => j.job_ref));
 
-      // Step 4: Match and link — simple case-insensitive equality
+      // Step 4: Match, create, or skip
       let matched = 0;
+      let created = 0;
       const skippedDetails: { folder: string; reason: string }[] = [];
       const conflicts: string[] = [];
 
@@ -157,41 +158,98 @@ export default function LeadsPage() {
           continue;
         }
 
+        const numMatch = folderName.match(/^(\d+)/);
+        const numPrefix = numMatch ? parseInt(numMatch[1], 10) : null;
+
         const match = jobs.find(j => j.job_ref.toLowerCase() === folderName.toLowerCase());
-        console.log(`[Drive Import] "${folderName.toLowerCase()}" === job_ref? ${match ? match.job_ref : "NO MATCH"}`);
 
-        if (!match) {
-          skippedDetails.push({ folder: folder.name, reason: `no_matching_job` });
+        if (match) {
+          const { error: linkErr } = await (supabase.from("cab_job_files") as any).insert({
+            company_id: companyId,
+            job_id: match.id,
+            url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
+            file_type: "drive_folder",
+          });
+          if (linkErr) {
+            conflicts.push(`Failed to link "${folder.name}": ${linkErr.message}`);
+            continue;
+          }
+          matched++;
           continue;
         }
 
-        // Insert link
-        const { error: linkErr } = await (supabase.from("cab_job_files") as any).insert({
-          company_id: companyId,
-          job_id: match.id,
-          url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
-          file_type: "drive_folder",
-        });
-
-        if (linkErr) {
-          conflicts.push(`Failed to link "${folder.name}": ${linkErr.message}`);
+        // No match — auto-create if numeric prefix >= 046
+        if (numPrefix === null || numPrefix < 46) {
+          skippedDetails.push({ folder: folder.name, reason: numPrefix === null ? "no_numeric_prefix" : `prefix_${numPrefix}_below_046` });
           continue;
         }
-        matched++;
-        console.log(`[Drive Import] Matched "${folder.name}" → ${match.job_ref} (${match.id})`);
+
+        const underscoreIdx = folderName.indexOf("_");
+        const rawDisplayName = underscoreIdx >= 0 ? folderName.slice(underscoreIdx + 1) : folderName;
+        const jobTitle = rawDisplayName
+          .replace(/([a-z])([A-Z])/g, "$1 $2")
+          .replace(/_/g, " ")
+          .trim();
+
+        try {
+          // Look up or create customer
+          const { data: existingCust } = await (supabase.from("cab_customers") as any)
+            .select("id")
+            .eq("company_id", companyId)
+            .ilike("first_name", jobTitle)
+            .limit(1)
+            .maybeSingle();
+
+          let customerId: string;
+          if (existingCust?.id) {
+            customerId = existingCust.id;
+          } else {
+            const { data: newCust, error: custErr } = await (supabase.from("cab_customers") as any)
+              .insert({ company_id: companyId, first_name: jobTitle, last_name: "" })
+              .select("id")
+              .single();
+            if (custErr) throw custErr;
+            customerId = newCust.id;
+          }
+
+          const { data: newJob, error: jobErr } = await (supabase.from("cab_jobs") as any)
+            .insert({
+              company_id: companyId,
+              job_ref: folderName,
+              job_title: jobTitle,
+              current_stage_key: "lead",
+              customer_id: customerId,
+              status: "lead",
+            })
+            .select("id")
+            .single();
+          if (jobErr) throw jobErr;
+
+          await (supabase.from("cab_job_files") as any).insert({
+            company_id: companyId,
+            job_id: newJob.id,
+            url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
+            file_type: "drive_folder",
+          });
+
+          created++;
+          console.log(`[Drive Import] Created job "${folderName}" → ${newJob.id}`);
+        } catch (createErr: any) {
+          conflicts.push(`Failed to create "${folder.name}": ${createErr.message}`);
+        }
       }
 
-      console.log(`[Drive Import] Summary: ${matched} matched, ${skippedDetails.length} skipped`);
+      console.log(`[Drive Import] Summary: ${matched} linked, ${created} created, ${skippedDetails.length} skipped`);
 
-      if (matched === 0 && conflicts.length === 0) {
+      if (matched === 0 && created === 0 && conflicts.length === 0) {
         const skipReasons = skippedDetails.slice(0, 10).map((s) => `• ${s.folder}: ${s.reason}`).join("\n");
         toast({
-          title: "No folders matched",
+          title: "No folders matched or created",
           description: `Found ${allFolders.length} folder(s) in _Jobs. ${skippedDetails.length} skipped:\n${skipReasons || "None"}`,
         });
       } else {
         toast({
-          title: `${matched} folder${matched !== 1 ? "s" : ""} matched, ${skippedDetails.length} skipped`,
+          title: `${matched} linked, ${created} created, ${skippedDetails.length} skipped`,
           description: `${allFolders.length} total folders scanned.${conflicts.length > 0 ? ` ${conflicts.length} conflict(s)` : ""}`,
         });
         load();
