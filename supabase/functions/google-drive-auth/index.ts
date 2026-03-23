@@ -1,4 +1,4 @@
-// Force redeploy v6 - 2026-03-23 - XLSX binary download support
+// Force redeploy v7 - 2026-03-23 - recursive subfolder search for list_job_folder_files
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -2423,21 +2423,39 @@ Deno.serve(async (req) => {
       }
 
       const accessToken = await getAccessToken();
-      const query = `'${driveFolderId}' in parents and trashed=false`;
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-      const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(`[list_job_folder_files] Drive API error for folder ${driveFolderId}:`, JSON.stringify(data));
+      
+      // Recursive listing to find files in subfolders
+      const allFiles: any[] = [];
+      async function listRecursive(folderId: string) {
+        const query = `'${folderId}' in parents and trashed=false`;
+        const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const data = await res.json();
+        if (!res.ok) {
+          console.error(`[list_job_folder_files] Drive API error for folder ${folderId}:`, JSON.stringify(data));
+          throw new Error(`Drive API error: ${data.error?.message || "Unknown"}`);
+        }
+        for (const file of (data.files || [])) {
+          if (file.mimeType === "application/vnd.google-apps.folder") {
+            await listRecursive(file.id);
+          } else {
+            allFiles.push(file);
+          }
+        }
+      }
+
+      try {
+        await listRecursive(driveFolderId);
+      } catch (e: any) {
         return new Response(JSON.stringify({ 
-          error: `Drive API error: ${data.error?.message || "Unknown"}`,
-          debug: { folder_id: driveFolderId, status: res.status, drive_error: data.error }
+          error: e.message,
+          debug: { folder_id: driveFolderId }
         }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      return new Response(JSON.stringify({ files: data.files || [] }), {
+      return new Response(JSON.stringify({ files: allFiles }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
