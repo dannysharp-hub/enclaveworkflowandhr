@@ -24,7 +24,10 @@ export async function deleteCabJob(jobId: string): Promise<void> {
   // 5. Delete buylist items
   await supabase.from("cab_buylist_items").delete().eq("job_id", jobId);
 
-  // 6. Delete the job itself
+  // 6. Delete job files (drive folder links, etc.)
+  await (supabase.from("cab_job_files") as any).delete().eq("job_id", jobId);
+
+  // 7. Delete the job itself
   const { error } = await supabase.from("cab_jobs").delete().eq("id", jobId);
   if (error) throw error;
 }
