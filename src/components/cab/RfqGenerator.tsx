@@ -201,32 +201,45 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
           parsedData = parsed.data as Record<string, string>[];
         }
 
+        // Log raw headers for debugging thickness/column issues
+        if (parsedData.length > 0) {
+          const rawHeaders = Object.keys(parsedData[0]);
+          console.log(`[RfqGenerator] Raw headers for ${bomFile.name}:`, rawHeaders);
+          console.log(`[RfqGenerator] First row sample:`, JSON.stringify(parsedData[0]));
+        }
+
         const fileRows: BomRow[] = parsedData.map((row: any) => {
+          // Normalize keys: trim whitespace from XLSX headers
+          const normRow: Record<string, any> = {};
+          for (const [k, v] of Object.entries(row)) {
+            normRow[k.trim()] = v;
+          }
           const get = (keys: string[]) => {
             for (const k of keys) {
-              const val = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
-              if (val !== undefined && val !== "") return val;
+              if (normRow[k] !== undefined && normRow[k] !== "") return normRow[k];
             }
+            const nKeys = Object.keys(normRow);
             for (const k of keys) {
-              const found = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
-              if (found && row[found] !== undefined && row[found] !== "") return row[found];
+              const found = nKeys.find(rk => rk.toLowerCase() === k.toLowerCase());
+              if (found && normRow[found] !== undefined && normRow[found] !== "") return normRow[found];
             }
             return "";
           };
           return {
-            part_number: get(["Part Number", "PartNumber", "Part_Number", "part_number", "Part No"]),
-            filename: get(["Filename", "File Name", "FileName", "filename", "Description", "Name", "Component"]),
-            material: get(["Material", "material", "Material_Text", "Mat"]),
-            grain: get(["Grain", "grain", "Grain Direction"]),
-            width: parseFloat(get(["Width", "width", "W"])) || 0,
-            length: parseFloat(get(["Length", "length", "L"])) || 0,
-            thickness: parseFloat(get(["Thickness", "thickness", "Thk"])) || 0,
-            qty: parseInt(get(["QTY", "Qty", "qty", "Quantity", "quantity"])) || 1,
-            structure: get(["BOM Structure", "Structure", "BOM_Structure", "bom_structure", "Type"]),
+            part_number: String(get(["Part Number", "PartNumber", "Part_Number", "part_number", "Part No"]) ?? ""),
+            filename: String(get(["Filename", "File Name", "FileName", "filename", "Description", "Name", "Component"]) ?? ""),
+            material: String(get(["Material", "material", "Material_Text", "Mat"]) ?? ""),
+            grain: String(get(["Grain", "grain", "Grain Direction"]) ?? ""),
+            width: parseFloat(String(get(["Width", "width", "W"]))) || 0,
+            length: parseFloat(String(get(["Length", "length", "L"]))) || 0,
+            thickness: parseFloat(String(get(["Thickness", "thickness", "Thk", "Thick"]))) || 0,
+            qty: parseInt(String(get(["QTY", "Qty", "qty", "Quantity", "quantity"]))) || 1,
+            structure: String(get(["BOM Structure", "Structure", "BOM_Structure", "bom_structure", "Type"]) ?? ""),
           };
         }).filter((r: BomRow) => r.filename || r.part_number);
         allRows.push(...fileRows);
-        console.log(`[RfqGenerator] Parsed ${fileRows.length} rows from ${bomFile.name}`);
+        console.log(`[RfqGenerator] Parsed ${fileRows.length} rows from ${bomFile.name}`,
+          `Sample thickness:`, fileRows.slice(0, 3).map(r => r.thickness));
       }
 
       // Aggregate: merge duplicate parts (same part_number + material + thickness) by summing qty
