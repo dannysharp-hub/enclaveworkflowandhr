@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, FileText, RefreshCw, Package, Paintbrush, Wrench } from "lucide-react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 const SHEET_W = 1220; // mm
 const SHEET_L = 2440; // mm
@@ -161,13 +162,18 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
       }
 
       const files = filesData?.files || [];
-      const bomFile = files.find((f: any) =>
-        f.name.toUpperCase().includes("BOM") &&
-        (f.name.toLowerCase().endsWith(".csv") || f.mimeType === "application/vnd.google-apps.spreadsheet" || f.mimeType === "text/csv")
-      );
+      const bomFile = files.find((f: any) => {
+        const name = (f.name || "").toUpperCase();
+        const hasBom = name.includes("BOM");
+        const isValidType = name.endsWith(".CSV") || name.endsWith(".XLSX") ||
+          f.mimeType === "application/vnd.google-apps.spreadsheet" ||
+          f.mimeType === "text/csv" ||
+          f.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return hasBom && isValidType;
+      });
 
       if (!bomFile) {
-        toast({ title: "No BOM file found", description: "Upload a CSV file containing 'BOM' in the filename to the job's Drive folder.", variant: "destructive" });
+        toast({ title: "No BOM file found", description: "Upload a CSV or XLSX file containing 'BOM' in the filename to the job's Drive folder.", variant: "destructive" });
         setLoading(false);
         setOpen(false);
         return;
@@ -179,9 +185,21 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
       if (dlErr) throw new Error(dlErr.message);
       if (dlData?.error) throw new Error(dlData.error);
 
-      const parsed = Papa.parse(dlData.content.trim(), { header: true, skipEmptyLines: true });
-
-      const rows: BomRow[] = parsed.data.map((row: any) => {
+      // Parse CSV or XLSX
+      let parsedData: Record<string, string>[];
+      if (dlData.format === "xlsx_base64") {
+        // Decode base64 to binary
+        const binaryStr = atob(dlData.content);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+        const workbook = XLSX.read(bytes, { type: "array" });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        parsedData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+      } else {
+        const parsed = Papa.parse(dlData.content.trim(), { header: true, skipEmptyLines: true });
+        parsedData = parsed.data as Record<string, string>[];
+      }
+      const rows: BomRow[] = parsedData.map((row: any) => {
         const get = (keys: string[]) => {
           for (const k of keys) {
             const val = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];

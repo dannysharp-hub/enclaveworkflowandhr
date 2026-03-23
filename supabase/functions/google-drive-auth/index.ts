@@ -1,4 +1,4 @@
-// Force redeploy v5 - 2026-03-23 - extractDriveFolderId fix
+// Force redeploy v6 - 2026-03-23 - XLSX binary download support
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -2459,12 +2459,30 @@ Deno.serve(async (req) => {
       const metaData = await metaRes.json();
       if (!metaRes.ok) throw new Error(`Drive API error: ${metaData.error?.message || "File not found"}`);
 
+      const isXlsx = metaData.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        (metaData.name || "").toLowerCase().endsWith(".xlsx");
+      const isGoogleSheet = metaData.mimeType === "application/vnd.google-apps.spreadsheet";
+
       let content: string;
-      if (metaData.mimeType === "application/vnd.google-apps.spreadsheet") {
+      let format: string = "csv";
+
+      if (isGoogleSheet) {
         const exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/csv`;
         const exportRes = await fetch(exportUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (!exportRes.ok) throw new Error("Failed to export Google Sheet as CSV");
         content = await exportRes.text();
+      } else if (isXlsx) {
+        // Download as binary and return base64
+        const dlUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
+        const dlRes = await fetch(dlUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!dlRes.ok) throw new Error("Failed to download XLSX file");
+        const buf = await dlRes.arrayBuffer();
+        // Convert to base64
+        const bytes = new Uint8Array(buf);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        content = btoa(binary);
+        format = "xlsx_base64";
       } else {
         const dlUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
         const dlRes = await fetch(dlUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
@@ -2472,7 +2490,7 @@ Deno.serve(async (req) => {
         content = await dlRes.text();
       }
 
-      return new Response(JSON.stringify({ content, file_name: metaData.name }), {
+      return new Response(JSON.stringify({ content, file_name: metaData.name, format }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
