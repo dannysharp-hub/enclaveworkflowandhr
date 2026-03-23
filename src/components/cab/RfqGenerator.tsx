@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, FileText, RefreshCw, Package, Paintbrush, Wrench } from "lucide-react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 const SHEET_W = 1220; // mm
 const SHEET_L = 2440; // mm
