@@ -1036,6 +1036,62 @@ export default function JobDetailPage() {
             </p>
           </div>
 
+          {/* Link Drive Folder */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+              <Link size={14} className="text-primary" /> Link Drive Folder
+            </h3>
+            {(() => {
+              const [driveFolderName, setDriveFolderName] = useState("");
+              const [linkingDrive, setLinkingDrive] = useState(false);
+              const [linkedFolder, setLinkedFolder] = useState<string | null>(null);
+
+              return (
+                <>
+                  {linkedFolder && (
+                    <p className="text-xs text-green-700 font-medium">✔ Linked to: {linkedFolder}</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={driveFolderName}
+                      onChange={e => setDriveFolderName(e.target.value)}
+                      placeholder="e.g. 059_SpacemakerDevelopments-SycamoreHouse"
+                      className="text-xs h-8 flex-1"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!driveFolderName.trim() || linkingDrive}
+                      className="text-xs h-8"
+                      onClick={async () => {
+                        setLinkingDrive(true);
+                        try {
+                          const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+                            body: { action: "search_folder_by_name", folder_name: driveFolderName.trim(), job_id: job.id },
+                          });
+                          if (error) throw error;
+                          if (data?.error) throw new Error(data.error);
+                          setLinkedFolder(data.folder_name);
+                          setDriveFolderName("");
+                          toast({ title: "Drive folder linked", description: `Linked to "${data.folder_name}"` });
+                        } catch (err: any) {
+                          toast({ title: "Link failed", description: err.message, variant: "destructive" });
+                        } finally {
+                          setLinkingDrive(false);
+                        }
+                      }}
+                    >
+                      {linkingDrive ? <RefreshCw size={12} className="animate-spin" /> : <Link size={12} />}
+                      Link
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Enter the exact Drive folder name from _Jobs to link it to this job.
+                  </p>
+                </>
+              );
+            })()}
+          </div>
 
           {/* Quotes */}
           {quotes.length > 0 && (
