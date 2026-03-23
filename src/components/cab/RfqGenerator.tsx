@@ -148,9 +148,17 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
       const { data: filesData, error: filesErr } = await supabase.functions.invoke("google-drive-auth", {
         body: { action: "list_job_folder_files", job_id: job.id },
       });
-      console.log("[RfqGenerator] list_job_folder_files response:", { filesData, filesErr });
-      if (filesErr) throw new Error(filesErr.message || JSON.stringify(filesErr));
-      if (filesData?.error) throw new Error(`${filesData.error}${filesData.debug ? ` | Debug: ${JSON.stringify(filesData.debug)}` : ""}`);
+      if (filesErr) {
+        let errBody: any = null;
+        try { errBody = await (filesErr as any).context?.json?.(); } catch (_) {}
+        if (!errBody) try { errBody = (filesErr as any).context; } catch (_) {}
+        console.log("[RfqGenerator] list_job_folder_files FULL ERROR:", { message: filesErr.message, errBody, filesData, filesErr });
+        throw new Error(filesErr.message + (errBody ? ` | ${JSON.stringify(errBody)}` : ""));
+      }
+      if (filesData?.error) {
+        console.log("[RfqGenerator] list_job_folder_files error in data:", filesData);
+        throw new Error(filesData.error);
+      }
 
       const files = filesData?.files || [];
       const bomFile = files.find((f: any) =>
