@@ -2429,9 +2429,10 @@ Deno.serve(async (req) => {
       const accessToken = await getAccessToken();
 
       // Check if it's a Google Sheets file — export as CSV
-      const metaUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name&supportsAllDrives=true`;
+      const metaUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=mimeType,name&supportsAllDrives=true`;
       const metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
       const metaData = await metaRes.json();
+      if (!metaRes.ok) throw new Error(`Drive API error: ${metaData.error?.message || "File not found"}`);
 
       let content: string;
       if (metaData.mimeType === "application/vnd.google-apps.spreadsheet") {
