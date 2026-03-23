@@ -162,7 +162,7 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
       }
 
       const files = filesData?.files || [];
-      const bomFile = files.find((f: any) => {
+      const bomFiles = files.filter((f: any) => {
         const name = (f.name || "").toUpperCase();
         const hasBom = name.includes("BOM");
         const isValidType = name.endsWith(".CSV") || name.endsWith(".XLSX") ||
@@ -172,57 +172,76 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
         return hasBom && isValidType;
       });
 
-      if (!bomFile) {
+      if (bomFiles.length === 0) {
         toast({ title: "No BOM file found", description: "Upload a CSV or XLSX file containing 'BOM' in the filename to the job's Drive folder.", variant: "destructive" });
         setLoading(false);
         setOpen(false);
         return;
       }
 
-      const { data: dlData, error: dlErr } = await supabase.functions.invoke("google-drive-auth", {
-        body: { action: "download_file_content", file_id: bomFile.id },
-      });
-      if (dlErr) throw new Error(dlErr.message);
-      if (dlData?.error) throw new Error(dlData.error);
+      // Download and parse ALL BOM files, then merge
+      const allRows: BomRow[] = [];
+      for (const bomFile of bomFiles) {
+        const { data: dlData, error: dlErr } = await supabase.functions.invoke("google-drive-auth", {
+          body: { action: "download_file_content", file_id: bomFile.id },
+        });
+        if (dlErr) { console.warn(`[RfqGenerator] Failed to download ${bomFile.name}:`, dlErr.message); continue; }
+        if (dlData?.error) { console.warn(`[RfqGenerator] Error in ${bomFile.name}:`, dlData.error); continue; }
 
-      // Parse CSV or XLSX
-      let parsedData: Record<string, string>[];
-      if (dlData.format === "xlsx_base64") {
-        // Decode base64 to binary
-        const binaryStr = atob(dlData.content);
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-        const workbook = XLSX.read(bytes, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        parsedData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
-      } else {
-        const parsed = Papa.parse(dlData.content.trim(), { header: true, skipEmptyLines: true });
-        parsedData = parsed.data as Record<string, string>[];
+        let parsedData: Record<string, string>[];
+        if (dlData.format === "xlsx_base64") {
+          const binaryStr = atob(dlData.content);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+          const workbook = XLSX.read(bytes, { type: "array" });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          parsedData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+        } else {
+          const parsed = Papa.parse(dlData.content.trim(), { header: true, skipEmptyLines: true });
+          parsedData = parsed.data as Record<string, string>[];
+        }
+
+        const fileRows: BomRow[] = parsedData.map((row: any) => {
+          const get = (keys: string[]) => {
+            for (const k of keys) {
+              const val = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
+              if (val !== undefined && val !== "") return val;
+            }
+            for (const k of keys) {
+              const found = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
+              if (found && row[found] !== undefined && row[found] !== "") return row[found];
+            }
+            return "";
+          };
+          return {
+            part_number: get(["Part Number", "PartNumber", "Part_Number", "part_number", "Part No"]),
+            filename: get(["Filename", "File Name", "FileName", "filename", "Description", "Name", "Component"]),
+            material: get(["Material", "material", "Material_Text", "Mat"]),
+            grain: get(["Grain", "grain", "Grain Direction"]),
+            width: parseFloat(get(["Width", "width", "W"])) || 0,
+            length: parseFloat(get(["Length", "length", "L"])) || 0,
+            thickness: parseFloat(get(["Thickness", "thickness", "Thk"])) || 0,
+            qty: parseInt(get(["QTY", "Qty", "qty", "Quantity", "quantity"])) || 1,
+            structure: get(["BOM Structure", "Structure", "BOM_Structure", "bom_structure", "Type"]),
+          };
+        }).filter((r: BomRow) => r.filename || r.part_number);
+        allRows.push(...fileRows);
+        console.log(`[RfqGenerator] Parsed ${fileRows.length} rows from ${bomFile.name}`);
       }
-      const rows: BomRow[] = parsedData.map((row: any) => {
-        const get = (keys: string[]) => {
-          for (const k of keys) {
-            const val = row[k] || row[k.toLowerCase()] || row[k.toUpperCase()];
-            if (val !== undefined && val !== "") return val;
-          }
-          for (const k of keys) {
-            const found = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
-            if (found && row[found] !== undefined && row[found] !== "") return row[found];
-          }
-          return "";
-        };
-        return {
-          part_number: get(["Part Number", "PartNumber", "Part_Number", "part_number", "Part No"]),
-          filename: get(["Filename", "File Name", "FileName", "filename", "Description", "Name", "Component"]),
-          material: get(["Material", "material", "Material_Text", "Mat"]),
-          grain: get(["Grain", "grain", "Grain Direction"]),
-          width: parseFloat(get(["Width", "width", "W"])) || 0,
-          length: parseFloat(get(["Length", "length", "L"])) || 0,
-          thickness: parseFloat(get(["Thickness", "thickness", "Thk"])) || 0,
-          qty: parseInt(get(["QTY", "Qty", "qty", "Quantity", "quantity"])) || 1,
-          structure: get(["BOM Structure", "Structure", "BOM_Structure", "bom_structure", "Type"]),
-        };
-      }).filter((r: BomRow) => r.filename || r.part_number);
+
+      // Aggregate: merge duplicate parts (same part_number + material + thickness) by summing qty
+      const mergeKey = (r: BomRow) => `${r.part_number}||${r.material}||${r.thickness}||${r.structure}`;
+      const merged = new Map<string, BomRow>();
+      for (const r of allRows) {
+        const key = mergeKey(r);
+        const existing = merged.get(key);
+        if (existing) {
+          existing.qty += r.qty;
+        } else {
+          merged.set(key, { ...r });
+        }
+      }
+      const rows: BomRow[] = Array.from(merged.values());
 
       const panelItems = rows.filter(r => r.structure === "Normal");
       const sprayItems = rows.filter(r => r.structure === "Normal" && r.material.toLowerCase().includes("finsa"));
