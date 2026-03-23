@@ -272,11 +272,10 @@ export default function GhlSettingsPage() {
           onClick={async () => {
             setReconnectingDrive(true);
             try {
-              const { data, error } = await supabase.functions.invoke("google-drive-auth", {
+              const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
                 body: {
                   action: "initiate",
-                  redirect_uri: window.location.origin + "/settings/google-drive",
-                  force_reauth: true,
+                  redirect_uri: "https://enclaveworkflowandhr.lovable.app/settings",
                 },
               });
               if (error) throw error;
