@@ -276,7 +276,7 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
         id: s.id, name: s.name, email: s.email || s.contact_email || "", supplier_type: s.supplier_type,
       })));
 
-      toast({ title: "BOM parsed", description: `${rows.length} parts found. ${cats.length} RFQ categories ready.` });
+      toast({ title: "BOM parsed", description: `${bomFiles.length} BOM file(s) merged → ${rows.length} unique parts. ${cats.length} RFQ categories ready.` });
     } catch (err: any) {
       toast({ title: "RFQ generation failed", description: err.message, variant: "destructive" });
       setOpen(false);
