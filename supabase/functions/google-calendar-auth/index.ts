@@ -164,6 +164,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── INITIATE DRIVE: OAuth with Drive scopes ───
+    if (action === "initiate_drive") {
+      const redirectUri = body.redirect_uri as string;
+      if (!redirectUri) {
+        return new Response(JSON.stringify({ error: "redirect_uri required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const state = btoa(JSON.stringify({ tenant_id: tenantId, include_drive: true }));
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: DRIVE_SCOPES,
+        access_type: "offline",
+        prompt: "consent",
+        state,
+        include_granted_scopes: "true",
+      });
+      const url = `${GOOGLE_AUTH_URL}?${params.toString()}`;
+
+      return new Response(JSON.stringify({ url }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ─── CALLBACK: exchange code for tokens ───
     if (action === "callback") {
       const code = body.code as string;
