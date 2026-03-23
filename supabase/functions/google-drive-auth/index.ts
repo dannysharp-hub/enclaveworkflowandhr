@@ -1,4 +1,4 @@
-// Force redeploy v3 - 2026-03-23 - improved error logging
+// Force redeploy v4 - 2026-03-23 - extract folder ID from URL
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
