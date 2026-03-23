@@ -2399,8 +2399,8 @@ Deno.serve(async (req) => {
         if (driveLink) driveFolderId = driveLink.drive_folder_id;
       }
 
-      if (!driveFolderId) {
-        return new Response(JSON.stringify({ error: "No Drive folder linked to this job" }), {
+      if (!driveFolderId || driveFolderId.trim() === "" || driveFolderId.trim() === ".") {
+        return new Response(JSON.stringify({ error: "No Drive folder linked to this job. Please link a Drive folder first." }), {
           status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -2419,8 +2419,8 @@ Deno.serve(async (req) => {
 
     // ─── DOWNLOAD FILE CONTENT (text) ───
     if (action === "download_file_content") {
-      const fileId = body.file_id as string;
-      if (!fileId) {
+      const fileId = (body.file_id as string || "").trim();
+      if (!fileId || fileId === ".") {
         return new Response(JSON.stringify({ error: "file_id required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -2429,9 +2429,10 @@ Deno.serve(async (req) => {
       const accessToken = await getAccessToken();
 
       // Check if it's a Google Sheets file — export as CSV
-      const metaUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name&supportsAllDrives=true`;
+      const metaUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=mimeType,name&supportsAllDrives=true`;
       const metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
       const metaData = await metaRes.json();
+      if (!metaRes.ok) throw new Error(`Drive API error: ${metaData.error?.message || "File not found"}`);
 
       let content: string;
       if (metaData.mimeType === "application/vnd.google-apps.spreadsheet") {
