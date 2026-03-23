@@ -24,6 +24,14 @@ const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
 ].join(" ");
 
+const DRIVE_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.metadata.readonly",
+].join(" ");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -144,6 +152,34 @@ Deno.serve(async (req) => {
         redirect_uri: redirectUri,
         response_type: "code",
         scope: GMAIL_SCOPES,
+        access_type: "offline",
+        prompt: "consent",
+        state,
+        include_granted_scopes: "true",
+      });
+      const url = `${GOOGLE_AUTH_URL}?${params.toString()}`;
+
+      return new Response(JSON.stringify({ url }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── INITIATE DRIVE: OAuth with Drive scopes ───
+    if (action === "initiate_drive") {
+      const redirectUri = body.redirect_uri as string;
+      if (!redirectUri) {
+        return new Response(JSON.stringify({ error: "redirect_uri required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const state = btoa(JSON.stringify({ tenant_id: tenantId, include_drive: true }));
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: DRIVE_SCOPES,
         access_type: "offline",
         prompt: "consent",
         state,

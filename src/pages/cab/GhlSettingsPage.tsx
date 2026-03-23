@@ -274,7 +274,7 @@ export default function GhlSettingsPage() {
             try {
               const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
                 body: {
-                  action: "initiate",
+                  action: "initiate_drive",
                   redirect_uri: "https://enclaveworkflowandhr.lovable.app/settings",
                 },
               });
