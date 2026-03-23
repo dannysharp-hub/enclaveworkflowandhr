@@ -1178,38 +1178,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Find _Jobs folder first
-      const { data: settings } = await supabaseAdmin
-        .from("google_drive_integration_settings")
-        .select("is_connected, projects_root_folder_id")
-        .eq("tenant_id", tenantId)
-        .single();
-
-      if (!settings?.is_connected || !settings.projects_root_folder_id) {
-        return new Response(JSON.stringify({ error: "Drive not connected or no root folder set" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
+      // Hardcoded _Jobs folder ID
+      const JOBS_FOLDER_ID = "1FfyX8aL26pX3aLAvw2I7LWgGL4EjdMa7";
       const accessToken = await getAccessToken();
-      const rootId = settings.projects_root_folder_id;
-
-      // Find _Jobs folder
-      const jobsFolderQuery = `'${rootId}' in parents and name='_Jobs' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const jobsFolderUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(jobsFolderQuery)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`;
-      const jobsFolderRes = await fetch(jobsFolderUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const jobsFolderData = await jobsFolderRes.json();
-      if (!jobsFolderRes.ok) throw new Error(`Drive API error: ${jobsFolderData.error?.message}`);
-
-      const jobsFolder = jobsFolderData.files?.[0];
-      if (!jobsFolder) {
-        return new Response(JSON.stringify({ error: "No '_Jobs' folder found" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
 
       // Search for the exact folder name inside _Jobs
-      const searchQuery = `'${jobsFolder.id}' in parents and name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const searchQuery = `'${JOBS_FOLDER_ID}' in parents and name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
       const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id,name,webViewLink)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`;
       const searchRes = await fetch(searchUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
       const searchData = await searchRes.json();
