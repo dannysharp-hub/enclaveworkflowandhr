@@ -1,4 +1,4 @@
-// Force redeploy v4 - 2026-03-23 - extract folder ID from URL
+// Force redeploy v5 - 2026-03-23 - extractDriveFolderId fix
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
