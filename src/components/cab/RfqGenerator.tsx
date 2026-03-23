@@ -185,8 +185,20 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
       if (dlErr) throw new Error(dlErr.message);
       if (dlData?.error) throw new Error(dlData.error);
 
-      const parsed = Papa.parse(dlData.content.trim(), { header: true, skipEmptyLines: true });
-
+      // Parse CSV or XLSX
+      let parsedData: Record<string, string>[];
+      if (dlData.format === "xlsx_base64") {
+        // Decode base64 to binary
+        const binaryStr = atob(dlData.content);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+        const workbook = XLSX.read(bytes, { type: "array" });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        parsedData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+      } else {
+        const parsed = Papa.parse(dlData.content.trim(), { header: true, skipEmptyLines: true });
+        parsedData = parsed.data as Record<string, string>[];
+      }
       const rows: BomRow[] = parsed.data.map((row: any) => {
         const get = (keys: string[]) => {
           for (const k of keys) {
