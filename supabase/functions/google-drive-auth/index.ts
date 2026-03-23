@@ -2408,9 +2408,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      console.log(`[list_job_folder_files] resolved driveFolderId="${driveFolderId}", source=${lookupSource}`);
+      // Extract raw folder ID from URL if needed
+      driveFolderId = extractDriveFolderId(driveFolderId!);
 
-      if (!driveFolderId || driveFolderId.trim() === "" || driveFolderId.trim() === ".") {
+      console.log(`[list_job_folder_files] resolved driveFolderId="${driveFolderId}", source=${lookupSource}`);
         return new Response(JSON.stringify({ 
           error: "No Drive folder linked to this job. Please link a Drive folder first.",
           debug: { job_id: jobId, lookup_source: lookupSource, raw_folder_id: driveFolderId }
