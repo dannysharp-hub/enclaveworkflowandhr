@@ -2490,7 +2490,7 @@ Deno.serve(async (req) => {
         content = await dlRes.text();
       }
 
-      return new Response(JSON.stringify({ content, file_name: metaData.name }), {
+      return new Response(JSON.stringify({ content, file_name: metaData.name, format }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
