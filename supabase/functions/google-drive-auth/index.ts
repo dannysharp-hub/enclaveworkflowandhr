@@ -2412,6 +2412,8 @@ Deno.serve(async (req) => {
       driveFolderId = extractDriveFolderId(driveFolderId!);
 
       console.log(`[list_job_folder_files] resolved driveFolderId="${driveFolderId}", source=${lookupSource}`);
+
+      if (!driveFolderId || driveFolderId.trim() === "" || driveFolderId.trim() === ".") {
         return new Response(JSON.stringify({ 
           error: "No Drive folder linked to this job. Please link a Drive folder first.",
           debug: { job_id: jobId, lookup_source: lookupSource, raw_folder_id: driveFolderId }
