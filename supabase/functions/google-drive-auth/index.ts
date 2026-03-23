@@ -2429,10 +2429,14 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("google-drive-auth error:", err);
 
-    await supabaseAdmin.from("google_drive_integration_settings").update({
-      status: "error",
-      last_error_message: err instanceof Error ? err.message : "Unknown error",
-    }).eq("tenant_id", tenantId).catch(() => {});
+    try {
+      await supabaseAdmin.from("google_drive_integration_settings").update({
+        status: "error",
+        last_error_message: err instanceof Error ? err.message : "Unknown error",
+      }).eq("tenant_id", tenantId);
+    } catch (_updateErr) {
+      // Ignore update errors in the error handler
+    }
 
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
