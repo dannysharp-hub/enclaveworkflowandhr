@@ -1,4 +1,4 @@
-// Force redeploy v2 - 2026-03-12
+// Force redeploy v3 - 2026-03-23 - improved error logging
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
