@@ -306,8 +306,9 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
         });
       }
 
+      const sentLabel = catKey === "spray" ? "Spray Finish" : catKey === "hardware" ? "Hardware" : "Panels";
       setSentCategories(prev => new Set([...prev, catKey]));
-      toast({ title: `RFQs sent to ${selectedSuppList.filter(s => s.email).length} suppliers`, description: `${categoryLabel} RFQ sent successfully.` });
+      toast({ title: `RFQs sent to ${selectedSuppList.filter(s => s.email).length} suppliers`, description: `${sentLabel} RFQ sent successfully.` });
       onRefresh();
     } catch (err: any) {
       toast({ title: "Send failed", description: err.message, variant: "destructive" });
