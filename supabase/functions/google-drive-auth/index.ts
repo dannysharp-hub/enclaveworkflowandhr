@@ -2371,6 +2371,86 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── LIST FILES IN A JOB'S LINKED DRIVE FOLDER ───
+    if (action === "list_job_folder_files") {
+      const jobId = body.job_id as string;
+      if (!jobId) {
+        return new Response(JSON.stringify({ error: "job_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get the linked Drive folder for this job (try cab_job_files first, then job_drive_links)
+      let driveFolderId: string | null = null;
+      const { data: cabFile } = await supabaseAdmin
+        .from("cab_job_files")
+        .select("url")
+        .eq("job_id", jobId)
+        .eq("file_type", "drive_folder")
+        .maybeSingle();
+      if (cabFile?.url) {
+        driveFolderId = cabFile.url;
+      } else {
+        const { data: driveLink } = await supabaseAdmin
+          .from("job_drive_links")
+          .select("drive_folder_id")
+          .eq("job_id", jobId)
+          .maybeSingle();
+        if (driveLink) driveFolderId = driveLink.drive_folder_id;
+      }
+
+      if (!driveFolderId) {
+        return new Response(JSON.stringify({ error: "No Drive folder linked to this job" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+      const query = `'${driveFolderId}' in parents and trashed=false`;
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,size)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Drive API error: ${data.error?.message}`);
+
+      return new Response(JSON.stringify({ files: data.files || [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── DOWNLOAD FILE CONTENT (text) ───
+    if (action === "download_file_content") {
+      const fileId = body.file_id as string;
+      if (!fileId) {
+        return new Response(JSON.stringify({ error: "file_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accessToken = await getAccessToken();
+
+      // Check if it's a Google Sheets file — export as CSV
+      const metaUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name&supportsAllDrives=true`;
+      const metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const metaData = await metaRes.json();
+
+      let content: string;
+      if (metaData.mimeType === "application/vnd.google-apps.spreadsheet") {
+        const exportUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/csv`;
+        const exportRes = await fetch(exportUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!exportRes.ok) throw new Error("Failed to export Google Sheet as CSV");
+        content = await exportRes.text();
+      } else {
+        const dlUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
+        const dlRes = await fetch(dlUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (!dlRes.ok) throw new Error("Failed to download file");
+        content = await dlRes.text();
+      }
+
+      return new Response(JSON.stringify({ content, file_name: metaData.name }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
