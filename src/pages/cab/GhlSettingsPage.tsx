@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Zap, Send, RefreshCw, CalendarDays, Info, Copy, Globe } from "lucide-react";
+import { CheckCircle2, XCircle, Zap, Send, RefreshCw, CalendarDays, Info, Copy, Globe, HardDrive } from "lucide-react";
 
 const STAGE_KEYS = [
   "lead_captured",
