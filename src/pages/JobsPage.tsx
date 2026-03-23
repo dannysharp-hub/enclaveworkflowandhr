@@ -60,28 +60,6 @@ export default function JobsPage() {
     } finally { setDeleting(false); }
   }, [deleteJob, fetchJobs]);
 
-  const handleCreateTestJob = useCallback(async () => {
-    if (!cabCompanyId) return;
-    try {
-      const { error } = await (supabase.from("cab_jobs") as any).insert({
-        company_id: cabCompanyId,
-        job_ref: "059_SpacemakerDevelopments-SycamoreHouse",
-        job_title: "Test Job",
-        customer_id: cabCompanyId,
-        status: "lead",
-        current_stage_key: "lead_captured",
-        production_stage_key: "lead",
-        contract_value: 0,
-        ballpark_min: 0,
-        ballpark_max: 0,
-      });
-      if (error) throw error;
-      toast({ title: "Test job created", description: "059_SpacemakerDevelopments-SycamoreHouse created successfully" });
-      fetchJobs();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  }, [cabCompanyId, fetchJobs]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
