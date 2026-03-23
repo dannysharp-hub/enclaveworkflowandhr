@@ -621,6 +621,10 @@ export default function JobDetailPage() {
               )}
               <RfqGenerator companyId={companyId!} job={job} onRefresh={load} />
               <Button
+                size="sm"
+                variant="outline"
+                disabled={ghlSyncing}
+                onClick={async () => {
                   setGhlSyncing(true);
                   try {
                     const res = await supabase.functions.invoke("ghl-worker", {
