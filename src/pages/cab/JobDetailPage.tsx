@@ -656,9 +656,7 @@ export default function JobDetailPage() {
                 <Button size="sm" variant="outline" onClick={() => toast({ title: "Buy list generation coming soon" })}>
                   <Package size={12} /> Generate Buy List
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => toast({ title: "RFQ sending coming soon" })}>
-                  <Send size={12} /> Send RFQs
-                </Button>
+                <RfqGenerator companyId={companyId!} job={job} onRefresh={load} />
                 <Button size="sm" variant="outline" onClick={() => toast({ title: "Purchase orders coming soon" })}>
                   <FileText size={12} /> Create Purchase Orders
                 </Button>
