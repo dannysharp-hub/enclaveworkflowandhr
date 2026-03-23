@@ -2399,8 +2399,8 @@ Deno.serve(async (req) => {
         if (driveLink) driveFolderId = driveLink.drive_folder_id;
       }
 
-      if (!driveFolderId) {
-        return new Response(JSON.stringify({ error: "No Drive folder linked to this job" }), {
+      if (!driveFolderId || driveFolderId.trim() === "" || driveFolderId.trim() === ".") {
+        return new Response(JSON.stringify({ error: "No Drive folder linked to this job. Please link a Drive folder first." }), {
           status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
