@@ -69,18 +69,41 @@ interface Props {
   onRefresh: () => void;
 }
 
+function normalizeMaterialName(material: string): string {
+  return material.trim().replace(/\s+/g, " ");
+}
+
+function getPreferredThickness(rows: BomRow[]): number {
+  const nonZeroRows = rows.filter((row) => row.thickness > 0);
+  if (nonZeroRows.length === 0) return 0;
+
+  const counts = new Map<number, number>();
+  for (const row of nonZeroRows) {
+    counts.set(row.thickness, (counts.get(row.thickness) || 0) + row.qty);
+  }
+
+  return Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
+}
+
 function calculateSheets(rows: BomRow[]): SheetLine[] {
-  const groups: Record<string, { parts: BomRow[]; material: string; thickness: number }> = {};
+  const groups: Record<string, { parts: BomRow[]; material: string }> = {};
 
   for (const r of rows) {
-    const key = `${r.material}||${r.thickness}`;
-    if (!groups[key]) groups[key] = { parts: [], material: r.material, thickness: r.thickness };
+    const material = normalizeMaterialName(r.material);
+    if (!material) continue;
+
+    const key = material.toLowerCase();
+    if (!groups[key]) groups[key] = { parts: [], material };
     groups[key].parts.push(r);
   }
 
-  return Object.values(groups).map(({ parts, material, thickness }) => {
+  return Object.values(groups).map(({ parts, material }) => {
+    const thickness = getPreferredThickness(parts);
     const totalParts = parts.reduce((s, p) => s + p.qty, 0);
-    const grain = parts[0]?.grain?.toUpperCase().trim() || "";
+    const grain = (parts.find((part) => {
+      const value = part.grain?.toUpperCase().trim() || "";
+      return value === "V" || value === "H";
+    })?.grain || "").toUpperCase().trim();
     const isGrained = grain === "V" || grain === "H";
 
     if (isGrained) {
