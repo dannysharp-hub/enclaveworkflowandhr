@@ -3,8 +3,8 @@
  * Used for deposit, pre-install, and final invoice emails.
  */
 
-/** Absolute HTTPS URL — Gmail proxies external images reliably */
-const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/ec-logo.png";
+/** Public Supabase Storage URL — reliable in Gmail */
+const LOGO_URL = "https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png";
 
 interface InvoiceEmailParams {
   invoiceNumber: string;
@@ -76,7 +76,9 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="vertical-align:top;">
-          <img src="${logoUrl}" alt="Enclave Cabinetry" width="48" height="48" style="display:block;border-radius:8px;" />
+          <table cellpadding="0" cellspacing="0" border="0"><tr><td>
+            <img src="${logoUrl}" alt="Enclave Cabinetry" width="120" height="120" style="display:block;border-radius:8px;" />
+          </td></tr></table>
         </td>
         <td style="text-align:right;vertical-align:top;">
           <span style="font-size:12px;color:#666;">Enclave Cabinetry Invoice</span>
@@ -151,7 +153,9 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   <!-- FOOTER -->
   <tr><td style="padding:0 32px 28px 32px;text-align:center;">
     <p style="margin:0 0 16px 0;font-size:14px;color:#1a1a1a;font-weight:500;">Thank you for your business.</p>
-    <img src="${logoUrl}" alt="EC" width="32" height="32" style="display:block;margin:0 auto;border-radius:6px;opacity:0.6;" />
+    <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;"><tr><td>
+      <img src="${logoUrl}" alt="Enclave Cabinetry" width="120" height="120" style="display:block;border-radius:6px;opacity:0.6;" />
+    </td></tr></table>
   </td></tr>
 
 </table>
