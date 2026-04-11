@@ -1,5 +1,6 @@
-// Force redeploy v7 - 2026-03-23 - recursive subfolder search for list_job_folder_files
+// Force redeploy v8 - 2026-04-11 - add XLSX workbook debug logging for BOM inspection
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -2495,6 +2496,41 @@ Deno.serve(async (req) => {
         const dlRes = await fetch(dlUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (!dlRes.ok) throw new Error("Failed to download XLSX file");
         const buf = await dlRes.arrayBuffer();
+
+        try {
+          const workbook = XLSX.read(buf, { type: "array", raw: true, dense: false });
+          const sheetNames = workbook.SheetNames || [];
+          console.log(`[google-drive-auth] XLSX debug for ${metaData.name}: ${sheetNames.length} sheet(s)`, sheetNames);
+
+          for (const sheetName of sheetNames) {
+            const worksheet = workbook.Sheets[sheetName];
+            const rawRows = XLSX.utils.sheet_to_json(worksheet, {
+              header: 1,
+              raw: true,
+              defval: "",
+              blankrows: false,
+            }) as unknown[][];
+
+            const headers = (rawRows[0] || []).map((value) => String(value));
+            console.log(`[google-drive-auth] XLSX headers for ${metaData.name} :: ${sheetName}`, headers);
+
+            const thicknessIndex = headers.findIndex((header) => {
+              const normalized = header.trim().toLowerCase().replace(/\s+/g, " ");
+              return normalized === "thickness" || normalized === "thk" || normalized === "thick";
+            });
+
+            const sampleRows = rawRows.slice(1, 6).map((row, index) => ({
+              rowNumber: index + 2,
+              values: row,
+              thicknessValue: thicknessIndex >= 0 ? row[thicknessIndex] ?? "" : "<thickness column not found>",
+            }));
+
+            console.log(`[google-drive-auth] XLSX first 5 rows for ${metaData.name} :: ${sheetName}`, sampleRows);
+          }
+        } catch (xlsxLogError) {
+          console.error(`[google-drive-auth] XLSX debug logging failed for ${metaData.name}`, xlsxLogError);
+        }
+
         // Convert to base64
         const bytes = new Uint8Array(buf);
         let binary = "";
