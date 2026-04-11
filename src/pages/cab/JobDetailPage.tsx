@@ -105,6 +105,25 @@ export default function JobDetailPage() {
     await (supabase.from("cab_jobs") as any).update(updates).eq("id", job.id);
   };
 
+  const startEdit = (field: string, currentValue: string) => {
+    setEditingField(field);
+    setEditValue(currentValue || "");
+  };
+
+  const saveCustomerField = async (field: string) => {
+    if (!customer) return;
+    const { error } = await (supabase.from("cab_customers") as any)
+      .update({ [field]: editValue || null })
+      .eq("id", customer.id);
+    if (error) {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Customer updated" });
+      setCustomer({ ...customer, [field]: editValue || null });
+    }
+    setEditingField(null);
+  };
+
   // Ballpark state
   const [ballparkMin, setBallparkMin] = useState("");
   const [ballparkMax, setBallparkMax] = useState("");
