@@ -76,7 +76,9 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td style="vertical-align:top;">
-          <img src="${logoUrl}" alt="Enclave Cabinetry" width="48" height="48" style="display:block;border-radius:8px;" />
+          <table cellpadding="0" cellspacing="0" border="0"><tr><td>
+            <img src="${logoUrl}" alt="Enclave Cabinetry" width="120" height="120" style="display:block;border-radius:8px;" />
+          </td></tr></table>
         </td>
         <td style="text-align:right;vertical-align:top;">
           <span style="font-size:12px;color:#666;">Enclave Cabinetry Invoice</span>
