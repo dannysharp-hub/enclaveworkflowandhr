@@ -1,0 +1,1 @@
+ALTER TABLE public.cab_customers DROP CONSTRAINT IF EXISTS cab_customers_company_email_unique;
