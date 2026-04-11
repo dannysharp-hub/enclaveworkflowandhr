@@ -330,11 +330,7 @@ export default function NextActionsPanel({
       case "quote_viewed":
         return (
           <>
-            <Button size="sm" disabled={disabled} onClick={() => emitAndRefresh(
-              "deposit.requested",
-              { job_ref: job.job_ref },
-              { current_stage_key: "awaiting_deposit", state: "awaiting_deposit", updated_at: new Date().toISOString() }
-            )}>
+            <Button size="sm" disabled={disabled} onClick={handleRequestDeposit}>
               <Banknote size={14} /> Request Deposit
             </Button>
             <Button size="sm" variant="secondary" disabled={disabled} onClick={() => scrollTo("[data-section='quote-builder']")}>
