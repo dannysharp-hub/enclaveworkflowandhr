@@ -826,7 +826,7 @@ export default function JobDetailPage() {
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;">
   <tr><td style="background:#1a1a2e;padding:24px;text-align:center;">
-    <img src="https://enclaveworkflowandhr.lovable.app/ec-logo.png" alt="Enclave Cabinetry" height="40" />
+    <img src="https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png" alt="Enclave Cabinetry" width="120" height="120" style="display:block;margin:0 auto;" />
   </td></tr>
   <tr><td style="padding:32px;">
     <h1 style="color:#1a1a2e;font-size:22px;margin:0 0 16px;">Choose Your Install Dates</h1>
@@ -1049,7 +1049,7 @@ export default function JobDetailPage() {
 <body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;"><tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;">
-<tr><td style="background:#1a1a2e;padding:24px;text-align:center;"><img src="https://enclaveworkflowandhr.lovable.app/ec-logo.png" alt="Enclave Cabinetry" height="40" style="height:40px;"/></td></tr>
+<tr><td style="background:#1a1a2e;padding:24px;text-align:center;"><img src="https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png" alt="Enclave Cabinetry" width="120" height="120" style="display:block;margin:0 auto;"/></td></tr>
 <tr><td style="padding:32px;">
 <h1 style="color:#1a1a2e;font-size:22px;margin:0 0 16px;">Choose Your Install Dates</h1>
 <p style="color:#333;font-size:15px;line-height:1.6;">Hi ${customer.first_name},</p>
