@@ -392,7 +392,7 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;"><tr><td align="center">
 <table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;">
 <tr><td style="background:${brandColor};padding:24px;text-align:center;">
-<img src="https://enclaveworkflowandhr.lovable.app/ec-logo.png" alt="Enclave Cabinetry" height="40" style="height:40px;" />
+<img src="https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png" alt="Enclave Cabinetry" width="120" height="120" style="display:block;margin:0 auto;" />
 </td></tr>
 <tr><td style="padding:32px;">
 <h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:#1a1a2e;">RFQ – ${job.job_ref} – ${categoryLabel}</h2>

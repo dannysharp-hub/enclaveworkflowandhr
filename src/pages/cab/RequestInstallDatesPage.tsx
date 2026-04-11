@@ -168,7 +168,7 @@ export default function RequestInstallDatesPage() {
       <div className="max-w-lg mx-auto space-y-6 pt-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <img src="/ec-logo.png" alt="Enclave Cabinetry" className="h-10 mx-auto" />
+          <img src="https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png" alt="Enclave Cabinetry" className="h-16 mx-auto" />
           <h1 className="text-2xl font-bold text-gray-900">Choose Your Install Dates</h1>
           <p className="text-gray-600">
             Hi {customer?.first_name}, please select 3 preferred dates for your installation.
@@ -269,7 +269,7 @@ function buildNotificationHtml(
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
   <tr><td style="background:#1a1a2e;padding:24px;text-align:center;">
-    <img src="https://enclaveworkflowandhr.lovable.app/ec-logo.png" alt="Enclave Cabinetry" height="40" style="height:40px;" />
+    <img src="https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png" alt="Enclave Cabinetry" width="120" height="120" style="display:block;margin:0 auto;" />
   </td></tr>
   <tr><td style="padding:32px;">
     <h1 style="color:#1a1a2e;font-size:20px;margin:0 0 16px;">📅 Install Dates Submitted</h1>
