@@ -65,6 +65,10 @@ export default function NextActionsPanel({
   };
 
   const handleRequestDeposit = async () => {
+    if (!job.contract_value || job.contract_value <= 0) {
+      toast({ title: "Please add a contract value before requesting the deposit", variant: "destructive" });
+      return;
+    }
     setActing(true);
     try {
       console.log("[RequestDeposit] Button clicked for job:", job.id, job.job_ref);
@@ -147,6 +151,10 @@ export default function NextActionsPanel({
   };
 
   const handleResendDepositInvoice = async () => {
+    if (!job.contract_value || job.contract_value <= 0) {
+      toast({ title: "Please add a contract value before requesting the deposit", variant: "destructive" });
+      return;
+    }
     setActing(true);
     try {
       console.log("[ResendDeposit] Resending deposit invoice for job:", job.id, job.job_ref);
