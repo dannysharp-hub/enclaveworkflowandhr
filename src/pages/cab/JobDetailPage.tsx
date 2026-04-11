@@ -59,6 +59,8 @@ export default function JobDetailPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [installCompleteOpen, setInstallCompleteOpen] = useState(false);
   const [installCompleteSending, setInstallCompleteSending] = useState(false);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
