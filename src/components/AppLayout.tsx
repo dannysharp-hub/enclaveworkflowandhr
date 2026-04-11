@@ -22,8 +22,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface NavItem {
   to: string;
   label: string;
-  icon: LucideIcon;
-  featureFlag?: string;
+  icon: typeof LayoutDashboard;
 }
 
 
@@ -277,7 +276,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           })()}
 
           {/* Top-level nav items */}
-          {topLevelItems.filter(item => canRoleAccessRoute(userRole, item.to)).map(item => {
+          {topLevelItems.map(item => {
             const isActive = location.pathname === item.to;
             return (
               <NavLink
