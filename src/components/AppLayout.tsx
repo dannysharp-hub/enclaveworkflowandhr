@@ -183,12 +183,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   // ── Desktop / Manager sidebar layout ──
-  // Determine page title from navGroups + self-service
-  const allItems = [...topLevelItems, ...cabAdminItems, { to: "/settings", label: "Settings", icon: Settings }];
+  const allItems = [{ to: "/", label: "Business Overview", icon: LayoutDashboard }, ...topLevelItems, ...cabAdminItems];
   const currentTitle = (() => {
-    if (location.pathname === "/") {
-      return isOperative(userRole) ? "My Day" : "Business Overview";
-    }
+    if (location.pathname === "/") return "Business Overview";
     return allItems.find(n => n.to !== "/" && location.pathname.startsWith(n.to))?.label
       || branding.companyName || "Enclave";
   })();
