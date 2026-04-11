@@ -3,8 +3,8 @@
  * Used for deposit, pre-install, and final invoice emails.
  */
 
-/** Absolute HTTPS URL — Gmail proxies external images reliably */
-const LOGO_URL = "https://enclaveworkflowandhr.lovable.app/ec-logo.png";
+/** Public Supabase Storage URL — reliable in Gmail */
+const LOGO_URL = "https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png";
 
 interface InvoiceEmailParams {
   invoiceNumber: string;
