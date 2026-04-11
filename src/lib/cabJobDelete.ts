@@ -1,41 +1,64 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Deletes a cab_job and all associated records in the correct order.
+ * Deletes a cab_job and all associated records in dependency order.
+ * Every FK referencing cab_jobs must be cleaned up before the job row.
  */
 export async function deleteCabJob(jobId: string): Promise<void> {
-  const runDelete = async (query: PromiseLike<{ error: any }>, label: string) => {
-    const { error } = await query;
-    if (error) throw new Error(`Failed to delete ${label}: ${error.message}`);
+  const del = async (table: string, column = "job_id") => {
+    const { error } = await (supabase.from(table) as any).delete().eq(column, jobId);
+    if (error) {
+      console.error(`[cabJobDelete] Failed to delete from ${table}:`, error.message);
+      throw new Error(`Failed to delete ${table}: ${error.message}`);
+    }
   };
 
-  // 1. Delete sync logs
-  await runDelete((supabase.from("cab_ghl_sync_log") as any).delete().eq("job_id", jobId), "cab_ghl_sync_log");
+  // --- Leaf tables first (no other FK points at them) ---
 
-  // 2. Delete events
-  await runDelete((supabase.from("cab_events") as any).delete().eq("job_id", jobId), "cab_events");
+  // 1. Appointments
+  await del("cab_appointments");
 
-  // 3. Delete quote items then quotes
-  const { data: jobQuotes, error: quotesFetchError } = await (supabase.from("cab_quotes") as any)
-    .select("id")
-    .eq("job_id", jobId);
-  if (quotesFetchError) throw new Error(`Failed to load cab_quotes: ${quotesFetchError.message}`);
+  // 2. Events (referenced by cab_ghl_sync_log.event_id)
+  await del("cab_ghl_sync_log");
+  await del("cab_events");
 
-  if (jobQuotes?.length) {
-    const qIds = jobQuotes.map((q: any) => q.id);
-    await runDelete((supabase.from("cab_quote_items") as any).delete().in("quote_id", qIds), "cab_quote_items");
+  // 3. Job files
+  await del("cab_job_files");
+
+  // 4. Purchase order items → purchase orders (PO items FK to POs)
+  const { data: pos } = await (supabase.from("cab_purchase_orders") as any)
+    .select("id").eq("job_id", jobId);
+  if (pos?.length) {
+    const poIds = pos.map((p: any) => p.id);
+    await (supabase.from("cab_purchase_order_items") as any).delete().in("po_id", poIds);
   }
-  await runDelete((supabase.from("cab_quotes") as any).delete().eq("job_id", jobId), "cab_quotes");
+  await del("cab_purchase_orders");
 
-  // 4. Delete appointments by cab_jobs.id before deleting the job
-  await runDelete((supabase.from("cab_appointments") as any).delete().eq("job_id", jobId), "cab_appointments");
+  // 5. Buylist items (referenced by cab_purchase_order_items.buylist_item_id — already gone)
+  await del("cab_buylist_items");
 
-  // 5. Delete buylist items
-  await runDelete((supabase.from("cab_buylist_items") as any).delete().eq("job_id", jobId), "cab_buylist_items");
+  // 6. RFQs
+  await del("cab_rfqs");
 
-  // 6. Delete job files (drive folder links, etc.)
-  await runDelete((supabase.from("cab_job_files") as any).delete().eq("job_id", jobId), "cab_job_files");
+  // 7. Quote acceptances & views → quote items → quotes
+  await del("cab_quote_acceptances");
+  await del("cab_quote_views");
+  const { data: quotes } = await (supabase.from("cab_quotes") as any)
+    .select("id").eq("job_id", jobId);
+  if (quotes?.length) {
+    const qIds = quotes.map((q: any) => q.id);
+    await (supabase.from("cab_quote_items") as any).delete().in("quote_id", qIds);
+  }
+  await del("cab_quotes");
 
-  // 7. Delete the job itself
-  await runDelete((supabase.from("cab_jobs") as any).delete().eq("id", jobId), "cab_jobs");
+  // 8. Payments (FK to cab_invoices) → invoices
+  await del("cab_payments");
+  await del("cab_invoices");
+
+  // 9. Job cost lines & alerts
+  await del("cab_job_cost_lines");
+  await del("cab_job_alerts");
+
+  // 10. Finally delete the job itself
+  await del("cab_jobs", "id");
 }
