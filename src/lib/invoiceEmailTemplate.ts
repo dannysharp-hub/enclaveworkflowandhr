@@ -153,7 +153,9 @@ export function buildInvoiceEmailHtml(params: InvoiceEmailParams): string {
   <!-- FOOTER -->
   <tr><td style="padding:0 32px 28px 32px;text-align:center;">
     <p style="margin:0 0 16px 0;font-size:14px;color:#1a1a1a;font-weight:500;">Thank you for your business.</p>
-    <img src="${logoUrl}" alt="EC" width="32" height="32" style="display:block;margin:0 auto;border-radius:6px;opacity:0.6;" />
+    <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;"><tr><td>
+      <img src="${logoUrl}" alt="Enclave Cabinetry" width="120" height="120" style="display:block;border-radius:6px;opacity:0.6;" />
+    </td></tr></table>
   </td></tr>
 
 </table>
