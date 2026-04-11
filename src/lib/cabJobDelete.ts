@@ -1,3 +1,4 @@
+// v2
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -5,13 +6,17 @@ import { supabase } from "@/integrations/supabase/client";
  * Every FK referencing cab_jobs must be cleaned up before the job row.
  */
 export async function deleteCabJob(jobId: string): Promise<void> {
+  console.log("[cabJobDelete] start", { jobId });
+
   const del = async (table: string, column: string = "job_id") => {
+    console.log("[cabJobDelete] deleting", { table, column, jobId });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.from(table as any) as any).delete().eq(column, jobId);
     if (error) {
       console.error(`[cabJobDelete] Failed to delete from ${table}:`, error.message);
       throw new Error(`Failed to delete ${table}: ${error.message}`);
     }
+    console.log("[cabJobDelete] deleted", { table, column, jobId });
   };
 
   // --- Leaf tables first (no other FK points at them) ---
