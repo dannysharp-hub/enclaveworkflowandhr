@@ -64,6 +64,88 @@ export default function NextActionsPanel({
     }
   };
 
+  const handleRequestDeposit = async () => {
+    setActing(true);
+    try {
+      console.log("[RequestDeposit] Button clicked for job:", job.id, job.job_ref);
+
+      console.log("[RequestDeposit] Updating job stage to awaiting_deposit...");
+      const { error: jobErr } = await (supabase.from("cab_jobs") as any).update({
+        current_stage_key: "awaiting_deposit",
+        state: "awaiting_deposit",
+        updated_at: new Date().toISOString(),
+      }).eq("id", job.id);
+      if (jobErr) throw new Error(`Job update failed: ${jobErr.message}`);
+      console.log("[RequestDeposit] Job stage updated OK");
+
+      console.log("[RequestDeposit] Inserting cab_event...");
+      await insertCabEvent({ companyId, eventType: "deposit.requested", jobId: job.id, payload: { job_ref: job.job_ref } });
+      console.log("[RequestDeposit] Event inserted OK");
+
+      console.log("[RequestDeposit] Fetching customer:", job.customer_id);
+      const { data: customers } = await (supabase.from("cab_customers") as any)
+        .select("*").eq("id", job.customer_id).limit(1);
+      const customer = customers?.[0];
+      console.log("[RequestDeposit] Customer:", customer?.email, customer?.first_name, customer?.last_name);
+
+      if (customer?.email) {
+        const contractValue = job.contract_value || 0;
+        const depAmount = (contractValue * 0.50).toFixed(2);
+        const customerFullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || "Customer";
+        const jobRefNum = job.job_ref?.replace(/[^0-9]/g, "") || job.job_ref;
+
+        console.log("[RequestDeposit] Building deposit email HTML...");
+        const depositHtml = await buildInvoiceEmailHtml({
+          invoiceNumber: `DEP-${jobRefNum}`,
+          customerName: customerFullName,
+          customerFirstName: customer.first_name || "there",
+          jobRef: job.job_ref,
+          jobTitle: job.job_title || job.job_ref,
+          milestone: "deposit",
+          amount: Number(depAmount).toLocaleString("en-GB", { minimumFractionDigits: 2 }),
+          paymentReference: job.job_ref,
+        });
+
+        console.log("[RequestDeposit] Calling send-email edge function...");
+        const { data: emailRes, error: emailErr } = await supabase.functions.invoke("send-email", {
+          body: {
+            to: customer.email,
+            subject: `Deposit Invoice — Enclave Cabinetry — ${job.job_ref}`,
+            html: depositHtml,
+            replyTo: "danny@enclavecabinetry.com",
+          },
+        });
+        console.log("[RequestDeposit] Email response:", JSON.stringify(emailRes), "error:", emailErr);
+
+        if (emailErr) {
+          toast({ title: "Deposit requested but email failed", description: emailErr.message, variant: "destructive" });
+        } else {
+          toast({ title: "Deposit invoice sent", description: `Email sent to ${customer.email}` });
+        }
+      } else {
+        console.log("[RequestDeposit] No customer email — skipping email");
+        toast({ title: "Deposit requested", description: "No customer email on file — no invoice sent", variant: "destructive" });
+      }
+
+      console.log("[RequestDeposit] Sending notification to Danny...");
+      await supabase.functions.invoke("send-email", {
+        body: {
+          to: "danny@enclavecabinetry.com",
+          subject: `Deposit Requested — ${job.job_ref}`,
+          html: `<p>Deposit invoice has been sent for ${job.job_ref} (${job.job_title}).</p>`,
+          replyTo: "danny@enclavecabinetry.com",
+        },
+      });
+
+      onRefresh();
+    } catch (err: any) {
+      console.error("[RequestDeposit] Error:", err);
+      toast({ title: "Request Deposit failed", description: err.message, variant: "destructive" });
+    } finally {
+      setActing(false);
+    }
+  };
+
   const handleDepositReceived = async () => {
     if (!depositAmount || parseFloat(depositAmount) <= 0) {
       toast({ title: "Enter a valid deposit amount", variant: "destructive" });
