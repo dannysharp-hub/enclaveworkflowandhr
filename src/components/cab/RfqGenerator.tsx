@@ -255,7 +255,14 @@ export default function RfqGenerator({ companyId, job, onRefresh }: Props) {
             grain: String(get(["Grain", "grain", "Grain Direction"]) ?? ""),
             width: parseFloat(String(get(["Width", "width", "W"]))) || 0,
             length: parseFloat(String(get(["Length", "length", "L"]))) || 0,
-            thickness: parseFloat(String(get(["Thickness", "thickness", "Thk", "Thick"]))) || 0,
+            thickness: (() => {
+              const raw = parseFloat(String(get(["Thickness", "thickness", "Thk", "Thick"])));
+              if (!isNaN(raw) && raw > 0) return raw;
+              // Fallback: extract thickness from material name e.g. "Finsa MR MDF - 18mm"
+              const mat = String(get(["Material", "material", "Material_Text", "Mat"]) ?? "");
+              const match = mat.match(/(\d+(?:\.\d+)?)\s*mm/i);
+              return match ? parseFloat(match[1]) : 0;
+            })(),
             qty: parseInt(String(get(["QTY", "Qty", "qty", "Quantity", "quantity"]))) || 1,
             structure: String(get(["BOM Structure", "Structure", "BOM_Structure", "bom_structure", "Type"]) ?? ""),
           };
