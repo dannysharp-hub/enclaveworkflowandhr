@@ -168,7 +168,7 @@ export default function RequestInstallDatesPage() {
       <div className="max-w-lg mx-auto space-y-6 pt-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <img src="/ec-logo.png" alt="Enclave Cabinetry" className="h-10 mx-auto" />
+          <img src="https://taftcuryslgdkstzqrcy.supabase.co/storage/v1/object/public/assets/ec-logo.png" alt="Enclave Cabinetry" className="h-16 mx-auto" />
           <h1 className="text-2xl font-bold text-gray-900">Choose Your Install Dates</h1>
           <p className="text-gray-600">
             Hi {customer?.first_name}, please select 3 preferred dates for your installation.
