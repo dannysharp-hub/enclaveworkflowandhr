@@ -50,6 +50,7 @@ const cabAdminItems: NavItem[] = [
   { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
   { to: "/admin/ghl", label: "GHL Settings", icon: Settings },
   { to: "/admin/team", label: "Team & Invites", icon: Users },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 // ── Operative bottom nav items ──
@@ -256,9 +257,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-0.5">
-          {/* Landing page link */}
+          {/* Business Overview — hardcoded */}
           {(() => {
-            const landingLabel = userRole === "admin" ? "Business Overview" : isOperative(userRole) ? "My Day" : "Overview";
             const isActive = location.pathname === "/";
             return (
               <NavLink
@@ -270,7 +270,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <LayoutDashboard size={18} className={isActive ? "text-primary" : ""} />
-                {!collapsed && <span>{landingLabel}</span>}
+                {!collapsed && <span>Business Overview</span>}
               </NavLink>
             );
           })()}
@@ -318,25 +318,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Settings */}
-          <div className="mt-4">
-            {(() => {
-              const isActive = location.pathname === "/settings";
-              return (
-                <NavLink
-                  to="/settings"
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
-                    isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <Settings size={18} className={isActive ? "text-primary" : ""} />
-                  {!collapsed && <span>Settings</span>}
-                </NavLink>
-              );
-            })()}
-          </div>
         </nav>
 
         {/* Footer */}
