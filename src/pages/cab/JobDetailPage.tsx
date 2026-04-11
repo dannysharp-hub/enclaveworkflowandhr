@@ -511,6 +511,7 @@ export default function JobDetailPage() {
                 ) : (
                   <span className="flex items-center gap-1">{customer?.postcode || "—"}<button onClick={() => startEdit("postcode", customer?.postcode)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
                 )}
+              </div>
               <div className="col-span-2">
                 <Label className="text-xs text-muted-foreground">Contract Value</Label>
                 <div className="flex items-center gap-1 mt-0.5">
