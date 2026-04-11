@@ -25,6 +25,7 @@ import {
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
   CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
   Users, ExternalLink, Trash2,
+  Pencil, Check, X as XIcon,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -58,6 +59,8 @@ export default function JobDetailPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [installCompleteOpen, setInstallCompleteOpen] = useState(false);
   const [installCompleteSending, setInstallCompleteSending] = useState(false);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -100,6 +103,25 @@ export default function JobDetailPage() {
 
   const updateJob = async (updates: Record<string, any>) => {
     await (supabase.from("cab_jobs") as any).update(updates).eq("id", job.id);
+  };
+
+  const startEdit = (field: string, currentValue: string) => {
+    setEditingField(field);
+    setEditValue(currentValue || "");
+  };
+
+  const saveCustomerField = async (field: string) => {
+    if (!customer) return;
+    const { error } = await (supabase.from("cab_customers") as any)
+      .update({ [field]: editValue || null })
+      .eq("id", customer.id);
+    if (error) {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Customer updated" });
+      setCustomer({ ...customer, [field]: editValue || null });
+    }
+    setEditingField(null);
   };
 
   // Ballpark state
@@ -454,9 +476,42 @@ export default function JobDetailPage() {
             <h3 className="font-mono text-sm font-bold text-foreground mb-2">Customer</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div><span className="text-muted-foreground">Name:</span> {customer?.first_name} {customer?.last_name}</div>
-              <div><span className="text-muted-foreground">Phone:</span> {customer?.phone || "—"}</div>
-              <div><span className="text-muted-foreground">Email:</span> {customer?.email || "—"}</div>
-              <div><span className="text-muted-foreground">Postcode:</span> {customer?.postcode || "—"}</div>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Phone:</span>
+                {editingField === "phone" ? (
+                  <span className="flex items-center gap-1">
+                    <Input className="h-6 text-xs w-32" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("phone")} />
+                    <button onClick={() => saveCustomerField("phone")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
+                    <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">{customer?.phone || "—"}<button onClick={() => startEdit("phone", customer?.phone)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Email:</span>
+                {editingField === "email" ? (
+                  <span className="flex items-center gap-1">
+                    <Input className="h-6 text-xs w-44" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("email")} />
+                    <button onClick={() => saveCustomerField("email")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
+                    <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">{customer?.email || "—"}<button onClick={() => startEdit("email", customer?.email)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Postcode:</span>
+                {editingField === "postcode" ? (
+                  <span className="flex items-center gap-1">
+                    <Input className="h-6 text-xs w-24" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("postcode")} />
+                    <button onClick={() => saveCustomerField("postcode")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
+                    <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">{customer?.postcode || "—"}<button onClick={() => startEdit("postcode", customer?.postcode)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
+                )}
+              </div>
               <div className="col-span-2">
                 <Label className="text-xs text-muted-foreground">Contract Value</Label>
                 <div className="flex items-center gap-1 mt-0.5">
