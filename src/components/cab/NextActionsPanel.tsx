@@ -341,9 +341,14 @@ export default function NextActionsPanel({
 
       case "awaiting_deposit":
         return (
-          <Button size="sm" disabled={disabled} onClick={() => setDepositOpen(true)}>
-            <Banknote size={14} /> Mark Deposit Received
-          </Button>
+          <>
+            <Button size="sm" disabled={disabled} onClick={() => setDepositOpen(true)}>
+              <Banknote size={14} /> Mark Deposit Received
+            </Button>
+            <Button size="sm" variant="secondary" disabled={disabled} onClick={handleResendDepositInvoice}>
+              <Send size={14} /> Resend Deposit Invoice
+            </Button>
+          </>
         );
 
       case "project_confirmed":
