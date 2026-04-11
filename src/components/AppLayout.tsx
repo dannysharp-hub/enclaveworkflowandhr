@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
@@ -14,12 +14,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { canRoleAccessRoute, FINANCE_ROLES } from "@/lib/roleVisibility";
 import ClockAnomalyPrompt from "@/components/ClockAnomalyPrompt";
 import RoleSwitcher from "@/components/RoleSwitcher";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type { LucideIcon } from "lucide-react";
-
 // ── Types ──
 
 interface NavItem {
