@@ -146,6 +146,52 @@ export default function NextActionsPanel({
     }
   };
 
+  const handleResendDepositInvoice = async () => {
+    setActing(true);
+    try {
+      console.log("[ResendDeposit] Resending deposit invoice for job:", job.id, job.job_ref);
+      const { data: customers } = await (supabase.from("cab_customers") as any)
+        .select("*").eq("id", job.customer_id).limit(1);
+      const customer = customers?.[0];
+      if (!customer?.email) {
+        toast({ title: "No customer email on file", variant: "destructive" });
+        return;
+      }
+      const contractValue = job.contract_value || 0;
+      const depAmount = (contractValue * 0.50).toFixed(2);
+      const customerFullName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || "Customer";
+      const jobRefNum = job.job_ref?.replace(/[^0-9]/g, "") || job.job_ref;
+      const depositHtml = await buildInvoiceEmailHtml({
+        invoiceNumber: `DEP-${jobRefNum}`,
+        customerName: customerFullName,
+        customerFirstName: customer.first_name || "there",
+        jobRef: job.job_ref,
+        jobTitle: job.job_title || job.job_ref,
+        milestone: "deposit",
+        amount: Number(depAmount).toLocaleString("en-GB", { minimumFractionDigits: 2 }),
+        paymentReference: job.job_ref,
+      });
+      const { error: emailErr } = await supabase.functions.invoke("send-email", {
+        body: {
+          to: customer.email,
+          subject: `Deposit Invoice — Enclave Cabinetry — ${job.job_ref}`,
+          html: depositHtml,
+          replyTo: "danny@enclavecabinetry.com",
+        },
+      });
+      if (emailErr) {
+        toast({ title: "Email failed", description: emailErr.message, variant: "destructive" });
+      } else {
+        toast({ title: "Deposit invoice resent", description: `Email sent to ${customer.email}` });
+      }
+    } catch (err: any) {
+      console.error("[ResendDeposit] Error:", err);
+      toast({ title: "Resend failed", description: err.message, variant: "destructive" });
+    } finally {
+      setActing(false);
+    }
+  };
+
   const handleDepositReceived = async () => {
     if (!depositAmount || parseFloat(depositAmount) <= 0) {
       toast({ title: "Enter a valid deposit amount", variant: "destructive" });
