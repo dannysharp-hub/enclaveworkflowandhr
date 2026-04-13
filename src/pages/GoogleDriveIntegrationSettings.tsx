@@ -645,6 +645,11 @@ export default function GoogleDriveIntegrationSettings() {
         </div>
       )}
 
+      {/* ─── Backfill Drive Folders ─── */}
+      {isConnected && (
+        <BackfillDriveFoldersPanel />
+      )}
+
       {/* ─── Advanced ─── */}
       {isConnected && (
         <div className="glass-panel rounded-lg max-w-2xl overflow-hidden">
@@ -747,6 +752,87 @@ export default function GoogleDriveIntegrationSettings() {
               <p className="text-[10px] text-warning -mt-2">
                 ⚠ DXFs still require dimension/material validation before nesting.
               </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Backfill Drive Folders Panel ───
+function BackfillDriveFoldersPanel() {
+  const [running, setRunning] = useState(false);
+  const [results, setResults] = useState<{ matched: number; total_unlinked_jobs: number; total_drive_folders: number; results: Array<{ job_ref: string; folder_name: string; status: string }> } | null>(null);
+
+  const handleBackfill = async () => {
+    if (!confirm("This will scan your Drive _Jobs folder and link matching folders to existing jobs. Continue?")) return;
+    setRunning(true);
+    setResults(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("backfill-drive-folders");
+      if (error) throw error;
+      if (!data.ok) throw new Error(data.error || "Backfill failed");
+      setResults(data);
+      toast({
+        title: "Backfill Complete",
+        description: `Matched ${data.matched} of ${data.total_unlinked_jobs} unlinked jobs (${data.total_drive_folders} Drive folders scanned)`,
+      });
+    } catch (err: any) {
+      toast({ title: "Backfill Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
+      <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">Backfill Drive Folders</h4>
+      <p className="text-xs text-muted-foreground">
+        Match existing jobs to their Drive folders by job number. Scans all folders in _Jobs and links any that match an unlinked job's numeric prefix.
+      </p>
+
+      <button
+        onClick={handleBackfill}
+        disabled={running}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {running ? <Loader2 size={14} className="animate-spin" /> : <FolderSearch size={14} />}
+        {running ? "Scanning…" : "Backfill Drive Folders"}
+      </button>
+
+      {results && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Scanned <strong>{results.total_drive_folders}</strong> folders · <strong>{results.matched}</strong> matched · <strong>{results.total_unlinked_jobs - results.matched}</strong> unmatched
+          </p>
+          {results.results.length > 0 && (
+            <div className="max-h-48 overflow-y-auto border border-border rounded-md">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left px-3 py-1.5 font-mono text-[10px] text-muted-foreground uppercase">Job Ref</th>
+                    <th className="text-left px-3 py-1.5 font-mono text-[10px] text-muted-foreground uppercase">Drive Folder</th>
+                    <th className="text-left px-3 py-1.5 font-mono text-[10px] text-muted-foreground uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.results.map((r, i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td className="px-3 py-1.5 font-mono">{r.job_ref}</td>
+                      <td className="px-3 py-1.5">{r.folder_name}</td>
+                      <td className="px-3 py-1.5">
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                          r.status === "linked" ? "bg-emerald-500/20 text-emerald-400" : "bg-destructive/20 text-destructive"
+                        )}>
+                          {r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
