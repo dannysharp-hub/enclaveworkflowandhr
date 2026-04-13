@@ -1503,6 +1503,8 @@ export type Database = {
           estimated_remaining_cost: number | null
           final_payment_amount: number | null
           final_payment_paid_at: string | null
+          final_signoff_url: string | null
+          fitter_notes: string | null
           forecast_cost_total: number | null
           forecast_margin_pct: number | null
           ghl_contact_id: string | null
@@ -1579,6 +1581,8 @@ export type Database = {
           estimated_remaining_cost?: number | null
           final_payment_amount?: number | null
           final_payment_paid_at?: string | null
+          final_signoff_url?: string | null
+          fitter_notes?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
@@ -1655,6 +1659,8 @@ export type Database = {
           estimated_remaining_cost?: number | null
           final_payment_amount?: number | null
           final_payment_paid_at?: string | null
+          final_signoff_url?: string | null
+          fitter_notes?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
