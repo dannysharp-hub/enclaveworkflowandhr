@@ -159,8 +159,7 @@ Deno.serve(async (req) => {
     const accessToken = await getAccessToken(supabaseAdmin, tenantId);
 
     // Build folder name
-    const safeName = (customer_last_name || "unknown").replace(/[^a-zA-Z0-9_\-]/g, "");
-    const folderName = `${job_ref}_${safeName}`;
+    const folderName = job_ref;
 
     // Create folder in Google Drive
     errorStage = "create_drive_folder";
