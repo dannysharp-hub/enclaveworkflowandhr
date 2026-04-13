@@ -406,6 +406,119 @@ Deno.serve(async (req) => {
     });
 
     console.log(`ghl-form: NEW lead created ${job.job_ref}`);
+
+    // Auto-create Drive folder (fire & forget via edge function call)
+    try {
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+      // Get a tenant's user to make the call (need auth context for google-drive-auth)
+      const { data: memberRow } = await supabase
+        .from("cab_company_memberships")
+        .select("user_id")
+        .eq("company_id", companyId)
+        .eq("role", "admin")
+        .limit(1)
+        .single();
+
+      if (memberRow?.user_id) {
+        // Get the tenant_id for this user
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("user_id", memberRow.user_id)
+          .single();
+
+        if (prof?.tenant_id) {
+          // Check if Google Drive is connected for this tenant
+          const { data: driveSettings } = await supabase
+            .from("google_drive_integration_settings")
+            .select("is_connected")
+            .eq("tenant_id", prof.tenant_id)
+            .single();
+
+          if (driveSettings?.is_connected) {
+            // Get Google OAuth tokens directly
+            const { data: tokenRow } = await supabase
+              .from("google_oauth_tokens")
+              .select("*")
+              .eq("tenant_id", prof.tenant_id)
+              .single();
+
+            if (tokenRow) {
+              let accessToken: string;
+              const now = new Date();
+              const expiresAt = new Date(tokenRow.expires_at);
+
+              if (expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
+                accessToken = atob(tokenRow.access_token_encrypted);
+              } else {
+                const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+                const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+                const refreshToken = atob(tokenRow.refresh_token_encrypted);
+
+                const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({
+                    client_id: GOOGLE_CLIENT_ID,
+                    client_secret: GOOGLE_CLIENT_SECRET,
+                    refresh_token: refreshToken,
+                    grant_type: "refresh_token",
+                  }),
+                });
+                const tokenData = await tokenRes.json();
+                if (tokenRes.ok) {
+                  accessToken = tokenData.access_token;
+                  await supabase.from("google_oauth_tokens").update({
+                    access_token_encrypted: btoa(tokenData.access_token),
+                    expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+                    token_version: tokenRow.token_version + 1,
+                  }).eq("id", tokenRow.id);
+                } else {
+                  accessToken = "";
+                }
+              }
+
+              if (accessToken) {
+                // Build folder name
+                const parts = [job.job_ref];
+                if (lastName) parts.push(lastName);
+                if (roomType) parts.push(roomType);
+                const folderName = parts.join("_").replace(/[\/\\:*?"<>|]/g, "_");
+                const JOBS_FOLDER_ID = "1FfyX8aL26pX3aLAvw2I7LWgGL4EjdMa7";
+
+                const createRes = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true", {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    name: folderName,
+                    mimeType: "application/vnd.google-apps.folder",
+                    parents: [JOBS_FOLDER_ID],
+                  }),
+                });
+                const createData = await createRes.json();
+                if (createRes.ok && createData.id) {
+                  await supabase.from("cab_jobs").update({
+                    drive_folder_id: createData.id,
+                    drive_folder_name: folderName,
+                    updated_at: new Date().toISOString(),
+                  }).eq("id", job.id);
+                  console.log(`ghl-form: Drive folder created "${folderName}" → ${createData.id}`);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (driveErr: unknown) {
+      console.error("ghl-form: Drive folder creation failed (non-fatal)", driveErr);
+    }
+
     return ok({ success: true, job_ref: job.job_ref, reused: false, note: "new_job_created" });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);

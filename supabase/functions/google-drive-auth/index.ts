@@ -1297,6 +1297,78 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── CREATE CAB JOB FOLDER ───
+    if (action === "create_cab_job_folder") {
+      const cabJobId = body.cab_job_id as string;
+      if (!cabJobId) {
+        return new Response(JSON.stringify({ error: "cab_job_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Check if folder already linked
+      const { data: existingCabJob } = await supabaseAdmin
+        .from("cab_jobs")
+        .select("id, job_ref, job_title, room_type, customer_id, company_id, drive_folder_id")
+        .eq("id", cabJobId)
+        .single();
+
+      if (!existingCabJob) {
+        return new Response(JSON.stringify({ error: "Cab job not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (existingCabJob.drive_folder_id) {
+        return new Response(JSON.stringify({ success: true, already_linked: true, folder_id: existingCabJob.drive_folder_id }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get customer last name
+      let customerLastName = "";
+      if (existingCabJob.customer_id) {
+        const { data: cust } = await supabaseAdmin
+          .from("cab_customers")
+          .select("last_name")
+          .eq("id", existingCabJob.customer_id)
+          .single();
+        customerLastName = cust?.last_name || "";
+      }
+
+      // Build folder name: {job_ref}_{last_name}_{room_type}
+      const parts = [existingCabJob.job_ref || "unknown"];
+      if (customerLastName) parts.push(customerLastName);
+      if (existingCabJob.room_type) parts.push(existingCabJob.room_type);
+      const cabFolderName = parts.join("_").replace(/[\/\\:*?"<>|]/g, "_");
+
+      // Use hardcoded _Jobs folder as parent
+      const JOBS_FOLDER_ID = "1FfyX8aL26pX3aLAvw2I7LWgGL4EjdMa7";
+
+      const accessToken = await getAccessToken();
+      const cabFolderId = await createDriveFolder(accessToken, JOBS_FOLDER_ID, cabFolderName);
+
+      // Save to cab_jobs
+      await supabaseAdmin.from("cab_jobs").update({
+        drive_folder_id: cabFolderId,
+        drive_folder_name: cabFolderName,
+        updated_at: new Date().toISOString(),
+      }).eq("id", cabJobId);
+
+      // Audit
+      await supabaseAdmin.from("drive_sync_audit").insert({
+        tenant_id: tenantId,
+        actor_staff_id: user.id,
+        action: "auto_create_cab_job_folder",
+        job_id: cabJobId,
+        drive_folder_id: cabFolderId,
+        payload_after_json: { folder_name: cabFolderName },
+      }).catch(() => {}); // silent if audit table missing columns
+
+      return new Response(JSON.stringify({ success: true, folder_id: cabFolderId, folder_name: cabFolderName }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // ─── INDEX JOB FILES ───
     if (action === "index_job_files") {

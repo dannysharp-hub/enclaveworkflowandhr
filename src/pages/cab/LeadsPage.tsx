@@ -232,6 +232,11 @@ export default function LeadsPage() {
             file_type: "drive_folder",
           });
 
+          // Auto-create Drive folder (fire & forget)
+          supabase.functions.invoke("google-drive-auth", {
+            body: { action: "create_cab_job_folder", cab_job_id: newJob.id },
+          }).catch(() => {});
+
           created++;
           console.log(`[Drive Import] Created job "${folderName}" → ${newJob.id}`);
         } catch (createErr: any) {
@@ -643,6 +648,11 @@ export async function submitLead(companyId: string, form: {
     companyId, eventType: "lead.captured", jobId: job.id, customerId: customerId!,
     payload: { room_type: jobType, notes: form.notes, source: form.source || null },
   });
+
+  // Auto-create Drive folder (fire & forget)
+  supabase.functions.invoke("google-drive-auth", {
+    body: { action: "create_cab_job_folder", cab_job_id: job.id },
+  }).catch(() => {});
 
   return { jobId: job.id, jobRef, reused: false };
 }
