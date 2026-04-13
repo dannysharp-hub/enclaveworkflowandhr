@@ -8,6 +8,13 @@ const corsHeaders = {
 
 const PARENT_FOLDER_ID = "1FfyX8aL26pX3aLAvw2I7LWgGL4EjdMa7";
 
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 async function getAccessToken(supabaseAdmin: any, tenantId: string): Promise<string> {
   const { data: tokenRow, error: tokenErr } = await supabaseAdmin
     .from("google_oauth_tokens")
@@ -83,10 +90,7 @@ Deno.serve(async (req) => {
     const { job_id, job_ref, customer_last_name } = await req.json();
 
     if (!job_id || !job_ref) {
-      return new Response(
-        JSON.stringify({ error: "job_id and job_ref are required", stage: errorStage }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ ok: false, error: "job_id and job_ref are required", stage: errorStage }, 400);
     }
 
     const supabaseAdmin = createClient(
@@ -94,11 +98,39 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Resolve tenant_id: try cab_company_tenant_map first, fall back to first available token
+    errorStage = "authenticate_user";
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ ok: false, error: "Unauthorized", stage: errorStage }, 401);
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const supabaseWithAuth = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: claimsData, error: authError } = await supabaseWithAuth.auth.getClaims(token);
+    if (authError || !claimsData?.claims?.sub) {
+      return jsonResponse({ ok: false, error: "Unauthorized", stage: errorStage }, 401);
+    }
+    const userId = claimsData.claims.sub as string;
+
+    // Resolve tenant_id from the authenticated caller, matching the existing Drive integration flow
     errorStage = "resolve_tenant";
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("tenant_id")
+      .eq("user_id", userId)
+      .single();
+
+    if (profileError || !profile?.tenant_id) {
+      throw new Error(`No tenant found for authenticated user ${userId}`);
+    }
+
     const { data: jobRow, error: jobErr } = await supabaseAdmin
       .from("cab_jobs")
-      .select("company_id")
+      .select("id, company_id, drive_folder_id")
       .eq("id", job_id)
       .single();
 
@@ -106,27 +138,18 @@ Deno.serve(async (req) => {
       throw new Error(`Job not found: ${job_id}`);
     }
 
-    let tenantId: string | null = null;
-
-    // Try tenant map first
-    const { data: tenantMap } = await supabaseAdmin
-      .from("cab_company_tenant_map")
-      .select("tenant_id")
-      .eq("company_id", jobRow.company_id)
-      .single();
-
-    if (tenantMap?.tenant_id) {
-      tenantId = tenantMap.tenant_id;
-    } else {
-      // Fallback: use the first available google_oauth_tokens row
-      const { data: fallbackToken } = await supabaseAdmin
-        .from("google_oauth_tokens")
-        .select("tenant_id")
-        .limit(1)
-        .single();
-      tenantId = fallbackToken?.tenant_id || null;
-      console.log(`No tenant map for company ${jobRow.company_id}, falling back to tenant ${tenantId}`);
+    if (jobRow.drive_folder_id) {
+      return jsonResponse({
+        ok: true,
+        drive_folder_id: jobRow.drive_folder_id,
+        drive_folder_name: job_ref,
+        already_linked: true,
+        stage: errorStage,
+        processing_time_ms: Date.now() - startTime,
+      });
     }
+
+    const tenantId = profile.tenant_id;
 
     if (!tenantId) {
       throw new Error("No Google OAuth tokens configured. Please connect Google Drive first.");
@@ -177,23 +200,19 @@ Deno.serve(async (req) => {
 
     if (updateError) throw updateError;
 
-    return new Response(
-      JSON.stringify({
-        drive_folder_id: driveFolder.id,
-        drive_folder_name: folderName,
-        processing_time_ms: Date.now() - startTime,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      ok: true,
+      drive_folder_id: driveFolder.id,
+      drive_folder_name: folderName,
+      processing_time_ms: Date.now() - startTime,
+    });
   } catch (err: any) {
     console.error(`create-drive-folder failed at stage="${errorStage}":`, err.message);
-    return new Response(
-      JSON.stringify({
-        error: err.message,
-        stage: errorStage,
-        processing_time_ms: Date.now() - startTime,
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      ok: false,
+      error: err.message,
+      stage: errorStage,
+      processing_time_ms: Date.now() - startTime,
+    }, 500);
   }
 });
