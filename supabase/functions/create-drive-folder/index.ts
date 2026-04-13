@@ -175,6 +175,10 @@ Deno.serve(async (req) => {
     const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
     const folderName = `${jobNumber}_${capitalize(customer.first_name)}${capitalize(customer.last_name)}`;
 
+    // Get access token
+    errorStage = "get_access_token";
+    const accessToken = await getAccessToken(supabaseAdmin, tenantId);
+
     // Create folder in Google Drive
     errorStage = "create_drive_folder";
     console.log(`Creating Drive folder: ${folderName} in parent ${PARENT_FOLDER_ID}`);
