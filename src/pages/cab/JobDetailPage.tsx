@@ -1245,6 +1245,84 @@ export default function JobDetailPage() {
             </div>
           )}
 
+          {/* Design Sign-Off */}
+          {job && (() => {
+            const DEPOSIT_AND_BEYOND = ["deposit_received", "project_confirmed", "materials_ordered", "manufacturing_started", "cabinetry_assembled", "ready_for_installation", "install_booked", "installation_complete", "practical_completed", "closed_paid"];
+            if (!DEPOSIT_AND_BEYOND.includes(stageKey || "")) return null;
+            const isSigned = !!job.customer_signoff_at;
+            return (
+              <div className="rounded-lg border border-border bg-card p-4">
+                <h3 className="font-mono text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                  <ClipboardCheck size={14} className="text-primary" /> Design Sign-Off
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isSigned ? "default" : "outline"} className={isSigned ? "bg-emerald-600 text-white" : ""}>
+                      {isSigned ? "Signed" : "Pending"}
+                    </Badge>
+                    {isSigned && job.customer_signoff_at && (
+                      <span className="text-xs text-muted-foreground">Signed {format(new Date(job.customer_signoff_at), "dd MMM yyyy HH:mm")}</span>
+                    )}
+                  </div>
+                  {job.sign_off_signature_url && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <FileText size={12} className="text-muted-foreground" />
+                      <a href={job.sign_off_signature_url} target="_blank" rel="noopener noreferrer" className="text-primary underline truncate max-w-xs">
+                        View signed document
+                      </a>
+                    </div>
+                  )}
+                  {!isSigned && (
+                    <div className="space-y-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Attach signed document (optional)</Label>
+                        <Input
+                          type="file"
+                          className="h-8 text-xs mt-1"
+                          accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const path = `${job.id}/design-signoff-${Date.now()}.${file.name.split(".").pop()}`;
+                            const { error: uploadErr } = await supabase.storage.from("install-signoffs").upload(path, file);
+                            if (uploadErr) {
+                              toast({ title: "Upload failed", description: uploadErr.message, variant: "destructive" });
+                              return;
+                            }
+                            const { data: urlData } = supabase.storage.from("install-signoffs").getPublicUrl(path);
+                            await updateJob({ sign_off_signature_url: urlData.publicUrl });
+                            toast({ title: "Document attached" });
+                            load();
+                          }}
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          const now = new Date().toISOString();
+                          await updateJob({
+                            customer_signoff_at: now,
+                            current_stage_key: "design_signed_off",
+                          });
+                          await insertCabEvent({
+                            companyId: companyId!,
+                            eventType: "design.signed_off",
+                            jobId: job.id,
+                            payload: { signed_at: now },
+                          });
+                          toast({ title: "Design sign-off recorded" });
+                          load();
+                        }}
+                      >
+                        <CheckCircle2 size={12} className="mr-1" /> Mark as Signed Off
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Invoices */}
           {invoices.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-4">
