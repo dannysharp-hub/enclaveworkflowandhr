@@ -1527,6 +1527,9 @@ export type Database = {
           sign_off_completed_at: string | null
           sign_off_signature_url: string | null
           sign_off_token: string | null
+          site_visit_2_completed: boolean | null
+          site_visit_2_date: string | null
+          site_visit_2_notes: string | null
           state: string | null
           status: string
           target_margin_pct: number | null
@@ -1597,6 +1600,9 @@ export type Database = {
           sign_off_completed_at?: string | null
           sign_off_signature_url?: string | null
           sign_off_token?: string | null
+          site_visit_2_completed?: boolean | null
+          site_visit_2_date?: string | null
+          site_visit_2_notes?: string | null
           state?: string | null
           status?: string
           target_margin_pct?: number | null
@@ -1667,6 +1673,9 @@ export type Database = {
           sign_off_completed_at?: string | null
           sign_off_signature_url?: string | null
           sign_off_token?: string | null
+          site_visit_2_completed?: boolean | null
+          site_visit_2_date?: string | null
+          site_visit_2_notes?: string | null
           state?: string | null
           status?: string
           target_margin_pct?: number | null

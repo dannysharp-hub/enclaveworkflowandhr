@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import DriveQuoteAttach from "@/components/DriveQuoteAttach";
 import CompletionPhotos from "@/components/cab/CompletionPhotos";
 import QuoteBuilder from "@/components/QuoteBuilder";
@@ -1174,6 +1177,85 @@ export default function JobDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Site Visit 2 (Post-Deposit Technical Survey) */}
+          {job && (() => {
+            const SV2_VISIBLE_STAGES = ["awaiting_deposit", "deposit", "deposit_received", "design", "design_signed_off", "in_production", "manufacturing", "manufacturing_started", "project_confirmed", "materials_ordered", "cabinetry_assembled", "ready_to_install", "ready_for_installation", "install", "install_booked", "installation_complete", "complete", "practical_completed", "closed_paid"];
+            if (!SV2_VISIBLE_STAGES.includes(stageKey || "")) return null;
+            const isCompleted = !!job.site_visit_2_completed;
+            return (
+              <div className="rounded-lg border border-border bg-card p-4">
+                <h3 className="font-mono text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                  <ClipboardCheck size={14} className="text-primary" /> Site Visit 2 — Technical Survey
+                </h3>
+                <div className="space-y-3">
+                  {isCompleted && (
+                    <Badge variant="default" className="gap-1"><CheckCircle2 size={10} /> Completed</Badge>
+                  )}
+
+                  {/* Date picker */}
+                  <div>
+                    <Label className="text-xs">Site Visit 2 Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-xs", !job.site_visit_2_date && "text-muted-foreground")}>
+                          <CalendarDays size={12} className="mr-2" />
+                          {job.site_visit_2_date ? format(new Date(job.site_visit_2_date), "dd MMM yyyy") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarPicker
+                          mode="single"
+                          selected={job.site_visit_2_date ? new Date(job.site_visit_2_date) : undefined}
+                          onSelect={async (date: Date | undefined) => {
+                            if (!date) return;
+                            await (supabase.from("cab_jobs") as any).update({ site_visit_2_date: date.toISOString(), updated_at: new Date().toISOString() }).eq("id", job.id);
+                            toast({ title: "Site Visit 2 date saved" });
+                            load();
+                          }}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <Label className="text-xs">Notes</Label>
+                    <textarea
+                      className="w-full min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      defaultValue={job.site_visit_2_notes || ""}
+                      placeholder="Technical survey notes…"
+                      onBlur={async (e) => {
+                        const val = e.target.value;
+                        if (val !== (job.site_visit_2_notes || "")) {
+                          await (supabase.from("cab_jobs") as any).update({ site_visit_2_notes: val, updated_at: new Date().toISOString() }).eq("id", job.id);
+                          toast({ title: "Notes saved" });
+                          load();
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Mark complete */}
+                  {!isCompleted && (
+                    <Button size="sm" variant="outline" className="w-full" onClick={async () => {
+                      const now = new Date().toISOString();
+                      await (supabase.from("cab_jobs") as any).update({ site_visit_2_completed: true, updated_at: now }).eq("id", job.id);
+                      if (companyId) {
+                        await insertCabEvent({ companyId, eventType: "site_visit_2.completed", jobId: job.id, payload: { completed_at: now } });
+                      }
+                      toast({ title: "Site Visit 2 marked complete" });
+                      load();
+                    }}>
+                      <CheckCircle2 size={12} className="mr-1" /> Mark Site Visit 2 Complete
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Design Sign-Off */}
           {job && (() => {
