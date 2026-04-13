@@ -106,8 +106,11 @@ export default function ProductionBoardPage() {
 
     setJobs(data.map((j: any) => {
       const c: any = custMap.get(j.customer_id) || {};
+      // Resolve effective production stage: prefer production_stage, fall back to production_stage_key
+      const effectiveStage = j.production_stage || (stageKeys.includes(j.production_stage_key) ? j.production_stage_key : null);
       return {
         ...j,
+        production_stage: effectiveStage,
         customer_first_name: c.first_name || "",
         customer_last_name: c.last_name || "",
         customer_email: c.email || null,
