@@ -63,6 +63,8 @@ export default function JobDetailPage() {
   const [installCompleteSending, setInstallCompleteSending] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [dfUploading, setDfUploading] = useState(false);
+  const [dfSending, setDfSending] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
