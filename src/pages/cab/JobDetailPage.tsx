@@ -53,9 +53,7 @@ export default function JobDetailPage() {
   const [emitting, setEmitting] = useState<string | null>(null);
   const [ghlSyncing, setGhlSyncing] = useState(false);
   const [installAssigning, setInstallAssigning] = useState(false);
-  const [driveFolderName, setDriveFolderName] = useState("");
   const [linkingDrive, setLinkingDrive] = useState(false);
-  const [linkedFolder, setLinkedFolder] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [installCompleteOpen, setInstallCompleteOpen] = useState(false);
