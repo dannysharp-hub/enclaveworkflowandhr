@@ -104,6 +104,7 @@ export default function JobDetailPage() {
 
   const updateJob = async (updates: Record<string, any>) => {
     await (supabase.from("cab_jobs") as any).update(updates).eq("id", job.id);
+    regenerateJobCard(job.id);
   };
 
   const startEdit = (field: string, currentValue: string) => {
