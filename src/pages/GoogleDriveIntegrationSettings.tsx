@@ -645,6 +645,11 @@ export default function GoogleDriveIntegrationSettings() {
         </div>
       )}
 
+      {/* ─── Backfill Drive Folders ─── */}
+      {isConnected && (
+        <BackfillDriveFoldersPanel />
+      )}
+
       {/* ─── Advanced ─── */}
       {isConnected && (
         <div className="glass-panel rounded-lg max-w-2xl overflow-hidden">
