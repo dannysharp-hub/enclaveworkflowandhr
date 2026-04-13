@@ -68,6 +68,8 @@ export default function JobDetailPage() {
   const [icFitterNotes, setIcFitterNotes] = useState("");
   const [icSignoffUploading, setIcSignoffUploading] = useState(false);
   const [icCompleting, setIcCompleting] = useState(false);
+  const [scheduledTasks, setScheduledTasks] = useState<any[]>([]);
+  const [reviewSending, setReviewSending] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -94,6 +96,7 @@ export default function JobDetailPage() {
       (supabase.from("cab_appointments") as any).select("*").eq("job_id", jobData.id).order("start_at", { ascending: true }),
       (supabase.from("cab_company_memberships") as any).select("user_id, role").eq("company_id", cid),
       (supabase.from("cab_ghl_sync_log") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }).limit(3),
+      (supabase.from("scheduled_tasks") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }),
     ]);
 
     setCustomer(custRes.data);
@@ -103,6 +106,7 @@ export default function JobDetailPage() {
     setAppointments(apptRes.data ?? []);
     setTeamMembers(teamRes.data ?? []);
     setLastSyncLogs(syncLogRes.data ?? []);
+    setScheduledTasks(scheduledTasksRes.data ?? []);
     setLoading(false);
   }, [jobRef, navigate]);
 
