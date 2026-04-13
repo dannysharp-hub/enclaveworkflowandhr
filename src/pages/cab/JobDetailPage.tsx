@@ -1419,6 +1419,124 @@ export default function JobDetailPage() {
             </div>
           )}
 
+          {/* Dry Fit & Progress Payment */}
+          {job && (() => {
+            const DRYFIT_VISIBLE_STAGES = ["assembly", "cabinetry_assembled", "ready_for_installation", "install_booked", "installation_complete", "practical_completed", "closed_paid"];
+            const prodKey = job.production_stage_key || job.production_stage || "";
+            if (!DRYFIT_VISIBLE_STAGES.includes(prodKey) && !DRYFIT_VISIBLE_STAGES.includes(stageKey || "")) return null;
+            const isDryFitDone = !!job.dry_fit_completed;
+            const photoUrls: string[] = job.dry_fit_photo_urls || [];
+            const [dfUploading, setDfUploading] = useState(false);
+            const [dfSending, setDfSending] = useState(false);
+
+            const handleDfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+              const files = Array.from(e.target.files || []);
+              if (!files.length) return;
+              setDfUploading(true);
+              try {
+                const newUrls: string[] = [...photoUrls];
+                for (const file of files) {
+                  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+                  const path = `${job.id}/dry-fit/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+                  const { error } = await supabase.storage.from("job-photos").upload(path, file, { contentType: file.type });
+                  if (error) throw error;
+                  const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(path);
+                  newUrls.push(urlData.publicUrl);
+                }
+                await (supabase.from("cab_jobs") as any).update({ dry_fit_photo_urls: newUrls }).eq("id", job.id);
+                toast({ title: `${files.length} photo(s) uploaded` });
+                load();
+              } catch (err: any) {
+                toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+              } finally {
+                setDfUploading(false);
+                e.target.value = "";
+              }
+            };
+
+            const handleDfComplete = async () => {
+              const now = new Date().toISOString();
+              await (supabase.from("cab_jobs") as any).update({ dry_fit_completed: true, dry_fit_completed_at: now }).eq("id", job.id);
+              if (companyId) {
+                insertCabEvent({ companyId, eventType: "dry_fit.completed", jobId: job.id, payload: {} }).catch(console.warn);
+              }
+              toast({ title: "Dry fit marked complete" });
+              load();
+            };
+
+            const handleSendProgressInvoice = async () => {
+              setDfSending(true);
+              try {
+                if (companyId) {
+                  await insertCabEvent({ companyId, eventType: "invoice.progress_requested", jobId: job.id, payload: {} });
+                }
+                toast({ title: "Progress invoice requested" });
+                load();
+              } catch (err: any) {
+                toast({ title: "Error", description: err.message, variant: "destructive" });
+              } finally {
+                setDfSending(false);
+              }
+            };
+
+            return (
+              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                  <Hammer size={14} className="text-primary" /> Dry Fit & Progress Payment
+                </h3>
+
+                {/* Dry Fit Photos */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Dry Fit Photos</Label>
+                  {photoUrls.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {photoUrls.map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                          className="aspect-square rounded-md overflow-hidden border border-border hover:border-primary/50 transition-colors">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  <label>
+                    <Button size="sm" variant="outline" asChild disabled={dfUploading}>
+                      <span className="cursor-pointer">
+                        {dfUploading ? <><Loader2 size={14} className="animate-spin mr-1" /> Uploading…</> : <><Camera size={14} className="mr-1" /> Add Photos</>}
+                      </span>
+                    </Button>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleDfUpload} />
+                  </label>
+                </div>
+
+                {/* Dry Fit Completed */}
+                <div className="flex items-center justify-between p-3 rounded border border-border">
+                  <div className="flex items-center gap-2">
+                    {isDryFitDone ? <CheckCircle2 size={14} className="text-emerald-500" /> : <span className="text-muted-foreground text-xs">●</span>}
+                    <span className="text-sm font-medium">Dry Fit Complete</span>
+                    {job.dry_fit_completed_at && <span className="text-[10px] text-muted-foreground">· {format(new Date(job.dry_fit_completed_at), "dd MMM yyyy")}</span>}
+                  </div>
+                  {!isDryFitDone && (
+                    <Button size="sm" variant="outline" onClick={handleDfComplete}>
+                      <CheckCircle2 size={12} className="mr-1" /> Mark Complete
+                    </Button>
+                  )}
+                </div>
+
+                {/* Send Progress Invoice */}
+                <Button
+                  size="sm"
+                  className="w-full"
+                  disabled={!isDryFitDone || !!job.progress_payment_paid_at || dfSending}
+                  onClick={handleSendProgressInvoice}
+                >
+                  <Send size={12} className="mr-1" /> {dfSending ? "Sending…" : "Send Progress Invoice"}
+                </Button>
+                {!isDryFitDone && <p className="text-[10px] text-muted-foreground">Complete dry fit to enable progress invoice</p>}
+                {isDryFitDone && job.progress_payment_paid_at && <p className="text-[10px] text-emerald-600">Progress payment already received</p>}
+              </div>
+            );
+          })()}
+
           {/* Invoices */}
           {invoices.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-4">
