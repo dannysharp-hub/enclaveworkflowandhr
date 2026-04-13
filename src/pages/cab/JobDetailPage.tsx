@@ -1096,86 +1096,58 @@ export default function JobDetailPage() {
             </p>
           </div>
 
-          {/* Link Drive Folder */}
+          {/* Google Drive */}
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
-              <Link size={14} className="text-primary" /> Link Drive Folder
+              <Link size={14} className="text-primary" /> Google Drive
             </h3>
-            {(job.drive_folder_id || linkedFolder) ? (
+            {job.drive_folder_id ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Folder:</span>
-                  <span className="text-xs font-medium text-foreground">{job.drive_folder_name || linkedFolder}</span>
+                  <span className="text-xs font-medium text-foreground">{job.drive_folder_name || job.drive_folder_id}</span>
+                  <Badge variant="default" className="bg-green-600 text-white text-[10px] px-1.5 py-0">Linked</Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">ID:</span>
-                  <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[200px]" title={job.drive_folder_id}>{job.drive_folder_id || "—"}</span>
+                  <a
+                    href={`https://drive.google.com/drive/folders/${job.drive_folder_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    <ExternalLink size={12} /> Open in Drive
+                  </a>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs h-7 text-destructive hover:text-destructive"
-                  onClick={async () => {
-                    try {
-                      await (supabase.from("cab_jobs") as any)
-                        .update({ drive_folder_id: null, drive_folder_name: null })
-                        .eq("id", job.id);
-                      setJob((prev: any) => ({ ...prev, drive_folder_id: null, drive_folder_name: null }));
-                      setLinkedFolder(null);
-                      toast({ title: "Drive folder unlinked" });
-                    } catch (err: any) {
-                      toast({ title: "Unlink failed", description: err.message, variant: "destructive" });
-                    }
-                  }}
-                >
-                  <XIcon size={12} className="mr-1" /> Unlink
-                </Button>
               </div>
             ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={driveFolderName}
-                    onChange={e => setDriveFolderName(e.target.value)}
-                    placeholder="e.g. 059_SpacemakerDevelopments-SycamoreHouse"
-                    className="text-xs h-8 flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!driveFolderName.trim() || linkingDrive}
-                    className="text-xs h-8"
-                    onClick={async () => {
-                      setLinkingDrive(true);
-                      try {
-                        const { data, error } = await supabase.functions.invoke("google-drive-auth", {
-                          body: { action: "search_folder_by_name", folder_name: driveFolderName.trim(), job_id: job.id },
-                        });
-                        if (error) throw error;
-                        if (data?.error) throw new Error(data.error);
-                        // Save to cab_jobs columns
-                        await (supabase.from("cab_jobs") as any)
-                          .update({ drive_folder_id: data.folder_id, drive_folder_name: data.folder_name })
-                          .eq("id", job.id);
-                        setJob((prev: any) => ({ ...prev, drive_folder_id: data.folder_id, drive_folder_name: data.folder_name }));
-                        setLinkedFolder(data.folder_name);
-                        setDriveFolderName("");
-                        toast({ title: "Drive folder linked", description: `Linked to "${data.folder_name}"` });
-                      } catch (err: any) {
-                        toast({ title: "Link failed", description: err.message, variant: "destructive" });
-                      } finally {
-                        setLinkingDrive(false);
-                      }
-                    }}
-                  >
-                    {linkingDrive ? <RefreshCw size={12} className="animate-spin" /> : <Link size={12} />}
-                    Link
-                  </Button>
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Enter the exact Drive folder name from _Jobs to link it to this job.
-                </p>
-              </>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={linkingDrive}
+                className="text-xs h-8"
+                onClick={async () => {
+                  setLinkingDrive(true);
+                  try {
+                    const { data, error } = await supabase.functions.invoke("create-drive-folder", {
+                      body: {
+                        job_id: job.id,
+                        job_ref: job.job_ref,
+                        customer_last_name: customer?.last_name || "unknown",
+                      },
+                    });
+                    if (error) throw error;
+                    if (data?.error) throw new Error(data.error);
+                    setJob((prev: any) => ({ ...prev, drive_folder_id: data.drive_folder_id, drive_folder_name: data.drive_folder_name }));
+                    toast({ title: "Drive folder created", description: `Created "${data.drive_folder_name}"` });
+                  } catch (err: any) {
+                    toast({ title: "Failed to create folder", description: err.message, variant: "destructive" });
+                  } finally {
+                    setLinkingDrive(false);
+                  }
+                }}
+              >
+                {linkingDrive ? <RefreshCw size={12} className="animate-spin mr-1" /> : <Link size={12} className="mr-1" />}
+                Create Drive Folder
+              </Button>
             )}
           </div>
 
