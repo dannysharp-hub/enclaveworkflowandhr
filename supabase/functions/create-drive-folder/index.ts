@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Resolve tenant_id from the job's company
+    // Resolve tenant_id: try cab_company_tenant_map first, fall back to first available token
     errorStage = "resolve_tenant";
     const { data: jobRow, error: jobErr } = await supabaseAdmin
       .from("cab_jobs")
@@ -106,18 +106,34 @@ Deno.serve(async (req) => {
       throw new Error(`Job not found: ${job_id}`);
     }
 
-    const { data: tenantMap, error: tmErr } = await supabaseAdmin
+    let tenantId: string | null = null;
+
+    // Try tenant map first
+    const { data: tenantMap } = await supabaseAdmin
       .from("cab_company_tenant_map")
       .select("tenant_id")
       .eq("company_id", jobRow.company_id)
       .single();
 
-    if (tmErr || !tenantMap) {
-      throw new Error(`No tenant mapping for company ${jobRow.company_id}`);
+    if (tenantMap?.tenant_id) {
+      tenantId = tenantMap.tenant_id;
+    } else {
+      // Fallback: use the first available google_oauth_tokens row
+      const { data: fallbackToken } = await supabaseAdmin
+        .from("google_oauth_tokens")
+        .select("tenant_id")
+        .limit(1)
+        .single();
+      tenantId = fallbackToken?.tenant_id || null;
+      console.log(`No tenant map for company ${jobRow.company_id}, falling back to tenant ${tenantId}`);
+    }
+
+    if (!tenantId) {
+      throw new Error("No Google OAuth tokens configured. Please connect Google Drive first.");
     }
 
     errorStage = "get_access_token";
-    const accessToken = await getAccessToken(supabaseAdmin, tenantMap.tenant_id);
+    const accessToken = await getAccessToken(supabaseAdmin, tenantId);
 
     // Build folder name
     const safeName = (customer_last_name || "unknown").replace(/[^a-zA-Z0-9_\-]/g, "");
