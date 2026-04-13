@@ -653,14 +653,20 @@ export async function submitLead(companyId: string, form: {
     payload: { room_type: jobType, notes: form.notes, source: form.source || null },
   });
 
-  // Auto-create Drive folder, then generate Job Card PDF
-  supabase.functions.invoke("google-drive-auth", {
-    body: { action: "create_cab_job_folder", cab_job_id: job.id },
-  }).then(() => {
+  // Auto-create Drive folder in the background, then generate Job Card PDF
+  supabase.functions.invoke("create-drive-folder", {
+    body: { job_id: job.id, job_ref: jobRef, customer_last_name: form.lastName },
+  }).then((res) => {
+    if (res.error) console.warn("[AutoDriveFolder] Failed:", res.error);
+    else if (!res.data?.ok) console.warn("[AutoDriveFolder] Failed:", res.data?.error);
+    else console.log("[AutoDriveFolder] Created:", res.data.drive_folder_id);
+    // Generate job card regardless of folder outcome
     supabase.functions.invoke("google-drive-auth", {
       body: { action: "generate_job_card", cab_job_id: job.id },
-    }).catch(() => {});
-  }).catch(() => {});
+    }).catch((e) => console.warn("[AutoJobCard] Failed:", e));
+  }).catch((e) => {
+    console.warn("[AutoDriveFolder] Error:", e);
+  });
 
   return { jobId: job.id, jobRef, reused: false };
 }
