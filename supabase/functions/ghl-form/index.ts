@@ -509,18 +509,6 @@ Deno.serve(async (req) => {
                     updated_at: new Date().toISOString(),
                   }).eq("id", job.id);
                   console.log(`ghl-form: Drive folder created "${folderName}" → ${createData.id}`);
-
-                  // Generate Job Card PDF in the new folder (fire & forget via edge function)
-                  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-                  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-                  fetch(`${SUPABASE_URL}/functions/v1/google-drive-auth`, {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-                    },
-                    body: JSON.stringify({ action: "generate_job_card", cab_job_id: job.id }),
-                  }).catch((e: unknown) => console.error("ghl-form: Job Card PDF generation failed (non-fatal)", e));
                 }
               }
             }
