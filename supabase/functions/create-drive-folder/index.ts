@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
 
     const { data: jobRow, error: jobErr } = await supabaseAdmin
       .from("cab_jobs")
-      .select("id, company_id, drive_folder_id")
+      .select("id, company_id, drive_folder_id, customer_id, job_ref")
       .eq("id", job_id)
       .single();
 
@@ -155,11 +155,25 @@ Deno.serve(async (req) => {
       throw new Error("No Google OAuth tokens configured. Please connect Google Drive first.");
     }
 
-    errorStage = "get_access_token";
-    const accessToken = await getAccessToken(supabaseAdmin, tenantId);
+    // Look up customer name for folder naming
+    errorStage = "lookup_customer";
+    const { data: customer, error: custErr } = await supabaseAdmin
+      .from("cab_customers")
+      .select("first_name, last_name")
+      .eq("id", jobRow.customer_id)
+      .single();
 
-    // Build folder name
-    const folderName = job_ref;
+    if (custErr || !customer) {
+      throw new Error(`Customer not found for job ${job_id}`);
+    }
+
+    // Extract job number from job_ref (e.g. "011_dannysharp" → "011")
+    const jobNumberMatch = (jobRow.job_ref || job_ref).match(/^(\d+)/);
+    const jobNumber = jobNumberMatch ? jobNumberMatch[1].padStart(3, "0") : "000";
+
+    // Capitalise first letter of each name part
+    const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+    const folderName = `${jobNumber}_${capitalize(customer.first_name)}${capitalize(customer.last_name)}`;
 
     // Create folder in Google Drive
     errorStage = "create_drive_folder";
