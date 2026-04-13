@@ -88,7 +88,7 @@ export default function JobDetailPage() {
     if (!jobData) { navigate("/admin/leads"); return; }
     setJob(jobData);
 
-    const [custRes, quotesRes, invRes, eventsRes, apptRes, teamRes, syncLogRes] = await Promise.all([
+    const [custRes, quotesRes, invRes, eventsRes, apptRes, teamRes, syncLogRes, scheduledTasksRes] = await Promise.all([
       (supabase.from("cab_customers") as any).select("*").eq("id", jobData.customer_id).single(),
       (supabase.from("cab_quotes") as any).select("*").eq("job_id", jobData.id).order("version", { ascending: false }),
       (supabase.from("cab_invoices") as any).select("*").eq("job_id", jobData.id).order("created_at"),
