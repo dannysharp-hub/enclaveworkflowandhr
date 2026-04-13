@@ -232,6 +232,11 @@ export default function LeadsPage() {
             file_type: "drive_folder",
           });
 
+          // Auto-create Drive folder (fire & forget)
+          supabase.functions.invoke("google-drive-auth", {
+            body: { action: "create_cab_job_folder", cab_job_id: newJob.id },
+          }).catch(() => {});
+
           created++;
           console.log(`[Drive Import] Created job "${folderName}" → ${newJob.id}`);
         } catch (createErr: any) {
