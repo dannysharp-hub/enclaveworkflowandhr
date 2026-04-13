@@ -1175,80 +1175,10 @@ export default function JobDetailPage() {
             </div>
           )}
 
-          {/* Payment Stages */}
-          {job && (
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="font-mono text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-                <Banknote size={14} className="text-primary" /> Payments
-              </h3>
-              {(() => {
-                const cv = Number(job.contract_value) || 0;
-                const stages = [
-                  { key: "deposit", label: "Deposit (50%)", pct: 0.5, amount: job.deposit_amount, paidAt: job.deposit_paid_at, amountCol: "deposit_amount", paidCol: "deposit_paid_at", enabled: true },
-                  { key: "progress", label: "Progress Payment (40%)", pct: 0.4, amount: job.progress_payment_amount, paidAt: job.progress_payment_paid_at, amountCol: "progress_payment_amount", paidCol: "progress_payment_paid_at", enabled: !!job.deposit_paid_at },
-                  { key: "final", label: "Final Payment (10%)", pct: 0.1, amount: job.final_payment_amount, paidAt: job.final_payment_paid_at, amountCol: "final_payment_amount", paidCol: "final_payment_paid_at", enabled: !!job.progress_payment_paid_at },
-                ];
-                const handleMarkStagePaid = async (stage: typeof stages[0]) => {
-                  const now = new Date().toISOString();
-                  const update: any = { [stage.paidCol]: now };
-                  // Auto-set amount from contract_value if not yet set
-                  if (!stage.amount && cv > 0) {
-                    update[stage.amountCol] = Math.round(cv * stage.pct * 100) / 100;
-                  }
-                  await (supabase.from("cab_jobs") as any).update(update).eq("id", job.id);
-                  toast({ title: `${stage.label} marked as paid` });
-                  if (job.drive_folder_id) {
-                    supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
-                      .catch((e) => console.warn("[write-job-json] sync failed:", e));
-                  }
-                  load();
-                };
-                const handleSetAmounts = async () => {
-                  if (cv <= 0) { toast({ title: "Set contract value first", variant: "destructive" }); return; }
-                  await (supabase.from("cab_jobs") as any).update({
-                    deposit_amount: Math.round(cv * 0.5 * 100) / 100,
-                    progress_payment_amount: Math.round(cv * 0.4 * 100) / 100,
-                    final_payment_amount: Math.round(cv * 0.1 * 100) / 100,
-                  }).eq("id", job.id);
-                  toast({ title: "Payment amounts calculated from contract value" });
-                  load();
-                };
-                return (
-                  <div className="space-y-3">
-                    {cv > 0 && !job.deposit_amount && (
-                      <Button size="sm" variant="outline" className="w-full" onClick={handleSetAmounts}>
-                        <RefreshCw size={12} className="mr-1" /> Auto-calculate amounts from £{cv.toLocaleString()}
-                      </Button>
-                    )}
-                    {stages.map((s, i) => (
-                      <div key={s.key} className={`flex items-center justify-between p-3 rounded border ${s.paidAt ? "border-emerald-500/30 bg-emerald-500/5" : "border-border"}`}>
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            {s.paidAt ? <CheckCircle2 size={14} className="text-emerald-500" /> : <span className="text-muted-foreground text-xs">●</span>}
-                            <span className="text-sm font-medium">{s.label}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-mono">£{(Number(s.amount) || Math.round(cv * s.pct * 100) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 })}</span>
-                            {s.paidAt && <span>· Paid {format(new Date(s.paidAt), "dd MMM yyyy")}</span>}
-                          </div>
-                        </div>
-                        {!s.paidAt && (
-                          <Button size="sm" variant="outline" disabled={!s.enabled} onClick={() => handleMarkStagePaid(s)}>
-                            <Banknote size={12} className="mr-1" /> Mark as Paid
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
           {/* Design Sign-Off */}
           {job && (() => {
-            const DEPOSIT_AND_BEYOND = ["deposit_received", "project_confirmed", "materials_ordered", "manufacturing_started", "cabinetry_assembled", "ready_for_installation", "install_booked", "installation_complete", "practical_completed", "closed_paid"];
-            if (!DEPOSIT_AND_BEYOND.includes(stageKey || "")) return null;
+            const SIGNOFF_VISIBLE_STAGES = ["awaiting_deposit", "deposit", "deposit_received", "design", "design_signed_off", "in_production", "manufacturing", "manufacturing_started", "project_confirmed", "materials_ordered", "cabinetry_assembled", "ready_to_install", "ready_for_installation", "install", "install_booked", "installation_complete", "complete", "practical_completed", "closed_paid"];
+            if (!SIGNOFF_VISIBLE_STAGES.includes(stageKey || "")) return null;
             const isSigned = !!job.customer_signoff_at;
             return (
               <div className="rounded-lg border border-border bg-card p-4">
@@ -1322,6 +1252,76 @@ export default function JobDetailPage() {
               </div>
             );
           })()}
+
+          {/* Payment Stages */}
+          {job && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="font-mono text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                <Banknote size={14} className="text-primary" /> Payments
+              </h3>
+              {(() => {
+                const cv = Number(job.contract_value) || 0;
+                const stages = [
+                  { key: "deposit", label: "Deposit (50%)", pct: 0.5, amount: job.deposit_amount, paidAt: job.deposit_paid_at, amountCol: "deposit_amount", paidCol: "deposit_paid_at", enabled: true },
+                  { key: "progress", label: "Progress Payment (40%)", pct: 0.4, amount: job.progress_payment_amount, paidAt: job.progress_payment_paid_at, amountCol: "progress_payment_amount", paidCol: "progress_payment_paid_at", enabled: !!job.deposit_paid_at },
+                  { key: "final", label: "Final Payment (10%)", pct: 0.1, amount: job.final_payment_amount, paidAt: job.final_payment_paid_at, amountCol: "final_payment_amount", paidCol: "final_payment_paid_at", enabled: !!job.progress_payment_paid_at },
+                ];
+                const handleMarkStagePaid = async (stage: typeof stages[0]) => {
+                  const now = new Date().toISOString();
+                  const update: any = { [stage.paidCol]: now };
+                  // Auto-set amount from contract_value if not yet set
+                  if (!stage.amount && cv > 0) {
+                    update[stage.amountCol] = Math.round(cv * stage.pct * 100) / 100;
+                  }
+                  await (supabase.from("cab_jobs") as any).update(update).eq("id", job.id);
+                  toast({ title: `${stage.label} marked as paid` });
+                  if (job.drive_folder_id) {
+                    supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
+                      .catch((e) => console.warn("[write-job-json] sync failed:", e));
+                  }
+                  load();
+                };
+                const handleSetAmounts = async () => {
+                  if (cv <= 0) { toast({ title: "Set contract value first", variant: "destructive" }); return; }
+                  await (supabase.from("cab_jobs") as any).update({
+                    deposit_amount: Math.round(cv * 0.5 * 100) / 100,
+                    progress_payment_amount: Math.round(cv * 0.4 * 100) / 100,
+                    final_payment_amount: Math.round(cv * 0.1 * 100) / 100,
+                  }).eq("id", job.id);
+                  toast({ title: "Payment amounts calculated from contract value" });
+                  load();
+                };
+                return (
+                  <div className="space-y-3">
+                    {cv > 0 && !job.deposit_amount && (
+                      <Button size="sm" variant="outline" className="w-full" onClick={handleSetAmounts}>
+                        <RefreshCw size={12} className="mr-1" /> Auto-calculate amounts from £{cv.toLocaleString()}
+                      </Button>
+                    )}
+                    {stages.map((s, i) => (
+                      <div key={s.key} className={`flex items-center justify-between p-3 rounded border ${s.paidAt ? "border-emerald-500/30 bg-emerald-500/5" : "border-border"}`}>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            {s.paidAt ? <CheckCircle2 size={14} className="text-emerald-500" /> : <span className="text-muted-foreground text-xs">●</span>}
+                            <span className="text-sm font-medium">{s.label}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-mono">£{(Number(s.amount) || Math.round(cv * s.pct * 100) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 })}</span>
+                            {s.paidAt && <span>· Paid {format(new Date(s.paidAt), "dd MMM yyyy")}</span>}
+                          </div>
+                        </div>
+                        {!s.paidAt && (
+                          <Button size="sm" variant="outline" disabled={!s.enabled} onClick={() => handleMarkStagePaid(s)}>
+                            <Banknote size={12} className="mr-1" /> Mark as Paid
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Invoices */}
           {invoices.length > 0 && (
