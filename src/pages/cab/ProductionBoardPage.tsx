@@ -145,9 +145,9 @@ export default function ProductionBoardPage() {
   const executeMove = async (job: ProdCard, toKey: string) => {
     setMoving(job.id);
     try {
-      // Update production_stage
+      // Update both production_stage fields
       await (supabase.from("cab_jobs") as any)
-        .update({ production_stage: toKey, updated_at: new Date().toISOString() })
+        .update({ production_stage: toKey, production_stage_key: toKey, updated_at: new Date().toISOString() })
         .eq("id", job.id);
 
       // Insert stage change event
