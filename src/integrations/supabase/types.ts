@@ -1491,6 +1491,8 @@ export type Database = {
           current_stage_key: string | null
           customer_id: string
           customer_signoff_at: string | null
+          drive_folder_id: string | null
+          drive_folder_name: string | null
           estimated_labour_hours: number | null
           estimated_next_action_at: string | null
           estimated_remaining_cost: number | null
@@ -1553,6 +1555,8 @@ export type Database = {
           current_stage_key?: string | null
           customer_id: string
           customer_signoff_at?: string | null
+          drive_folder_id?: string | null
+          drive_folder_name?: string | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null
@@ -1615,6 +1619,8 @@ export type Database = {
           current_stage_key?: string | null
           customer_id?: string
           customer_signoff_at?: string | null
+          drive_folder_id?: string | null
+          drive_folder_name?: string | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.cab_jobs ADD COLUMN drive_folder_id text, ADD COLUMN drive_folder_name text;
