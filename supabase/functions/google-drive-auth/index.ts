@@ -1371,6 +1371,222 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── GENERATE JOB CARD PDF ───
+    if (action === "generate_job_card") {
+      const cabJobId = body.cab_job_id as string;
+      if (!cabJobId) {
+        return new Response(JSON.stringify({ error: "cab_job_id required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fetch job
+      const { data: jcJob } = await supabaseAdmin
+        .from("cab_jobs")
+        .select("*")
+        .eq("id", cabJobId)
+        .single();
+
+      if (!jcJob) {
+        return new Response(JSON.stringify({ error: "Job not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!jcJob.drive_folder_id) {
+        return new Response(JSON.stringify({ success: false, reason: "no_drive_folder" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fetch customer
+      let jcCust: any = null;
+      if (jcJob.customer_id) {
+        const { data } = await supabaseAdmin.from("cab_customers").select("*").eq("id", jcJob.customer_id).single();
+        jcCust = data;
+      }
+
+      // Build PDF
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pw = 210; // A4 width
+      const margin = 15;
+      const contentW = pw - margin * 2;
+      let y = margin;
+
+      const fmtDate = (d: string | null) => {
+        if (!d) return "—";
+        try { return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); } catch { return d; }
+      };
+      const fmtMoney = (v: number | null) => v != null ? `£${Number(v).toLocaleString("en-GB", { minimumFractionDigits: 2 })}` : "—";
+
+      // Header bar
+      doc.setFillColor(30, 30, 30);
+      doc.rect(0, 0, pw, 28, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text("ENCLAVE CABINETRY", margin, 12);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Job Card", margin, 19);
+      doc.setFontSize(8);
+      doc.text(`Generated: ${fmtDate(new Date().toISOString())}`, pw - margin, 12, { align: "right" });
+      doc.text(jcJob.job_ref || "", pw - margin, 19, { align: "right" });
+      y = 34;
+
+      // Job title
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(jcJob.job_title || "Untitled Job", margin, y);
+      y += 10;
+
+      // Section helper
+      const section = (title: string) => {
+        y += 4;
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, y - 4, contentW, 7, "F");
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(80, 80, 80);
+        doc.text(title, margin + 3, y);
+        y += 6;
+      };
+
+      const row = (label: string, value: string) => {
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 100, 100);
+        doc.text(label, margin + 3, y);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30, 30, 30);
+        const valLines = doc.splitTextToSize(value || "—", contentW - 50);
+        doc.text(valLines, margin + 50, y);
+        y += Math.max(valLines.length * 4.5, 5.5);
+      };
+
+      // ── CLIENT ──
+      section("CLIENT");
+      row("Name", `${jcCust?.first_name || ""} ${jcCust?.last_name || ""}`.trim() || "—");
+      row("Postcode", jcCust?.postcode || "—");
+      const addr = jcJob.property_address_json;
+      const addrStr = addr ? [addr.address || addr.address_line_1, addr.city, addr.postcode].filter(Boolean).join(", ") : "—";
+      row("Address", addrStr);
+
+      // ── STATUS ──
+      section("STATUS");
+      row("Stage", (jcJob.production_stage_key || "—").replace(/_/g, " "));
+      row("Status", jcJob.status || "—");
+
+      // ── FINANCIALS ──
+      section("FINANCIALS");
+      if (jcJob.ballpark_min != null || jcJob.ballpark_max != null) {
+        row("Ballpark", `${fmtMoney(jcJob.ballpark_min)} – ${fmtMoney(jcJob.ballpark_max)}`);
+      }
+      row("Contract Value", fmtMoney(jcJob.contract_value));
+      row("Ballpark Sent", fmtDate(jcJob.ballpark_sent_at));
+      row("Customer Sign-off", fmtDate(jcJob.customer_signoff_at));
+
+      // ── KEY DATES ──
+      section("KEY DATES");
+      row("Created", fmtDate(jcJob.created_at));
+      row("Install Date", fmtDate(jcJob.install_date));
+      row("Install Complete", fmtDate(jcJob.install_completed_at));
+      row("Sign-off Complete", fmtDate(jcJob.sign_off_completed_at));
+
+      // ── ASSIGNED ──
+      section("ASSIGNED");
+      row("Rep", jcJob.assigned_rep_name || "—");
+
+      // ── INTERNAL ──
+      section("INTERNAL");
+      row("Room Type", jcJob.room_type || "—");
+      if (jcJob.ballpark_internal_notes) {
+        row("Notes", jcJob.ballpark_internal_notes);
+      }
+
+      // Footer
+      y = 282;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, y, pw - margin, y);
+      doc.setFontSize(7);
+      doc.setTextColor(160, 160, 160);
+      doc.text("Enclave Cabinetry — Confidential", margin, y + 4);
+      doc.text(jcJob.job_ref || "", pw - margin, y + 4, { align: "right" });
+
+      // Get PDF bytes
+      const pdfBytes = doc.output("arraybuffer");
+      const pdfUint8 = new Uint8Array(pdfBytes);
+
+      const accessToken = await getAccessToken();
+      const FILE_NAME = "Job Card.pdf";
+
+      // Search for existing "Job Card.pdf" in the folder
+      const searchQuery = `'${jcJob.drive_folder_id}' in parents and name='${FILE_NAME}' and trashed=false`;
+      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const searchRes = await fetch(searchUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const searchData = await searchRes.json();
+      const existingFileId = searchData.files?.[0]?.id;
+
+      if (existingFileId) {
+        // Update existing file content
+        const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=media&supportsAllDrives=true`;
+        const updateRes = await fetch(updateUrl, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/pdf",
+          },
+          body: pdfUint8,
+        });
+        if (!updateRes.ok) {
+          const err = await updateRes.json();
+          throw new Error(`Drive update failed: ${err.error?.message}`);
+        }
+        return new Response(JSON.stringify({ success: true, file_id: existingFileId, replaced: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        // Create new file via multipart upload
+        const boundary = "job_card_boundary_" + Date.now();
+        const metadata = JSON.stringify({
+          name: FILE_NAME,
+          mimeType: "application/pdf",
+          parents: [jcJob.drive_folder_id],
+        });
+
+        // Build multipart body
+        const encoder = new TextEncoder();
+        const beforeFile = encoder.encode(
+          `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`
+        );
+        const afterFile = encoder.encode(`\r\n--${boundary}--`);
+
+        const bodyParts = new Uint8Array(beforeFile.length + pdfUint8.length + afterFile.length);
+        bodyParts.set(beforeFile, 0);
+        bodyParts.set(pdfUint8, beforeFile.length);
+        bodyParts.set(afterFile, beforeFile.length + pdfUint8.length);
+
+        const createRes = await fetch(
+          "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": `multipart/related; boundary=${boundary}`,
+            },
+            body: bodyParts,
+          }
+        );
+        const createData = await createRes.json();
+        if (!createRes.ok) throw new Error(`Drive create failed: ${createData.error?.message}`);
+
+        return new Response(JSON.stringify({ success: true, file_id: createData.id, replaced: false }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // ─── INDEX JOB FILES ───
     if (action === "index_job_files") {
       const jobId = body.job_id as string;
