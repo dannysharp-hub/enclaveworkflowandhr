@@ -232,9 +232,13 @@ export default function LeadsPage() {
             file_type: "drive_folder",
           });
 
-          // Auto-create Drive folder (fire & forget)
+          // Auto-create Drive folder, then generate Job Card PDF
           supabase.functions.invoke("google-drive-auth", {
             body: { action: "create_cab_job_folder", cab_job_id: newJob.id },
+          }).then(() => {
+            supabase.functions.invoke("google-drive-auth", {
+              body: { action: "generate_job_card", cab_job_id: newJob.id },
+            }).catch(() => {});
           }).catch(() => {});
 
           created++;
@@ -649,9 +653,13 @@ export async function submitLead(companyId: string, form: {
     payload: { room_type: jobType, notes: form.notes, source: form.source || null },
   });
 
-  // Auto-create Drive folder (fire & forget)
+  // Auto-create Drive folder, then generate Job Card PDF
   supabase.functions.invoke("google-drive-auth", {
     body: { action: "create_cab_job_folder", cab_job_id: job.id },
+  }).then(() => {
+    supabase.functions.invoke("google-drive-auth", {
+      body: { action: "generate_job_card", cab_job_id: job.id },
+    }).catch(() => {});
   }).catch(() => {});
 
   return { jobId: job.id, jobRef, reused: false };
