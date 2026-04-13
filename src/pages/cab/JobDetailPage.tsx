@@ -68,6 +68,8 @@ export default function JobDetailPage() {
   const [icFitterNotes, setIcFitterNotes] = useState("");
   const [icSignoffUploading, setIcSignoffUploading] = useState(false);
   const [icCompleting, setIcCompleting] = useState(false);
+  const [scheduledTasks, setScheduledTasks] = useState<any[]>([]);
+  const [reviewSending, setReviewSending] = useState(false);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -86,7 +88,7 @@ export default function JobDetailPage() {
     if (!jobData) { navigate("/admin/leads"); return; }
     setJob(jobData);
 
-    const [custRes, quotesRes, invRes, eventsRes, apptRes, teamRes, syncLogRes] = await Promise.all([
+    const [custRes, quotesRes, invRes, eventsRes, apptRes, teamRes, syncLogRes, scheduledTasksRes] = await Promise.all([
       (supabase.from("cab_customers") as any).select("*").eq("id", jobData.customer_id).single(),
       (supabase.from("cab_quotes") as any).select("*").eq("job_id", jobData.id).order("version", { ascending: false }),
       (supabase.from("cab_invoices") as any).select("*").eq("job_id", jobData.id).order("created_at"),
@@ -94,6 +96,7 @@ export default function JobDetailPage() {
       (supabase.from("cab_appointments") as any).select("*").eq("job_id", jobData.id).order("start_at", { ascending: true }),
       (supabase.from("cab_company_memberships") as any).select("user_id, role").eq("company_id", cid),
       (supabase.from("cab_ghl_sync_log") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }).limit(3),
+      (supabase.from("scheduled_tasks") as any).select("*").eq("job_id", jobData.id).order("created_at", { ascending: false }),
     ]);
 
     setCustomer(custRes.data);
@@ -103,6 +106,7 @@ export default function JobDetailPage() {
     setAppointments(apptRes.data ?? []);
     setTeamMembers(teamRes.data ?? []);
     setLastSyncLogs(syncLogRes.data ?? []);
+    setScheduledTasks(scheduledTasksRes.data ?? []);
     setLoading(false);
   }, [jobRef, navigate]);
 
@@ -1699,6 +1703,97 @@ export default function JobDetailPage() {
               </div>
             );
           })()}
+
+          {/* Google Review Request */}
+          {job && (() => {
+            const REVIEW_VISIBLE = ["install_complete", "installation_complete", "practical_completed", "closed_paid", "complete"];
+            const rvProdKey = job.production_stage_key || job.production_stage || "";
+            if (!REVIEW_VISIBLE.includes(rvProdKey) && !REVIEW_VISIBLE.includes(stageKey || "")) return null;
+
+            const reviewTask = scheduledTasks.find((t: any) => t.task_type === "google_review_request");
+            const reviewEvent = events.find((e: any) => e.event_type === "review.requested");
+
+            const handleSendReviewNow = async () => {
+              setReviewSending(true);
+              try {
+                if (reviewTask && reviewTask.status === "pending") {
+                  // Mark the scheduled task as executed
+                  await (supabase.from("scheduled_tasks") as any)
+                    .update({ status: "executed", executed_at: new Date().toISOString() })
+                    .eq("id", reviewTask.id);
+                }
+                // Fire review.requested event
+                await insertCabEvent({
+                  companyId: companyId!,
+                  eventType: "review.requested",
+                  jobId: job.id,
+                  customerId: job.customer_id,
+                  payload: { source: "manual", job_ref: job.job_ref },
+                });
+                toast({ title: "Review request sent" });
+                load();
+              } catch (err: any) {
+                toast({ title: "Error", description: err.message, variant: "destructive" });
+              } finally {
+                setReviewSending(false);
+              }
+            };
+
+            const isSent = !!reviewEvent || reviewTask?.status === "executed";
+            const scheduledDate = reviewTask?.scheduled_for;
+
+            return (
+              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                  <Star size={14} /> Google Review Request
+                </h3>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Status</span>
+                    <div className="mt-1">
+                      {isSent ? (
+                        <Badge variant="default" className="text-[10px]">Sent</Badge>
+                      ) : reviewTask ? (
+                        <Badge variant="outline" className="text-[10px]">Scheduled</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px]">Not scheduled</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Scheduled for</span>
+                    <p className="font-mono mt-1">
+                      {scheduledDate ? format(new Date(scheduledDate), "dd MMM yyyy HH:mm") : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {reviewEvent && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Sent {format(new Date(reviewEvent.created_at), "dd MMM yyyy HH:mm")}
+                  </p>
+                )}
+
+                {!isSent && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={reviewSending}
+                    onClick={handleSendReviewNow}
+                  >
+                    {reviewSending ? (
+                      <><Loader2 size={12} className="animate-spin mr-1" /> Sending…</>
+                    ) : (
+                      <><Send size={12} className="mr-1" /> Send Review Request Now</>
+                    )}
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
+
           {invoices.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="font-mono text-sm font-bold text-foreground mb-2">Invoices</h3>

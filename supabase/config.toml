@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.create-drive-folder]
 verify_jwt = false
+
+[functions.process-scheduled-tasks]
+verify_jwt = false

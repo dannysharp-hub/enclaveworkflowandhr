@@ -109,6 +109,8 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
       return { stageKey: "closed_paid", tags: ["encl_job_completed"], noteExtra: "Job marked as complete" };
     case "invoice.final_requested":
       return { tags: ["encl_final_invoice_requested"], noteExtra: "Final invoice requested (10%)" };
+    case "review.requested":
+      return { tags: ["encl_review_requested"], noteExtra: "Google review request sent to customer" };
     default:
       return null;
   }
