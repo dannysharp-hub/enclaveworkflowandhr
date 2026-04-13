@@ -1274,9 +1274,10 @@ export default function JobDetailPage() {
                     update[stage.amountCol] = Math.round(cv * stage.pct * 100) / 100;
                   }
                   // If deposit, also push to production board
-                  if (stage.key === "deposit") {
-                    update.production_stage_key = "materials_ordered";
-                  }
+                   if (stage.key === "deposit") {
+                     update.production_stage_key = "materials_ordered";
+                     update.production_stage = "materials_ordered";
+                   }
                   await (supabase.from("cab_jobs") as any).update(update).eq("id", job.id);
                   toast({ title: `${stage.label} marked as paid` });
                   // Fire production.started event for deposit

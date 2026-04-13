@@ -65,9 +65,9 @@ export default function ProductionBoardPage() {
     console.log("[ProductionBoard] exact query:", queryDebug);
 
     const { data, error } = await (supabase.from("cab_jobs") as any)
-      .select("id, job_ref, job_title, production_stage, contract_value, company_id, customer_id, room_type, updated_at")
+      .select("id, job_ref, job_title, production_stage, production_stage_key, contract_value, company_id, customer_id, room_type, updated_at")
       .eq("company_id", cid)
-      .or(`production_stage.not.is.null,current_stage_key.in.(${stageKeys.join(",")})`)
+      .or(`production_stage.not.is.null,production_stage_key.in.(${stageKeys.join(",")}),current_stage_key.in.(${stageKeys.join(",")})`)
       .order("updated_at", { ascending: false });
 
     console.log("[ProductionBoard] board query result:", { data, error });
@@ -106,8 +106,11 @@ export default function ProductionBoardPage() {
 
     setJobs(data.map((j: any) => {
       const c: any = custMap.get(j.customer_id) || {};
+      // Resolve effective production stage: prefer production_stage, fall back to production_stage_key
+      const effectiveStage = j.production_stage || (stageKeys.includes(j.production_stage_key) ? j.production_stage_key : null);
       return {
         ...j,
+        production_stage: effectiveStage,
         customer_first_name: c.first_name || "",
         customer_last_name: c.last_name || "",
         customer_email: c.email || null,
@@ -142,9 +145,9 @@ export default function ProductionBoardPage() {
   const executeMove = async (job: ProdCard, toKey: string) => {
     setMoving(job.id);
     try {
-      // Update production_stage
+      // Update both production_stage fields
       await (supabase.from("cab_jobs") as any)
-        .update({ production_stage: toKey, updated_at: new Date().toISOString() })
+        .update({ production_stage: toKey, production_stage_key: toKey, updated_at: new Date().toISOString() })
         .eq("id", job.id);
 
       // Insert stage change event
