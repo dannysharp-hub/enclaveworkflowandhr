@@ -1540,7 +1540,165 @@ export default function JobDetailPage() {
             );
           })()}
 
-          {/* Invoices */}
+          {/* Installation & Completion */}
+          {job && (() => {
+            const IC_VISIBLE_STAGES = ["install", "installing", "ready_for_install", "install_complete", "installation_complete", "practical_completed", "closed_paid", "complete"];
+            const icProdKey = job.production_stage_key || job.production_stage || "";
+            if (!IC_VISIBLE_STAGES.includes(icProdKey) && !IC_VISIBLE_STAGES.includes(stageKey || "")) return null;
+
+            const isInstallDone = !!job.install_completed_at;
+            const hasSignoff = !!job.final_signoff_url;
+            const canComplete = isInstallDone && hasSignoff;
+
+            const handleIcInstallComplete = async () => {
+              const now = new Date().toISOString();
+              await (supabase.from("cab_jobs") as any).update({ install_completed_at: now }).eq("id", job.id);
+              if (companyId) insertCabEvent({ companyId, eventType: "install.completed", jobId: job.id, payload: {} }).catch(console.warn);
+              toast({ title: "Installation marked complete" });
+              load();
+            };
+
+            const handleIcFitterNotes = async () => {
+              await (supabase.from("cab_jobs") as any).update({ fitter_notes: icFitterNotes }).eq("id", job.id);
+              toast({ title: "Fitter notes saved" });
+            };
+
+            const handleIcSignoffUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setIcSignoffUploading(true);
+              try {
+                const ext = file.name.split(".").pop()?.toLowerCase() || "pdf";
+                const path = `${job.id}/signoff/${Date.now()}.${ext}`;
+                const { error } = await supabase.storage.from("install-signoffs").upload(path, file, { contentType: file.type });
+                if (error) throw error;
+                const { data: urlData } = supabase.storage.from("install-signoffs").getPublicUrl(path);
+                await (supabase.from("cab_jobs") as any).update({ final_signoff_url: urlData.publicUrl }).eq("id", job.id);
+
+                // Try uploading to Drive if linked
+                if (job.drive_folder_id) {
+                  try {
+                    const { uploadToDrive } = await import("@/lib/driveUpload");
+                    await uploadToDrive(job.id, `SignOff_${job.job_ref}.${ext}`, file, "Sign-Off", file.type);
+                  } catch (driveErr) {
+                    console.warn("Drive upload failed (non-blocking):", driveErr);
+                  }
+                }
+
+                toast({ title: "Sign-off document uploaded" });
+                load();
+              } catch (err: any) {
+                toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+              } finally {
+                setIcSignoffUploading(false);
+                e.target.value = "";
+              }
+            };
+
+            const handleMarkJobComplete = async () => {
+              setIcCompleting(true);
+              try {
+                await (supabase.from("cab_jobs") as any).update({
+                  status: "complete",
+                  production_stage_key: "complete",
+                  production_stage: "complete",
+                  updated_at: new Date().toISOString(),
+                }).eq("id", job.id);
+                if (companyId) {
+                  await insertCabEvent({ companyId, eventType: "job.completed", jobId: job.id, payload: {} });
+                  await insertCabEvent({ companyId, eventType: "invoice.final_requested", jobId: job.id, payload: {} });
+                }
+                toast({ title: "Job marked complete — final invoice requested" });
+                load();
+              } catch (err: any) {
+                toast({ title: "Error", description: err.message, variant: "destructive" });
+              } finally {
+                setIcCompleting(false);
+              }
+            };
+
+            return (
+              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
+                  <ClipboardCheck size={14} className="text-primary" /> Installation & Completion
+                </h3>
+
+                {/* Installation Date (read-only) */}
+                {job.install_date && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CalendarDays size={14} className="text-muted-foreground" />
+                    <span className="text-muted-foreground">Install Date:</span>
+                    <span className="font-medium">{format(new Date(job.install_date), "dd MMM yyyy")}</span>
+                  </div>
+                )}
+
+                {/* Installation Complete */}
+                <div className="flex items-center justify-between p-3 rounded border border-border">
+                  <div className="flex items-center gap-2">
+                    {isInstallDone ? <CheckCircle2 size={14} className="text-emerald-500" /> : <span className="text-muted-foreground text-xs">●</span>}
+                    <span className="text-sm font-medium">Installation Complete</span>
+                    {job.install_completed_at && <span className="text-[10px] text-muted-foreground">· {format(new Date(job.install_completed_at), "dd MMM yyyy")}</span>}
+                  </div>
+                  {!isInstallDone && (
+                    <Button size="sm" variant="outline" onClick={handleIcInstallComplete}>
+                      <CheckCircle2 size={12} className="mr-1" /> Mark Complete
+                    </Button>
+                  )}
+                </div>
+
+                {/* Fitter Notes */}
+                <div className="space-y-1">
+                  <Label className="text-xs">Fitter Notes</Label>
+                  <textarea
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Notes from the installation team…"
+                    defaultValue={job.fitter_notes || ""}
+                    onChange={(e) => setIcFitterNotes(e.target.value)}
+                    onBlur={() => {
+                      if (icFitterNotes && icFitterNotes !== (job.fitter_notes || "")) handleIcFitterNotes();
+                    }}
+                  />
+                </div>
+
+                {/* Final Sign-Off Document */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Final Sign-Off Document</Label>
+                  {hasSignoff && (
+                    <a href={job.final_signoff_url} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-primary underline flex items-center gap-1">
+                      <FileText size={12} /> View uploaded document
+                    </a>
+                  )}
+                  <label>
+                    <Button size="sm" variant="outline" asChild disabled={icSignoffUploading}>
+                      <span className="cursor-pointer">
+                        {icSignoffUploading ? <><Loader2 size={14} className="animate-spin mr-1" /> Uploading…</> : <><FileText size={14} className="mr-1" /> {hasSignoff ? "Replace Document" : "Upload Document"}</>}
+                      </span>
+                    </Button>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleIcSignoffUpload} />
+                  </label>
+                </div>
+
+                {/* Mark Job Complete */}
+                <Button
+                  size="sm"
+                  className="w-full"
+                  disabled={!canComplete || icCompleting}
+                  onClick={handleMarkJobComplete}
+                >
+                  <Star size={12} className="mr-1" /> {icCompleting ? "Completing…" : "Mark Job Complete"}
+                </Button>
+                {!canComplete && (
+                  <p className="text-[10px] text-muted-foreground">
+                    {!isInstallDone && "Mark installation complete"}
+                    {!isInstallDone && !hasSignoff && " and "}
+                    {!hasSignoff && "upload sign-off document"}
+                    {" to enable"}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
           {invoices.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="font-mono text-sm font-bold text-foreground mb-2">Invoices</h3>
