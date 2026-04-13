@@ -103,6 +103,11 @@ export default function JobDetailPage() {
   const updateJob = async (updates: Record<string, any>) => {
     await (supabase.from("cab_jobs") as any).update(updates).eq("id", job.id);
     regenerateJobCard(job.id);
+    // Sync job.json to Drive in the background
+    if (job?.drive_folder_id) {
+      supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
+        .catch((e) => console.warn("[write-job-json] sync failed:", e));
+    }
   };
 
   const startEdit = (field: string, currentValue: string) => {
@@ -1136,6 +1141,9 @@ export default function JobDetailPage() {
                     if (data?.error) throw new Error(data.error);
                     setJob((prev: any) => ({ ...prev, drive_folder_id: data.drive_folder_id, drive_folder_name: data.drive_folder_name }));
                     toast({ title: "Drive folder created", description: `Created "${data.drive_folder_name}"` });
+                    // Write job.json to new folder
+                    supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
+                      .catch((e) => console.warn("[write-job-json] sync failed:", e));
                   } catch (err: any) {
                     toast({ title: "Failed to create folder", description: err.message, variant: "destructive" });
                   } finally {
