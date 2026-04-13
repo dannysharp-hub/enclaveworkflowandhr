@@ -1428,8 +1428,6 @@ export default function JobDetailPage() {
             if (!DRYFIT_VISIBLE_STAGES.includes(prodKey) && !DRYFIT_VISIBLE_STAGES.includes(stageKey || "")) return null;
             const isDryFitDone = !!job.dry_fit_completed;
             const photoUrls: string[] = job.dry_fit_photo_urls || [];
-            const [dfUploading, setDfUploading] = useState(false);
-            const [dfSending, setDfSending] = useState(false);
 
             const handleDfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
               const files = Array.from(e.target.files || []);
