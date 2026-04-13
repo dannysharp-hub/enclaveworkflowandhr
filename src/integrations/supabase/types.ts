@@ -1495,6 +1495,9 @@ export type Database = {
           deposit_paid_at: string | null
           drive_folder_id: string | null
           drive_folder_name: string | null
+          dry_fit_completed: boolean | null
+          dry_fit_completed_at: string | null
+          dry_fit_photo_urls: string[] | null
           estimated_labour_hours: number | null
           estimated_next_action_at: string | null
           estimated_remaining_cost: number | null
@@ -1568,6 +1571,9 @@ export type Database = {
           deposit_paid_at?: string | null
           drive_folder_id?: string | null
           drive_folder_name?: string | null
+          dry_fit_completed?: boolean | null
+          dry_fit_completed_at?: string | null
+          dry_fit_photo_urls?: string[] | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null
@@ -1641,6 +1647,9 @@ export type Database = {
           deposit_paid_at?: string | null
           drive_folder_id?: string | null
           drive_folder_name?: string | null
+          dry_fit_completed?: boolean | null
+          dry_fit_completed_at?: string | null
+          dry_fit_photo_urls?: string[] | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null
