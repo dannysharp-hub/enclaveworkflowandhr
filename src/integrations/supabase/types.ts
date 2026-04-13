@@ -8750,6 +8750,60 @@ export type Database = {
           },
         ]
       }
+      scheduled_tasks: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          executed_at: string | null
+          id: string
+          job_id: string | null
+          payload_json: Json | null
+          scheduled_for: string
+          status: string
+          task_type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          job_id?: string | null
+          payload_json?: Json | null
+          scheduled_for: string
+          status?: string
+          task_type: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          job_id?: string | null
+          payload_json?: Json | null
+          scheduled_for?: string
+          status?: string
+          task_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_tasks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shared_media_assignments: {
         Row: {
           assigned_at: string | null
