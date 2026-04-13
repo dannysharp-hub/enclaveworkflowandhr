@@ -1491,11 +1491,15 @@ export type Database = {
           current_stage_key: string | null
           customer_id: string
           customer_signoff_at: string | null
+          deposit_amount: number | null
+          deposit_paid_at: string | null
           drive_folder_id: string | null
           drive_folder_name: string | null
           estimated_labour_hours: number | null
           estimated_next_action_at: string | null
           estimated_remaining_cost: number | null
+          final_payment_amount: number | null
+          final_payment_paid_at: string | null
           forecast_cost_total: number | null
           forecast_margin_pct: number | null
           ghl_contact_id: string | null
@@ -1516,6 +1520,8 @@ export type Database = {
           production_stage: string | null
           production_stage_key: string
           profit_last_calculated_at: string | null
+          progress_payment_amount: number | null
+          progress_payment_paid_at: string | null
           property_address_json: Json | null
           room_type: string | null
           sign_off_completed_at: string | null
@@ -1555,11 +1561,15 @@ export type Database = {
           current_stage_key?: string | null
           customer_id: string
           customer_signoff_at?: string | null
+          deposit_amount?: number | null
+          deposit_paid_at?: string | null
           drive_folder_id?: string | null
           drive_folder_name?: string | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null
+          final_payment_amount?: number | null
+          final_payment_paid_at?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
@@ -1580,6 +1590,8 @@ export type Database = {
           production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
+          progress_payment_amount?: number | null
+          progress_payment_paid_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
           sign_off_completed_at?: string | null
@@ -1619,11 +1631,15 @@ export type Database = {
           current_stage_key?: string | null
           customer_id?: string
           customer_signoff_at?: string | null
+          deposit_amount?: number | null
+          deposit_paid_at?: string | null
           drive_folder_id?: string | null
           drive_folder_name?: string | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null
+          final_payment_amount?: number | null
+          final_payment_paid_at?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
@@ -1644,6 +1660,8 @@ export type Database = {
           production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
+          progress_payment_amount?: number | null
+          progress_payment_paid_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
           sign_off_completed_at?: string | null
