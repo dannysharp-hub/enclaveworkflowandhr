@@ -93,6 +93,22 @@ function resolveActions(eventType: string, milestone?: string, payload?: Record<
       return { stageKey: "installation_complete", tags: ["encl_installation_complete"] };
     case "job.practical_completed":
       return { stageKey: "practical_completed", tags: ["encl_practical_completed"] };
+    case "lead.captured":
+      return { stageKey: "lead_captured", tags: ["encl_lead_captured"] };
+    case "production.started":
+      return { stageKey: "project_confirmed", tags: ["encl_production_started"], noteExtra: "Production started — deposit received" };
+    case "site_visit_2.completed":
+      return { tags: ["encl_site_visit_2_completed"], noteExtra: "Site Visit 2 (technical survey) completed" };
+    case "design.signed_off":
+      return { tags: ["encl_design_signed_off"], noteExtra: "Design signed off by customer" };
+    case "dry_fit.completed":
+      return { tags: ["encl_dry_fit_completed"], noteExtra: "Dry fit completed — ready for progress invoice" };
+    case "invoice.progress_requested":
+      return { tags: ["encl_progress_invoice_requested"], noteExtra: "Progress invoice requested" };
+    case "job.completed":
+      return { stageKey: "closed_paid", tags: ["encl_job_completed"], noteExtra: "Job marked as complete" };
+    case "invoice.final_requested":
+      return { tags: ["encl_final_invoice_requested"], noteExtra: "Final invoice requested (10%)" };
     default:
       return null;
   }
