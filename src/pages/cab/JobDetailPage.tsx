@@ -1273,8 +1273,21 @@ export default function JobDetailPage() {
                   if (!stage.amount && cv > 0) {
                     update[stage.amountCol] = Math.round(cv * stage.pct * 100) / 100;
                   }
+                  // If deposit, also push to production board
+                  if (stage.key === "deposit") {
+                    update.production_stage_key = "materials_ordered";
+                  }
                   await (supabase.from("cab_jobs") as any).update(update).eq("id", job.id);
                   toast({ title: `${stage.label} marked as paid` });
+                  // Fire production.started event for deposit
+                  if (stage.key === "deposit" && companyId) {
+                    insertCabEvent({
+                      companyId,
+                      eventType: "production.started",
+                      jobId: job.id,
+                      payload: { triggered_by: "deposit_paid" },
+                    }).catch((e) => console.warn("[production.started] event failed:", e));
+                  }
                   if (job.drive_folder_id) {
                     supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
                       .catch((e) => console.warn("[write-job-json] sync failed:", e));
