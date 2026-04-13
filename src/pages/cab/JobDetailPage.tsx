@@ -1197,6 +1197,10 @@ export default function JobDetailPage() {
                   }
                   await (supabase.from("cab_jobs") as any).update(update).eq("id", job.id);
                   toast({ title: `${stage.label} marked as paid` });
+                  if (job.drive_folder_id) {
+                    supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
+                      .catch((e) => console.warn("[write-job-json] sync failed:", e));
+                  }
                   load();
                 };
                 const handleSetAmounts = async () => {
