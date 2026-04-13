@@ -659,7 +659,12 @@ export async function submitLead(companyId: string, form: {
   }).then((res) => {
     if (res.error) console.warn("[AutoDriveFolder] Failed:", res.error);
     else if (!res.data?.ok) console.warn("[AutoDriveFolder] Failed:", res.data?.error);
-    else console.log("[AutoDriveFolder] Created:", res.data.drive_folder_id);
+    else {
+      console.log("[AutoDriveFolder] Created:", res.data.drive_folder_id);
+      // Write job.json to the new folder
+      supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
+        .catch((e) => console.warn("[write-job-json] sync failed:", e));
+    }
     // Generate job card regardless of folder outcome
     supabase.functions.invoke("google-drive-auth", {
       body: { action: "generate_job_card", cab_job_id: job.id },
