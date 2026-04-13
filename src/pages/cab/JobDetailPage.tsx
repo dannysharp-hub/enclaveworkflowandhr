@@ -6,6 +6,7 @@ import { getCabCompanyId, getCabCompany, insertCabEvent, estimatePostcodeDistanc
 import { deleteCabJob } from "@/lib/cabJobDelete";
 import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import { toast } from "@/hooks/use-toast";
+import { regenerateJobCard } from "@/lib/jobCardHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
