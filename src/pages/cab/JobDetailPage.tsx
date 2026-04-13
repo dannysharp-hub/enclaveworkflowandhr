@@ -1263,8 +1263,8 @@ export default function JobDetailPage() {
                 const cv = Number(job.contract_value) || 0;
                 const stages = [
                   { key: "deposit", label: "Deposit (50%)", pct: 0.5, amount: job.deposit_amount, paidAt: job.deposit_paid_at, amountCol: "deposit_amount", paidCol: "deposit_paid_at", enabled: true },
-                  { key: "progress", label: "Progress Payment (40%)", pct: 0.4, amount: job.progress_payment_amount, paidAt: job.progress_payment_paid_at, amountCol: "progress_payment_amount", paidCol: "progress_payment_paid_at", enabled: !!job.deposit_paid_at },
-                  { key: "final", label: "Final Payment (10%)", pct: 0.1, amount: job.final_payment_amount, paidAt: job.final_payment_paid_at, amountCol: "final_payment_amount", paidCol: "final_payment_paid_at", enabled: !!job.progress_payment_paid_at },
+                  { key: "progress", label: "Progress Payment (40%)", pct: 0.4, amount: job.progress_payment_amount, paidAt: job.progress_payment_paid_at, amountCol: "progress_payment_amount", paidCol: "progress_payment_paid_at", enabled: !!(Number(job.deposit_amount) > 0 && job.deposit_paid_at) },
+                  { key: "final", label: "Final Payment (10%)", pct: 0.1, amount: job.final_payment_amount, paidAt: job.final_payment_paid_at, amountCol: "final_payment_amount", paidCol: "final_payment_paid_at", enabled: !!(Number(job.progress_payment_amount) > 0 && job.progress_payment_paid_at) },
                 ];
                 const handleMarkStagePaid = async (stage: typeof stages[0]) => {
                   const now = new Date().toISOString();
