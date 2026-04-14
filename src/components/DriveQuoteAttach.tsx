@@ -347,9 +347,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
               )}
             </>
           )}
-          {quote && (
-            <Button size="sm" variant="ghost" onClick={handleDownloadPdf} disabled={downloading} className="h-7 px-2">
-              {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+          {quote?.drive_file_id && (
+            <Button size="sm" variant="ghost" onClick={handleOpenInDrive} className="h-7 px-2" title="Open in Google Drive">
+              <ExternalLink size={12} />
             </Button>
           )}
         </div>
