@@ -238,7 +238,7 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       setGeneratingPdf(true);
       let pdfResult: { drive_file_id?: string; file_name?: string } = {};
       try {
-        pdfResult = await generateQuotePdf(quoteId);
+        pdfResult = await generateQuoteDoc(quoteId);
       } catch (pdfErr: any) {
         console.warn("[DriveQuoteAttach] PDF generation failed, continuing with send:", pdfErr.message);
       }
