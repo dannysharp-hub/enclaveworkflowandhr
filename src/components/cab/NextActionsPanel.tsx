@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { insertCabEvent } from "@/lib/cabHelpers";
 import { toast } from "@/hooks/use-toast";
 import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
+import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -233,6 +234,9 @@ export default function NextActionsPanel({
         companyId, eventType: "deposit.received", jobId: job.id,
         payload: { amount, job_ref: job.job_ref },
       });
+
+      // Fire-and-forget: generate deposit invoice from template
+      fireDocumentGeneration(job.id, "invoice_deposit");
 
       toast({ title: "Deposit recorded — project confirmed" });
       setDepositOpen(false);

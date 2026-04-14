@@ -7,6 +7,7 @@ import { deleteCabJob } from "@/lib/cabJobDelete";
 import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import { toast } from "@/hooks/use-toast";
 import { regenerateJobCard } from "@/lib/jobCardHelper";
+import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1332,6 +1333,8 @@ export default function JobDetailPage() {
                             payload: { signed_at: now },
                           });
                           toast({ title: "Design sign-off recorded" });
+                          // Fire-and-forget: generate sign-off document from template
+                          fireDocumentGeneration(job.id, "sign_off");
                           load();
                         }}
                       >
@@ -1477,6 +1480,8 @@ export default function JobDetailPage() {
                 if (companyId) {
                   await insertCabEvent({ companyId, eventType: "invoice.progress_requested", jobId: job.id, payload: {} });
                 }
+                // Fire-and-forget: generate progress invoice from template
+                fireDocumentGeneration(job.id, "invoice_progress");
                 toast({ title: "Progress invoice requested" });
                 load();
               } catch (err: any) {
@@ -1612,6 +1617,9 @@ export default function JobDetailPage() {
                   await insertCabEvent({ companyId, eventType: "job.completed", jobId: job.id, payload: {} });
                   await insertCabEvent({ companyId, eventType: "invoice.final_requested", jobId: job.id, payload: {} });
                 }
+                // Fire-and-forget: generate final invoice and fitter form from templates
+                fireDocumentGeneration(job.id, "invoice_final");
+                fireDocumentGeneration(job.id, "fitter_form");
                 toast({ title: "Job marked complete — final invoice requested" });
                 load();
               } catch (err: any) {
