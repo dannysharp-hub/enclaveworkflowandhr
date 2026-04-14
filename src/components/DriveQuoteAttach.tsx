@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import {
-  FileText, Send, HardDrive, CheckCircle2, RefreshCw, Loader2, X, Mail, Download,
+  FileText, Send, HardDrive, CheckCircle2, RefreshCw, Loader2, X, Mail, ExternalLink,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -37,7 +37,6 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
   const [sending, setSending] = useState(false);
   const [resending, setResending] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [downloading, setDownloading] = useState(false);
 
   const ensureAcceptanceToken = async (quoteId: string): Promise<string> => {
     const { data: existing, error: fetchErr } = await (supabase.from("cab_quotes") as any)
@@ -84,44 +83,22 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
     if (error) throw error;
   };
 
-  const generateQuotePdf = async (quoteId: string): Promise<{ drive_file_id?: string; file_name?: string }> => {
+  const generateQuoteDoc = async (quoteId: string): Promise<{ drive_file_id?: string; file_name?: string; web_view_link?: string }> => {
     const { data, error } = await supabase.functions.invoke("generate-quote-pdf", {
       body: { quote_id: quoteId, job_id: job.id },
     });
-    if (error) throw new Error("PDF generation failed: " + error.message);
-    if (!data?.ok) throw new Error(data?.error || "PDF generation returned an error");
-    return { drive_file_id: data.drive_file_id, file_name: data.file_name };
+    if (error) throw new Error("Doc generation failed: " + error.message);
+    if (!data?.ok) throw new Error(data?.error || "Doc generation returned an error");
+    return { drive_file_id: data.drive_file_id, file_name: data.file_name, web_view_link: data.web_view_link };
   };
 
-  const handleDownloadPdf = async () => {
-    if (!quote) {
-      toast({ title: "No quote to download", variant: "destructive" });
+  const handleOpenInDrive = () => {
+    if (!quote?.drive_file_id) {
+      toast({ title: "No quote document yet", variant: "destructive" });
       return;
     }
-    setDownloading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-quote-pdf", {
-        body: { quote_id: quote.id, job_id: job.id, download: true },
-      });
-      if (error) throw error;
-
-      // The response is a blob when download=true
-      const blob = data instanceof Blob ? data : new Blob([JSON.stringify(data)], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Quote_v${quote.version}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast({ title: "Quote PDF downloaded" });
-    } catch (err: any) {
-      console.error("Download failed:", err);
-      toast({ title: "Download failed", description: err.message, variant: "destructive" });
-    } finally {
-      setDownloading(false);
-    }
+    const url = `https://docs.google.com/document/d/${quote.drive_file_id}/edit`;
+    window.open(url, "_blank");
   };
 
   const handleResendEmail = async () => {
@@ -168,8 +145,8 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       setSelectedFile({
         id: q.drive_file_id,
         file_name: q.drive_filename,
-        mime_type: "application/pdf",
-        drive_web_view_link: null,
+        mime_type: "application/vnd.google-apps.document",
+        drive_web_view_link: `https://docs.google.com/document/d/${q.drive_file_id}/edit`,
       });
     } else {
       setSelectedFile(null);
@@ -261,7 +238,7 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       setGeneratingPdf(true);
       let pdfResult: { drive_file_id?: string; file_name?: string } = {};
       try {
-        pdfResult = await generateQuotePdf(quoteId);
+        pdfResult = await generateQuoteDoc(quoteId);
       } catch (pdfErr: any) {
         console.warn("[DriveQuoteAttach] PDF generation failed, continuing with send:", pdfErr.message);
       }
@@ -370,9 +347,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
               )}
             </>
           )}
-          {quote && (
-            <Button size="sm" variant="ghost" onClick={handleDownloadPdf} disabled={downloading} className="h-7 px-2">
-              {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+          {quote?.drive_file_id && (
+            <Button size="sm" variant="ghost" onClick={handleOpenInDrive} className="h-7 px-2" title="Open in Google Drive">
+              <ExternalLink size={12} />
             </Button>
           )}
         </div>
@@ -401,7 +378,7 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       {/* PDF generation status */}
       {generatingPdf && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 size={12} className="animate-spin" /> Generating quote PDF…
+          <Loader2 size={12} className="animate-spin" /> Creating quote document…
         </div>
       )}
 
