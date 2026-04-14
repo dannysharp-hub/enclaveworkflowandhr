@@ -159,6 +159,7 @@ export default function SettingsPage() {
               <GoogleIntegrationSettings />
               <GoogleDriveIntegrationSettings />
               <GmailScanSettings />
+              <BackfillJobJsonSection />
             </div>
           )}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
@@ -991,6 +992,86 @@ function PurchasingSettingsTab() {
           className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
           <Save size={14} /> {saving ? "Saving…" : "Save Purchasing Settings"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Backfill Job JSON Section ────────────────────────
+function BackfillJobJsonSection() {
+  const [running, setRunning] = useState(false);
+  const [results, setResults] = useState<{ total: number; success: number; failed: number } | null>(null);
+
+  const handleBackfill = async () => {
+    setRunning(true);
+    setResults(null);
+    try {
+      // Fetch all jobs with drive_folder_id set
+      const { data: jobs, error } = await supabase
+        .from("cab_jobs")
+        .select("id, job_ref, drive_folder_id")
+        .not("drive_folder_id", "is", null);
+
+      if (error) throw error;
+      if (!jobs?.length) {
+        toast({ title: "No jobs with Drive folders found" });
+        setRunning(false);
+        return;
+      }
+
+      let success = 0;
+      let failed = 0;
+
+      // Process in batches of 5 to avoid rate limits
+      for (let i = 0; i < jobs.length; i += 5) {
+        const batch = jobs.slice(i, i + 5);
+        const promises = batch.map(async (job) => {
+          try {
+            const { data, error: fnErr } = await supabase.functions.invoke("write-job-json", {
+              body: { job_id: job.id },
+            });
+            if (fnErr || !data?.ok) {
+              failed++;
+              console.error(`[backfill] ${job.job_ref} failed:`, fnErr?.message || data?.error);
+            } else {
+              success++;
+            }
+          } catch {
+            failed++;
+          }
+        });
+        await Promise.all(promises);
+      }
+
+      setResults({ total: jobs.length, success, failed });
+      toast({ title: `Backfill complete: ${success}/${jobs.length} succeeded` });
+    } catch (err: any) {
+      toast({ title: "Backfill failed", description: err.message, variant: "destructive" });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-mono text-sm font-bold text-foreground">Backfill Job JSON</h3>
+      <div className="glass-panel rounded-lg p-6 space-y-4 max-w-2xl">
+        <p className="text-sm text-muted-foreground">
+          Write or update <code className="text-xs bg-muted px-1 py-0.5 rounded">job.json</code> to the Google Drive folder for every job that has a linked Drive folder.
+        </p>
+        <button
+          onClick={handleBackfill}
+          disabled={running}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          <Upload size={14} />
+          {running ? "Running backfill…" : "Backfill Job JSON"}
+        </button>
+        {results && (
+          <div className="text-sm text-muted-foreground">
+            Total: {results.total} · Success: {results.success} · Failed: {results.failed}
+          </div>
+        )}
       </div>
     </div>
   );
