@@ -159,6 +159,7 @@ export default function SettingsPage() {
               <GoogleIntegrationSettings />
               <GoogleDriveIntegrationSettings />
               <GmailScanSettings />
+              <BackfillJobJsonSection />
             </div>
           )}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
