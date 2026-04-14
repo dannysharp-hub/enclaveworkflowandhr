@@ -1044,7 +1044,7 @@ function BackfillJobJsonSection() {
       }
 
       setResults({ total: jobs.length, success, failed });
-      toast({ title: `Backfill complete: ${success}/${jobs.length} succeeded` });
+      toast({ title: `job.json written to ${success} jobs successfully, ${failed} failed` });
     } catch (err: any) {
       toast({ title: "Backfill failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1069,7 +1069,7 @@ function BackfillJobJsonSection() {
         </button>
         {results && (
           <div className="text-sm text-muted-foreground">
-            Total: {results.total} · Success: {results.success} · Failed: {results.failed}
+            job.json written to {results.success} jobs successfully, {results.failed} failed
           </div>
         )}
       </div>
