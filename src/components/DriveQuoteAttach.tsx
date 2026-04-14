@@ -378,7 +378,7 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       {/* PDF generation status */}
       {generatingPdf && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 size={12} className="animate-spin" /> Generating quote PDF…
+          <Loader2 size={12} className="animate-spin" /> Creating quote document…
         </div>
       )}
 
