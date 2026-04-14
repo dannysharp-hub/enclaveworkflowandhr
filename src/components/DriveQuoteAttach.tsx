@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { insertCabEvent } from "@/lib/cabHelpers";
 import { toast } from "@/hooks/use-toast";
+import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -303,6 +304,9 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       } else {
         toast({ title: `Quote sent to ${customerName}`, description: "No email on file — email was not sent." });
       }
+
+      // Fire-and-forget: generate quote document from template
+      fireDocumentGeneration(job.id, "quote");
 
       loadQuote();
       onRefresh();
