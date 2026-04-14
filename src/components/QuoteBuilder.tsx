@@ -232,6 +232,15 @@ export default function QuoteBuilder({ companyId, job, onRefresh }: QuoteBuilder
       }).eq("id", job.id);
 
       toast({ title: "Quote sent to customer" });
+
+      // Save quote PDF to Drive folder (fire-and-forget, don't block the send)
+      supabase.functions.invoke("save-quote-to-drive", {
+        body: { quote_id: quote.id, job_id: job.id },
+      }).then(({ error: driveErr }) => {
+        if (driveErr) console.error("[QuoteBuilder] save-quote-to-drive failed:", driveErr.message);
+        else console.log("[QuoteBuilder] Quote saved to Drive folder");
+      });
+
       loadQuote();
       onRefresh();
     } catch (err: any) {
