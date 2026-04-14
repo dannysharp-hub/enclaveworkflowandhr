@@ -288,6 +288,17 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       } else {
         toast({ title: `Quote sent to ${customerName}`, description: "No email on file — email was not sent." });
       }
+      // Save quote to job's Drive folder (fire-and-forget)
+      const quoteId = quote?.id;
+      if (quoteId) {
+        supabase.functions.invoke("save-quote-to-drive", {
+          body: { quote_id: quoteId, job_id: job.id },
+        }).then(({ error: driveErr }) => {
+          if (driveErr) console.error("[DriveQuoteAttach] save-quote-to-drive failed:", driveErr.message);
+          else console.log("[DriveQuoteAttach] Quote saved to Drive folder");
+        });
+      }
+
       loadQuote();
       onRefresh();
     } catch (err: any) {
