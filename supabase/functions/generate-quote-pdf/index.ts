@@ -343,27 +343,9 @@ Deno.serve(async (req) => {
     errorStage = "build_html";
     const html = buildQuoteHtml(quote, job, customer);
 
-    // Convert HTML to PDF
+    // Generate PDF directly (no external service)
     errorStage = "generate_pdf";
-    const pdfRes = await fetch("https://html2pdf.app/api/render", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        html,
-        options: {
-          format: "A4",
-          margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
-        },
-      }),
-    });
-
-    let pdfBytes: Uint8Array;
-    if (!pdfRes.ok) {
-      console.warn("[generate-quote-pdf] html2pdf.app unavailable, using fallback");
-      pdfBytes = generateFallbackPdf(quote, job, customer);
-    } else {
-      pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
-    }
+    const pdfBytes = generateFallbackPdf(quote, job, customer);
 
     // If download mode, return the PDF directly
     if (download) {
