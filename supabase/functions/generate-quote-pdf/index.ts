@@ -249,6 +249,16 @@ function generateFallbackPdf(quote: any, job: any, customer: any): Uint8Array {
   }
   streamContent += "ET\n";
 
+  // Encode as Windows-1252 (single-byte) so £ (0xA3) renders correctly
+  const toWin1252 = (str: string): Uint8Array => {
+    const bytes: number[] = [];
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      bytes.push(code < 256 ? code : 63); // '?' for unsupported chars
+    }
+    return new Uint8Array(bytes);
+  };
+
   let output = "%PDF-1.4\n";
   const offsets: number[] = [];
 
@@ -261,7 +271,7 @@ function generateFallbackPdf(quote: any, job: any, customer: any): Uint8Array {
   offsets.push(output.length);
   output += `4 0 obj\n<< /Length ${streamContent.length} >>\nstream\n${streamContent}endstream\nendobj\n`;
   offsets.push(output.length);
-  output += "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n";
+  output += "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n";
 
   const xrefOffset = output.length;
   output += "xref\n0 6\n0000000000 65535 f \n";
@@ -270,7 +280,7 @@ function generateFallbackPdf(quote: any, job: any, customer: any): Uint8Array {
   }
   output += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
-  return new TextEncoder().encode(output);
+  return toWin1252(output);
 }
 
 Deno.serve(async (req) => {
