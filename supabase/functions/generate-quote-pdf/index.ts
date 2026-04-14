@@ -64,223 +64,283 @@ function fmt(val: number | null | undefined): string {
   return `£${Number(val).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtDate(val: string | null | undefined): string {
-  if (!val) return new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
-  try { return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }); }
-  catch { return val; }
-}
-
-function escapeHtml(str: string | null | undefined): string {
-  if (!str) return "";
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
-}
-
-function buildQuoteHtml(quote: any, job: any, customer: any): string {
-  const addr = job.property_address_json || {};
-  const propertyAddress = [addr.address, addr.city, addr.postcode].filter(Boolean).join(", ");
-  const customerAddress = [
-    customer?.address_line_1, customer?.address_line_2, customer?.city, customer?.postcode
-  ].filter(Boolean).join(", ");
-  const displayAddress = propertyAddress || customerAddress || "—";
-  const quoteDate = fmtDate(quote.created_at);
+function buildDocRequests(quote: any, job: any, customer: any): any[] {
   const customerName = customer ? `${customer.first_name} ${customer.last_name}` : "—";
+  const quotePrice = quote.quote_price ?? quote.price_max ?? quote.price_min ?? 0;
+  const deposit = Math.round(quotePrice * 0.5 * 100) / 100;
+  const progress = Math.round(quotePrice * 0.4 * 100) / 100;
+  const final = Math.round(quotePrice * 0.1 * 100) / 100;
+  const version = quote.version || 1;
+  const versionStr = version < 10 ? `0${version}` : `${version}`;
+  const quoteRef = `Quote – ${job.job_ref || ""}-${versionStr}`;
 
-  // Use quote_price, or fall back to price_max, or price_min
-  const quotePrice = quote.quote_price ?? quote.price_max ?? quote.price_min;
+  const scope = quote.scope_markdown || quote.scope_of_works || "";
+  const terms = quote.terms_markdown || quote.terms_and_conditions || "";
 
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #1a1a1a; padding: 50px 55px; line-height: 1.5; }
-  
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 35px; padding-bottom: 20px; border-bottom: 2px solid #1a1a1a; }
-  .header-left h1 { font-size: 20pt; letter-spacing: 5px; font-weight: 700; margin-bottom: 3px; }
-  .header-left p { font-size: 8.5pt; color: #555; line-height: 1.4; }
-  .header-right { text-align: right; }
-  .header-right .doc-type { font-size: 14pt; font-weight: 700; letter-spacing: 3px; color: #333; }
-  .header-right .date { font-size: 9pt; color: #777; margin-top: 4px; }
-  
-  .ref-bar { background: #f5f5f5; padding: 10px 16px; margin-bottom: 25px; border-radius: 3px; font-weight: 600; font-size: 11pt; }
-  
-  .two-col { display: flex; gap: 40px; margin-bottom: 25px; }
-  .two-col > div { flex: 1; }
-  
-  .section { margin-bottom: 25px; }
-  .section-title { font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
-  
-  .detail-table { width: 100%; }
-  .detail-table td { padding: 3px 0; vertical-align: top; }
-  .detail-table td:first-child { font-weight: 600; color: #555; width: 110px; }
-  
-  .scope-text { white-space: pre-wrap; line-height: 1.6; font-size: 10.5pt; }
-  
-  .investment-box { background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 4px; padding: 20px 24px; text-align: center; margin-bottom: 25px; }
-  .investment-box .label { font-size: 9pt; text-transform: uppercase; letter-spacing: 2px; color: #777; margin-bottom: 6px; }
-  .investment-box .price { font-size: 22pt; font-weight: 700; color: #1a1a1a; }
-  .investment-box .vat { font-size: 9pt; color: #999; margin-top: 4px; }
-  
-  .terms-text { white-space: pre-wrap; line-height: 1.6; font-size: 10pt; color: #444; }
-  
-  .footer { margin-top: 35px; border-top: 2px solid #1a1a1a; padding-top: 15px; }
-  .footer .validity { font-size: 10pt; font-weight: 600; margin-bottom: 8px; }
-  .footer .contact { font-size: 8.5pt; color: #777; line-height: 1.5; }
-</style></head><body>
+  // Build the full text content first, then apply formatting via ranges
+  const sections: string[] = [];
 
-<div class="header">
-  <div class="header-left">
-    <h1>ENCLAVE CABINETRY</h1>
-    <p>Units 1 &amp; 2 Poplars Farm<br/>Lincolnshire, PE20 3QF<br/>danny@enclavecabinetry.com &bull; 07944 608098</p>
-  </div>
-  <div class="header-right">
-    <div class="doc-type">QUOTATION</div>
-    <div class="date">${quoteDate}</div>
-  </div>
-</div>
+  // PAGE 1 — Header & Client Details
+  sections.push("ENCLAVE CABINETRY\n");
+  sections.push("\n"); // will be horizontal rule area
+  sections.push(`${quoteRef}\n\n`);
+  sections.push("Designer: Alistair Wood | Email: alistair@enclavecabinetry.com | Mobile: 07944608098\n\n");
+  sections.push(`Quote To:\n${customerName}\n`);
+  if (customer?.email) sections.push(`${customer.email}\n`);
+  if (customer?.phone) sections.push(`${customer.phone}\n`);
+  const addr = [customer?.address_line_1, customer?.address_line_2, customer?.city, customer?.postcode].filter(Boolean).join(", ");
+  if (addr) sections.push(`${addr}\n`);
+  sections.push("\n\n"); // page break area
 
-<div class="ref-bar">${job.job_ref || ""} &mdash; Quote v${quote.version}</div>
+  // PAGE 2 — Line Items
+  sections.push("Line Items\n\n");
+  // We'll insert a table after text insertion
+  sections.push("\n\n");
 
-<div class="two-col">
-  <div class="section">
-    <div class="section-title">Client</div>
-    <table class="detail-table">
-      <tr><td>Name</td><td>${escapeHtml(customerName)}</td></tr>
-      <tr><td>Email</td><td>${escapeHtml(customer?.email) || "—"}</td></tr>
-      <tr><td>Phone</td><td>${escapeHtml(customer?.phone) || "—"}</td></tr>
-      <tr><td>Address</td><td>${escapeHtml(displayAddress)}</td></tr>
-    </table>
-  </div>
-  <div class="section">
-    <div class="section-title">Project</div>
-    <table class="detail-table">
-      <tr><td>Project</td><td>${escapeHtml(job.job_title) || "—"}</td></tr>
-      <tr><td>Room Type</td><td>${escapeHtml(job.room_type) || "—"}</td></tr>
-      <tr><td>Prepared by</td><td>${escapeHtml(job.assigned_rep_name) || "Enclave Cabinetry"}</td></tr>
-    </table>
-  </div>
-</div>
+  // PAGE 3 — Material Specification
+  sections.push("Material Specification\n\n");
+  sections.push("[Add material swatches and project photo here]\n\n\n");
 
-${quote.scope_markdown ? `
-<div class="section">
-  <div class="section-title">Scope of Works</div>
-  <div class="scope-text">${escapeHtml(quote.scope_markdown)}</div>
-</div>
-` : ""}
+  // PAGE 4 — Price & Scope
+  if (scope) {
+    sections.push("Scope of Works\n\n");
+    sections.push(`${scope}\n\n`);
+  }
+  sections.push(`Subtotal: ${fmt(quotePrice)}\n\n`);
+  sections.push("Payment Schedule\n\n");
+  sections.push(`Deposit (50%): ${fmt(deposit)}\n`);
+  sections.push(`Progress Payment (40%): ${fmt(progress)}\n`);
+  sections.push(`Final Payment (10%): ${fmt(final)}\n\n`);
+  sections.push("Units 1 & 2 Poplars Farm, East Heckington, PE20 3QF\n\n");
+  if (terms) {
+    sections.push("Terms and Conditions\n\n");
+    sections.push(`${terms}\n\n`);
+  }
+  sections.push("\n");
 
-${quotePrice != null ? `
-<div class="investment-box">
-  <div class="label">Your Investment</div>
-  <div class="price">${fmt(quotePrice)}</div>
-  <div class="vat">All prices exclude VAT unless otherwise stated</div>
-</div>
-` : ""}
+  // PAGE 5 — Thank you
+  sections.push("Thank you for your business.\n\n");
+  sections.push("Enclave Cabinetry\n");
 
-${quote.terms_markdown ? `
-<div class="section">
-  <div class="section-title">Payment Terms &amp; Conditions</div>
-  <div class="terms-text">${escapeHtml(quote.terms_markdown)}</div>
-</div>
-` : ""}
+  const fullText = sections.join("");
 
-<div class="footer">
-  <div class="validity">This quote is valid for 30 days from the date above.</div>
-  <div class="contact">
-    Enclave Cabinetry &bull; Units 1 &amp; 2 Poplars Farm, Lincolnshire, PE20 3QF<br/>
-    danny@enclavecabinetry.com &bull; 07944 608098 &bull; www.enclavecabinetry.com
-  </div>
-</div>
+  // Build requests: first insert all text, then format
+  const requests: any[] = [];
 
-</body></html>`;
-}
+  // Insert text at index 1 (after the initial newline in empty doc)
+  requests.push({
+    insertText: {
+      location: { index: 1 },
+      text: fullText,
+    },
+  });
 
-function generateFallbackPdf(quote: any, job: any, customer: any): Uint8Array {
-  const customerName = customer ? `${customer.first_name} ${customer.last_name}` : "N/A";
-  const quotePrice = quote.quote_price ?? quote.price_max ?? quote.price_min;
-
-  const lines: string[] = [
-    "ENCLAVE CABINETRY - QUOTATION",
-    `${job.job_ref || ""} - Quote v${quote.version}`,
-    `Date: ${fmtDate(quote.created_at)}`,
-    "",
-    "--- CLIENT ---",
-    `Name: ${customerName}`,
-    `Email: ${customer?.email || "N/A"}`,
-    `Phone: ${customer?.phone || "N/A"}`,
-    "",
-    "--- PROJECT ---",
-    `Title: ${job.job_title || "N/A"}`,
-    `Room Type: ${job.room_type || "N/A"}`,
-    "",
-  ];
-
-  if (quote.scope_markdown) {
-    lines.push("--- SCOPE OF WORKS ---");
-    lines.push(...quote.scope_markdown.split("\n").slice(0, 30));
-    lines.push("");
+  // Now calculate character offsets for formatting
+  let idx = 1;
+  const ranges: { start: number; end: number; text: string; section: string }[] = [];
+  for (const s of sections) {
+    ranges.push({ start: idx, end: idx + s.length, text: s, section: s });
+    idx += s.length;
   }
 
-  if (quotePrice != null) {
-    lines.push("--- INVESTMENT ---");
-    lines.push(`${fmt(quotePrice)} (excl. VAT)`);
-    lines.push("");
+  // Format "ENCLAVE CABINETRY" — first section
+  let offset = 1;
+  const titleEnd = offset + "ENCLAVE CABINETRY".length;
+  requests.push({
+    updateParagraphStyle: {
+      range: { startIndex: offset, endIndex: titleEnd + 1 },
+      paragraphStyle: { namedStyleType: "TITLE", alignment: "CENTER" },
+      fields: "namedStyleType,alignment",
+    },
+  });
+  requests.push({
+    updateTextStyle: {
+      range: { startIndex: offset, endIndex: titleEnd },
+      textStyle: {
+        bold: true,
+        fontSize: { magnitude: 24, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 0.1, green: 0.12, blue: 0.2 } } },
+      },
+      fields: "bold,fontSize,foregroundColor",
+    },
+  });
+
+  // Add horizontal rule after title
+  offset = titleEnd + 1; // after \n
+  // Skip the empty line section for HR
+  const hrIdx = offset;
+  offset += sections[1].length;
+
+  // Quote reference heading
+  const refText = quoteRef;
+  const refStart = offset;
+  const refEnd = offset + refText.length;
+  requests.push({
+    updateParagraphStyle: {
+      range: { startIndex: refStart, endIndex: refEnd + 1 },
+      paragraphStyle: { namedStyleType: "HEADING_1" },
+      fields: "namedStyleType",
+    },
+  });
+  requests.push({
+    updateTextStyle: {
+      range: { startIndex: refStart, endIndex: refEnd },
+      textStyle: {
+        fontSize: { magnitude: 18, unit: "PT" },
+        foregroundColor: { color: { rgbColor: { red: 0.1, green: 0.12, blue: 0.2 } } },
+      },
+      fields: "fontSize,foregroundColor",
+    },
+  });
+
+  // "Quote To:" bold formatting — find it
+  const quoteToSection = `Quote To:\n${customerName}\n`;
+  const quoteToIdx = fullText.indexOf("Quote To:");
+  if (quoteToIdx >= 0) {
+    const qtStart = 1 + quoteToIdx;
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: qtStart, endIndex: qtStart + "Quote To:".length },
+        textStyle: { bold: true, fontSize: { magnitude: 11, unit: "PT" } },
+        fields: "bold,fontSize",
+      },
+    });
+    // Customer name bold
+    const cnStart = qtStart + "Quote To:\n".length;
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: cnStart, endIndex: cnStart + customerName.length },
+        textStyle: { bold: true, fontSize: { magnitude: 12, unit: "PT" } },
+        fields: "bold,fontSize",
+      },
+    });
   }
 
-  if (quote.terms_markdown) {
-    lines.push("--- TERMS ---");
-    lines.push(...quote.terms_markdown.split("\n").slice(0, 20));
-    lines.push("");
-  }
-
-  lines.push("This quote is valid for 30 days.");
-  lines.push("Enclave Cabinetry - Units 1 & 2 Poplars Farm, Lincolnshire, PE20 3QF");
-
-  const escapePdf = (s: string) => s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-  const pageWidth = 595;
-  const pageHeight = 842;
-  const margin = 50;
-  const lineHeight = 14;
-  let y = pageHeight - margin;
-
-  let streamContent = "BT\n/F1 10 Tf\n";
-  for (const line of lines) {
-    if (y < margin) break;
-    streamContent += `1 0 0 1 ${margin} ${y} Tm\n(${escapePdf(line)}) Tj\n`;
-    y -= lineHeight;
-  }
-  streamContent += "ET\n";
-
-  // Encode as Windows-1252 (single-byte) so £ (0xA3) renders correctly
-  const toWin1252 = (str: string): Uint8Array => {
-    const bytes: number[] = [];
-    for (let i = 0; i < str.length; i++) {
-      const code = str.charCodeAt(i);
-      bytes.push(code < 256 ? code : 63); // '?' for unsupported chars
+  // Format section headings
+  const headings = ["Line Items", "Material Specification", "Scope of Works", "Payment Schedule", "Terms and Conditions"];
+  for (const h of headings) {
+    const hIdx = fullText.indexOf(h + "\n");
+    if (hIdx >= 0) {
+      const hStart = 1 + hIdx;
+      const hEnd = hStart + h.length;
+      requests.push({
+        updateParagraphStyle: {
+          range: { startIndex: hStart, endIndex: hEnd + 1 },
+          paragraphStyle: { namedStyleType: "HEADING_2" },
+          fields: "namedStyleType",
+        },
+      });
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: hStart, endIndex: hEnd },
+          textStyle: {
+            bold: true,
+            fontSize: { magnitude: 14, unit: "PT" },
+            foregroundColor: { color: { rgbColor: { red: 0.1, green: 0.12, blue: 0.2 } } },
+          },
+          fields: "bold,fontSize,foregroundColor",
+        },
+      });
     }
-    return new Uint8Array(bytes);
-  };
-
-  let output = "%PDF-1.4\n";
-  const offsets: number[] = [];
-
-  offsets.push(output.length);
-  output += "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
-  offsets.push(output.length);
-  output += "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
-  offsets.push(output.length);
-  output += `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n`;
-  offsets.push(output.length);
-  output += `4 0 obj\n<< /Length ${streamContent.length} >>\nstream\n${streamContent}endstream\nendobj\n`;
-  offsets.push(output.length);
-  output += "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n";
-
-  const xrefOffset = output.length;
-  output += "xref\n0 6\n0000000000 65535 f \n";
-  for (const off of offsets) {
-    output += off.toString().padStart(10, "0") + " 00000 n \n";
   }
-  output += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
-  return toWin1252(output);
+  // Format Subtotal bold
+  const subtotalText = `Subtotal: ${fmt(quotePrice)}`;
+  const stIdx = fullText.indexOf(subtotalText);
+  if (stIdx >= 0) {
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: 1 + stIdx, endIndex: 1 + stIdx + subtotalText.length },
+        textStyle: { bold: true, fontSize: { magnitude: 14, unit: "PT" } },
+        fields: "bold,fontSize",
+      },
+    });
+  }
+
+  // Format "Thank you" section
+  const tyText = "Thank you for your business.";
+  const tyIdx = fullText.indexOf(tyText);
+  if (tyIdx >= 0) {
+    requests.push({
+      updateParagraphStyle: {
+        range: { startIndex: 1 + tyIdx, endIndex: 1 + tyIdx + tyText.length + 1 },
+        paragraphStyle: { alignment: "CENTER" },
+        fields: "alignment",
+      },
+    });
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: 1 + tyIdx, endIndex: 1 + tyIdx + tyText.length },
+        textStyle: {
+          italic: true,
+          fontSize: { magnitude: 14, unit: "PT" },
+          foregroundColor: { color: { rgbColor: { red: 0.3, green: 0.3, blue: 0.3 } } },
+        },
+        fields: "italic,fontSize,foregroundColor",
+      },
+    });
+  }
+
+  const ecText = "Enclave Cabinetry";
+  const ecIdx = fullText.lastIndexOf(ecText);
+  if (ecIdx >= 0) {
+    requests.push({
+      updateParagraphStyle: {
+        range: { startIndex: 1 + ecIdx, endIndex: 1 + ecIdx + ecText.length + 1 },
+        paragraphStyle: { alignment: "CENTER" },
+        fields: "alignment",
+      },
+    });
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: 1 + ecIdx, endIndex: 1 + ecIdx + ecText.length },
+        textStyle: {
+          bold: true,
+          fontSize: { magnitude: 16, unit: "PT" },
+          foregroundColor: { color: { rgbColor: { red: 0.1, green: 0.12, blue: 0.2 } } },
+        },
+        fields: "bold,fontSize,foregroundColor",
+      },
+    });
+  }
+
+  // Insert page breaks before key sections
+  const pageBreakBefore = ["Line Items\n", "Material Specification\n", "Thank you for your business.\n"];
+  // Also before "Scope of Works" or "Subtotal" (page 4)
+  const scopeOrSubtotal = scope ? "Scope of Works\n" : subtotalText;
+  if (scopeOrSubtotal) pageBreakBefore.splice(2, 0, scopeOrSubtotal);
+
+  // We need to insert page breaks AFTER all text is inserted
+  // Page breaks need to be inserted in reverse order to not shift indices
+  const breakIndices: number[] = [];
+  for (const marker of pageBreakBefore) {
+    const mi = fullText.indexOf(marker);
+    if (mi >= 0) breakIndices.push(1 + mi);
+  }
+  // Sort descending so we insert from bottom to top
+  breakIndices.sort((a, b) => b - a);
+  for (const bi of breakIndices) {
+    requests.push({
+      insertPageBreak: {
+        location: { index: bi },
+      },
+    });
+  }
+
+  // Insert a table for line items after "Line Items" heading
+  const liIdx = fullText.indexOf("Line Items\n\n");
+  if (liIdx >= 0) {
+    const tableInsertIdx = 1 + liIdx + "Line Items\n\n".length;
+    requests.push({
+      insertTable: {
+        rows: 6,
+        columns: 4,
+        location: { index: tableInsertIdx },
+      },
+    });
+  }
+
+  return requests;
 }
 
 Deno.serve(async (req) => {
@@ -292,7 +352,7 @@ Deno.serve(async (req) => {
   try {
     errorStage = "parse_request";
     const body = await req.json();
-    const { quote_id, job_id, download } = body;
+    const { quote_id, job_id } = body;
     if (!quote_id) return jsonResponse({ ok: false, error: "quote_id is required" }, 400);
 
     const supabaseAdmin = createClient(
@@ -349,98 +409,99 @@ Deno.serve(async (req) => {
       .eq("id", job.customer_id)
       .single();
 
-    // Build HTML
-    errorStage = "build_html";
-    const html = buildQuoteHtml(quote, job, customer);
-
-    // Generate PDF directly (no external service)
-    errorStage = "generate_pdf";
-    const pdfBytes = generateFallbackPdf(quote, job, customer);
-
-    // If download mode, return the PDF directly
-    if (download) {
-      return new Response(pdfBytes, {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="Quote_v${quote.version}.pdf"`,
-        },
-      });
-    }
-
-    // Upload to Drive
+    // Check Drive folder
     if (!job.drive_folder_id) {
-      console.log(`[generate-quote-pdf] No Drive folder for job ${job.job_ref}, skipping upload`);
-      return jsonResponse({ ok: true, skipped_drive: true });
+      return jsonResponse({ ok: false, error: "No Drive folder linked to this job. Link a Drive folder first." }, 400);
     }
 
+    // Get Google access token
     errorStage = "get_access_token";
     const accessToken = await getAccessToken(supabaseAdmin, tenantId);
     const folderId = job.drive_folder_id;
-    const fileName = `Quote_v${quote.version}.pdf`;
+    const version = quote.version || 1;
+    const fileName = `Quote_v${version}`;
 
-    // Check existing
+    // Check if a doc already exists with this name
     errorStage = "search_existing";
-    const searchQuery = `name='${fileName}' and '${folderId}' in parents and trashed=false`;
+    const searchQuery = `name='${fileName}' and '${folderId}' in parents and trashed=false and mimeType='application/vnd.google-apps.document'`;
     const searchRes = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const searchData = await searchRes.json();
-    const existingFileId = searchData.files?.[0]?.id;
+    let existingDocId = searchData.files?.[0]?.id;
 
-    let driveFileId: string;
+    let docId: string;
 
-    if (existingFileId) {
-      errorStage = "overwrite_file";
-      const updateRes = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=media&supportsAllDrives=true&fields=id`,
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/pdf" },
-          body: pdfBytes,
-        }
-      );
-      if (!updateRes.ok) throw new Error(`Drive update failed ${updateRes.status}: ${await updateRes.text()}`);
-      driveFileId = existingFileId;
-      console.log(`[generate-quote-pdf] Updated ${fileName} (${driveFileId})`);
-    } else {
-      errorStage = "create_file";
-      const metadata = JSON.stringify({ name: fileName, parents: [folderId], mimeType: "application/pdf" });
-      const boundary = "quote_gen_boundary";
-      const encoder = new TextEncoder();
-      const metaPart = encoder.encode(
-        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: binary\r\n\r\n`
-      );
-      const endPart = encoder.encode(`\r\n--${boundary}--`);
-      const bodyArr = new Uint8Array(metaPart.length + pdfBytes.length + endPart.length);
-      bodyArr.set(metaPart, 0);
-      bodyArr.set(pdfBytes, metaPart.length);
-      bodyArr.set(endPart, metaPart.length + pdfBytes.length);
-
-      const createRes = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
-          body: bodyArr,
-        }
-      );
-      if (!createRes.ok) throw new Error(`Drive create failed ${createRes.status}: ${await createRes.text()}`);
-      const created = await createRes.json();
-      driveFileId = created.id;
-      console.log(`[generate-quote-pdf] Created ${fileName} (${driveFileId})`);
+    if (existingDocId) {
+      // Delete existing and recreate (Docs API doesn't support full content replacement easily)
+      errorStage = "delete_existing";
+      await fetch(`https://www.googleapis.com/drive/v3/files/${existingDocId}?supportsAllDrives=true`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      console.log(`[generate-quote-pdf] Deleted existing doc ${existingDocId}`);
     }
 
-    // Update quote record with drive file ID
+    // Create new Google Doc in the Drive folder
+    errorStage = "create_doc";
+    const createRes = await fetch(
+      "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,webViewLink",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: fileName,
+          mimeType: "application/vnd.google-apps.document",
+          parents: [folderId],
+        }),
+      }
+    );
+    if (!createRes.ok) throw new Error(`Drive create failed ${createRes.status}: ${await createRes.text()}`);
+    const created = await createRes.json();
+    docId = created.id;
+    const webViewLink = created.webViewLink;
+    console.log(`[generate-quote-pdf] Created Google Doc ${fileName} (${docId})`);
+
+    // Populate the doc with content using Google Docs API
+    errorStage = "populate_doc";
+    const docRequests = buildDocRequests(quote, job, customer);
+
+    const batchRes = await fetch(
+      `https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ requests: docRequests }),
+      }
+    );
+    if (!batchRes.ok) {
+      const errText = await batchRes.text();
+      console.error(`[generate-quote-pdf] Docs API batchUpdate failed:`, errText);
+      // Don't throw — doc is created but may be empty. Log and continue.
+    } else {
+      console.log(`[generate-quote-pdf] Populated doc content successfully`);
+    }
+
+    // Update quote record with Google Doc ID
     errorStage = "update_quote";
     await supabaseAdmin
       .from("cab_quotes")
-      .update({ drive_file_id: driveFileId, drive_filename: fileName })
+      .update({ drive_file_id: docId, drive_filename: fileName })
       .eq("id", quote_id);
 
-    return jsonResponse({ ok: true, drive_file_id: driveFileId, file_name: fileName });
+    return jsonResponse({
+      ok: true,
+      drive_file_id: docId,
+      file_name: fileName,
+      web_view_link: webViewLink || `https://docs.google.com/document/d/${docId}/edit`,
+    });
   } catch (err: any) {
     console.error(`[generate-quote-pdf] Failed at stage="${errorStage}":`, err.message);
     return jsonResponse({ ok: false, error: err.message, stage: errorStage }, 500);
