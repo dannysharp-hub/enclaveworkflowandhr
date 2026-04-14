@@ -2116,6 +2116,7 @@ export type Database = {
           job_id: string
           price_max: number | null
           price_min: number | null
+          quote_price: number | null
           scope_markdown: string | null
           scope_summary: string | null
           sent_at: string | null
@@ -2137,6 +2138,7 @@ export type Database = {
           job_id: string
           price_max?: number | null
           price_min?: number | null
+          quote_price?: number | null
           scope_markdown?: string | null
           scope_summary?: string | null
           sent_at?: string | null
@@ -2158,6 +2160,7 @@ export type Database = {
           job_id?: string
           price_max?: number | null
           price_min?: number | null
+          quote_price?: number | null
           scope_markdown?: string | null
           scope_summary?: string | null
           sent_at?: string | null
