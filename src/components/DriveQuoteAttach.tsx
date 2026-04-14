@@ -208,7 +208,18 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
   };
 
   const handleSendQuote = async () => {
-    if (!selectedFile) return;
+    // For re-sends, use existing quote data if no new file selected
+    const fileToSend = selectedFile || (quote?.drive_file_id ? {
+      id: quote.drive_file_id,
+      file_name: quote.drive_filename || "Quote.pdf",
+      mime_type: "application/pdf",
+      drive_web_view_link: null,
+    } as DriveFile : null);
+
+    if (!fileToSend) {
+      toast({ title: "No quote file attached", variant: "destructive" });
+      return;
+    }
     setSending(true);
     try {
       const acceptanceToken = crypto.randomUUID();
@@ -217,8 +228,8 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
       if (quote) {
         const { data: updated, error: updateErr } = await (supabase.from("cab_quotes") as any)
           .update({
-            drive_file_id: selectedFile.id,
-            drive_filename: selectedFile.file_name,
+            drive_file_id: fileToSend.id,
+            drive_filename: fileToSend.file_name,
             status: "sent",
             sent_at: new Date().toISOString(),
             acceptance_token: acceptanceToken,
@@ -236,8 +247,8 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
             job_id: job.id,
             version: 1,
             status: "sent",
-            drive_file_id: selectedFile.id,
-            drive_filename: selectedFile.file_name,
+            drive_file_id: fileToSend.id,
+            drive_filename: fileToSend.file_name,
             sent_at: new Date().toISOString(),
             currency: job.ballpark_currency || "GBP",
             acceptance_token: acceptanceToken,
@@ -257,8 +268,8 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
         customerId: job.customer_id,
         payload: {
           job_ref: job.job_ref,
-          drive_file_id: selectedFile.id,
-          drive_filename: selectedFile.file_name,
+          drive_file_id: fileToSend.id,
+          drive_filename: fileToSend.file_name,
         },
       });
 
