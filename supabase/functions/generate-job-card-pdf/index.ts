@@ -231,31 +231,10 @@ Deno.serve(async (req) => {
     errorStage = "build_html";
     const html = buildJobCardHtml(job, customer);
 
-    // Convert HTML to PDF using a public HTML-to-PDF service
+    // Generate PDF directly (no external service dependency)
     errorStage = "generate_pdf";
-    // Use a lightweight approach: render HTML via Deno's built-in capabilities
-    // We'll use the html2pdf.app free API for conversion
-    const pdfRes = await fetch("https://html2pdf.app/api/render", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        html,
-        options: {
-          format: "A4",
-          margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
-        },
-      }),
-    });
-
-    let pdfBytes: Uint8Array;
-
-    if (!pdfRes.ok) {
-      // Fallback: generate a simple text-based PDF manually
-      console.warn("[generate-job-card-pdf] html2pdf.app unavailable, using inline PDF generation");
-      pdfBytes = generateSimplePdf(job, customer);
-    } else {
-      pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
-    }
+    const pdfBytes = generateSimplePdf(job, customer);
+    console.log(`[generate-job-card-pdf] Generated PDF (${pdfBytes.length} bytes) for ${job.job_ref}`);
 
     // Get access token
     errorStage = "get_access_token";
