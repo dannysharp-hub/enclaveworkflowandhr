@@ -8,6 +8,11 @@ import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import { toast } from "@/hooks/use-toast";
 import { regenerateJobCard } from "@/lib/jobCardHelper";
 import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
+import {
+  canSeeFinancials, canDeleteRecords, canSeeClientContact,
+  canManageQuotes, canManageDesignSignoff, canManageDryFit,
+  canSeeJobSection, canEditJobDetails, canAccessGhlSettings,
+} from "@/lib/rolePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -418,7 +423,7 @@ export default function JobDetailPage() {
             <span className="font-mono text-xs text-muted-foreground">{job.job_ref}</span>
             <Badge variant="outline">{job.status}</Badge>
             <Badge variant="secondary" className="text-[10px]">{stageKey?.replace(/_/g, " ")}</Badge>
-            {job.contract_value && (
+            {canSeeFinancials(userRole) && job.contract_value && (
               <Badge variant="default" className="text-[10px]">£{Number(job.contract_value).toLocaleString()}</Badge>
             )}
             {isProjectConfirmed && (
@@ -439,7 +444,7 @@ export default function JobDetailPage() {
             </div>
           )}
         </div>
-        {userRole === "admin" && (
+        {canDeleteRecords(userRole) && (
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)} className="flex items-center gap-1.5">
             <Trash2 size={14} /> Delete
           </Button>
@@ -494,30 +499,39 @@ export default function JobDetailPage() {
             <h3 className="font-mono text-sm font-bold text-foreground mb-2">Customer</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div><span className="text-muted-foreground">Name:</span> {customer?.first_name} {customer?.last_name}</div>
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Phone:</span>
-                {editingField === "phone" ? (
-                  <span className="flex items-center gap-1">
-                    <Input className="h-6 text-xs w-32" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("phone")} />
-                    <button onClick={() => saveCustomerField("phone")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
-                    <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">{customer?.phone || "—"}<button onClick={() => startEdit("phone", customer?.phone)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Email:</span>
-                {editingField === "email" ? (
-                  <span className="flex items-center gap-1">
-                    <Input className="h-6 text-xs w-44" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("email")} />
-                    <button onClick={() => saveCustomerField("email")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
-                    <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">{customer?.email || "—"}<button onClick={() => startEdit("email", customer?.email)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
-                )}
-              </div>
+              {canSeeClientContact(userRole) ? (
+                <>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Phone:</span>
+                    {editingField === "phone" ? (
+                      <span className="flex items-center gap-1">
+                        <Input className="h-6 text-xs w-32" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("phone")} />
+                        <button onClick={() => saveCustomerField("phone")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
+                        <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">{customer?.phone || "—"}{canEditJobDetails(userRole) && <button onClick={() => startEdit("phone", customer?.phone)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button>}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Email:</span>
+                    {editingField === "email" ? (
+                      <span className="flex items-center gap-1">
+                        <Input className="h-6 text-xs w-44" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("email")} />
+                        <button onClick={() => saveCustomerField("email")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
+                        <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">{customer?.email || "—"}{canEditJobDetails(userRole) && <button onClick={() => startEdit("email", customer?.email)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button>}</span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div><span className="text-muted-foreground">Phone:</span> <span className="text-muted-foreground">—</span></div>
+                  <div><span className="text-muted-foreground">Email:</span> <span className="text-muted-foreground">—</span></div>
+                </>
+              )}
               <div className="flex items-center gap-1">
                 <span className="text-muted-foreground">Postcode:</span>
                 {editingField === "postcode" ? (
@@ -527,30 +541,32 @@ export default function JobDetailPage() {
                     <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1">{customer?.postcode || "—"}<button onClick={() => startEdit("postcode", customer?.postcode)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
+                  <span className="flex items-center gap-1">{customer?.postcode || "—"}{canEditJobDetails(userRole) && <button onClick={() => startEdit("postcode", customer?.postcode)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button>}</span>
                 )}
               </div>
-              <div className="col-span-2">
-                <Label className="text-xs text-muted-foreground">Contract Value</Label>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-sm font-mono text-muted-foreground">£</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="font-mono text-xs h-8 w-40"
-                    defaultValue={job.contract_value ?? ""}
-                    placeholder="0.00"
-                    onBlur={async (e) => {
-                      const val = e.target.value ? parseFloat(e.target.value) : null;
-                      if (val !== job.contract_value) {
-                        await updateJob({ contract_value: val });
-                        setJob((prev: any) => ({ ...prev, contract_value: val }));
-                        toast({ title: "Contract value saved" });
-                      }
-                    }}
-                  />
+              {canSeeFinancials(userRole) && (
+                <div className="col-span-2">
+                  <Label className="text-xs text-muted-foreground">Contract Value</Label>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-sm font-mono text-muted-foreground">£</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="font-mono text-xs h-8 w-40"
+                      defaultValue={job.contract_value ?? ""}
+                      placeholder="0.00"
+                      onBlur={async (e) => {
+                        const val = e.target.value ? parseFloat(e.target.value) : null;
+                        if (val !== job.contract_value) {
+                          await updateJob({ contract_value: val });
+                          setJob((prev: any) => ({ ...prev, contract_value: val }));
+                          toast({ title: "Contract value saved" });
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -605,7 +621,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Ballpark Card */}
-          <div data-section="ballpark" className="rounded-lg border border-border bg-card p-4 space-y-3">
+          {canSeeFinancials(userRole) && (<div data-section="ballpark" className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
                 <Banknote size={14} className="text-primary" /> Ballpark Estimate
@@ -656,7 +672,7 @@ export default function JobDetailPage() {
                 {ballparkSending ? "Sending…" : "Send Ballpark to Customer"}
               </Button>
             </div>
-          </div>
+           </div>)}
 
           {/* Appointment Request Status */}
           {(job.appointment_requested_at || job.booking_url) && (
@@ -950,22 +966,26 @@ export default function JobDetailPage() {
           )}
 
           {/* Quote — Attach & Send from Drive */}
-          <div data-section="quote-builder">
-            <DriveQuoteAttach companyId={companyId!} job={job} customer={customer} onRefresh={load} />
-          </div>
+          {canManageQuotes(userRole) && (
+            <div data-section="quote-builder">
+              <DriveQuoteAttach companyId={companyId!} job={job} customer={customer} onRefresh={load} />
+            </div>
+          )}
 
           {/* Manual Quote Builder */}
-          <div data-section="manual-quote-builder">
-            <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
-          </div>
+          {canManageQuotes(userRole) && (
+            <div data-section="manual-quote-builder">
+              <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+            </div>
+          )}
 
-          {/* Purchasing Tab — only after project confirmed */}
-          {isProjectConfirmed && (
+          {/* Purchasing Tab — only after project confirmed, admin only */}
+          {isProjectConfirmed && canSeeFinancials(userRole) && (
             <JobPurchasingTab companyId={companyId!} job={job} onRefresh={load} />
           )}
 
-          {/* Profitability Tab — only after project confirmed */}
-          {isProjectConfirmed && (
+          {/* Profitability Tab — only after project confirmed, admin only */}
+          {isProjectConfirmed && canSeeFinancials(userRole) && (
             <JobProfitabilityTab companyId={companyId!} job={job} onRefresh={load} />
           )}
 
@@ -1347,8 +1367,8 @@ export default function JobDetailPage() {
             );
           })()}
 
-          {/* Payment Stages */}
-          {job && (
+          {/* Payment Stages — admin only */}
+          {canSeeFinancials(userRole) && job && (
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="font-mono text-sm font-bold text-foreground mb-3 flex items-center gap-2">
                 <Banknote size={14} className="text-primary" /> Payments
@@ -1802,7 +1822,7 @@ export default function JobDetailPage() {
             );
           })()}
 
-          {invoices.length > 0 && (
+          {canSeeFinancials(userRole) && invoices.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="font-mono text-sm font-bold text-foreground mb-2">Invoices</h3>
               <div className="space-y-2">
@@ -1834,8 +1854,8 @@ export default function JobDetailPage() {
 
         {/* Right column — GHL Admin + Event log */}
         <div className="space-y-4">
-          {/* GHL Admin Actions */}
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          {/* GHL Admin Actions — admin only */}
+          {canAccessGhlSettings(userRole) && (<div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
               <Link size={14} className="text-primary" /> GHL Admin
             </h3>
@@ -1996,7 +2016,7 @@ export default function JobDetailPage() {
                 </a>
               )}
             </div>
-          </div>
+          </div>)}
 
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-mono text-sm font-bold text-foreground mb-3">Event Log</h3>
@@ -2125,7 +2145,7 @@ export default function JobDetailPage() {
       </Dialog>
 
       {/* Delete Job - admin only */}
-      {userRole === "admin" && job && (
+      {canDeleteRecords(userRole) && job && (
         <>
            <div className="border-t border-border pt-8 mt-8 space-y-3">
             <Button variant="destructive" onClick={() => setDeleteOpen(true)} className="flex items-center gap-2">

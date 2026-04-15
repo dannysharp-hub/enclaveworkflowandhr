@@ -14,8 +14,9 @@ function useLandingRedirect(): string | null {
   const { userRole, loading } = useAuth();
   if (loading) return null;
   switch (userRole) {
-    case "supervisor": return "/workflow";
-    case "office": return "/production";
+    case "installer": return "/installer/jobs";
+    case "supervisor": return "/admin/production";
+    case "office": return "/admin/leads";
     default: return null;
   }
 }

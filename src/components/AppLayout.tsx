@@ -17,6 +17,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import ClockAnomalyPrompt from "@/components/ClockAnomalyPrompt";
 import RoleSwitcher from "@/components/RoleSwitcher";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { canRoleAccessRoute } from "@/lib/roleVisibility";
+
 // ── Types ──
 
 interface NavItem {
@@ -25,13 +27,9 @@ interface NavItem {
   icon: typeof LayoutDashboard;
 }
 
-
-
-
 // ── Role helpers ──
 
 const OPERATIVE_ROLES = ["production", "installer"];
-const MANAGER_ROLES = ["admin", "supervisor", "office", "finance"];
 
 function isOperative(role: string | null): boolean {
   return OPERATIVE_ROLES.includes(role || "");
@@ -56,7 +54,7 @@ const cabAdminItems: NavItem[] = [
 // ── Operative bottom nav items ──
 const operativeBottomNav: NavItem[] = [
   { to: "/", label: "My Day", icon: Home },
-  { to: "/jobs", label: "Jobs", icon: Wrench },
+  { to: "/installer/jobs", label: "My Jobs", icon: Truck },
   { to: "/my-hours", label: "HR", icon: Timer },
 ];
 
@@ -81,8 +79,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const displayName = profile?.full_name || "Loading...";
   const displayRole = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "";
 
-
-
+  // Filter nav items by role
+  const filteredTopLevel = topLevelItems.filter(item => canRoleAccessRoute(userRole, item.to));
+  const filteredCabAdmin = cabAdminItems.filter(item => canRoleAccessRoute(userRole, item.to));
 
   // ── Operative on mobile → bottom nav layout ──
   if (isMobile && isOperative(userRole)) {
@@ -145,10 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="fixed bottom-16 left-0 right-0 z-50 bg-card border-t border-border rounded-t-xl p-4 space-y-1 max-h-[60vh] overflow-y-auto">
               <p className="text-xs font-mono font-bold text-muted-foreground mb-2 uppercase">More</p>
               {[
-                { to: "/my-work", label: "My Work", icon: ClipboardList },
-                { to: "/my-pay", label: "My Pay", icon: Banknote },
                 { to: "/documents", label: "Documents", icon: FileText },
-                ...(flags.enable_remnants ? [{ to: "/remnants", label: "Remnants", icon: Recycle }] : []),
                 { to: "/whos-in", label: "Who's In", icon: Users },
               ].map(item => {
                 const isActive = location.pathname === item.to;
@@ -272,8 +268,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })()}
 
-          {/* Top-level nav items */}
-          {topLevelItems.map(item => {
+          {/* Top-level nav items — filtered by role */}
+          {filteredTopLevel.map(item => {
             const isActive = location.pathname === item.to;
             return (
               <NavLink
@@ -291,29 +287,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          {/* Cabinetry Admin section */}
-          <div className="mt-4">
-            <p className="px-3 text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider mb-1">Cabinetry Admin</p>
-            <div className="space-y-0.5">
-              {cabAdminItems.map(item => {
-                const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
-                      isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                  >
-                    <item.icon size={18} className={isActive ? "text-primary" : ""} />
-                    {!collapsed && <span>{item.label}</span>}
-                  </NavLink>
-                );
-              })}
+          {/* Cabinetry Admin section — only show if there are visible items */}
+          {filteredCabAdmin.length > 0 && (
+            <div className="mt-4">
+              <p className="px-3 text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider mb-1">Cabinetry Admin</p>
+              <div className="space-y-0.5">
+                {filteredCabAdmin.map(item => {
+                  const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                        isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <item.icon size={18} className={isActive ? "text-primary" : ""} />
+                      {!collapsed && <span>{item.label}</span>}
+                    </NavLink>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
         </nav>
 
