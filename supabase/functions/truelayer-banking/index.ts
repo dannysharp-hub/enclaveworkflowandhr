@@ -699,6 +699,21 @@ Deno.serve(async (req) => {
       return json({ accounts: accounts || [] });
     }
 
+    // ──── MATCH TO JOBS (CAB) ────
+    if (action === "match_to_jobs") {
+      // Get company ID for this tenant
+      const { data: tenantMap } = await admin
+        .from("cab_company_tenant_map")
+        .select("company_id")
+        .eq("tenant_id", tenantId)
+        .single();
+
+      if (!tenantMap) return json({ error: "No company mapping found" }, 400);
+
+      const result = await matchTransactionsToJobs(tenantId, tenantMap.company_id);
+      return json(result);
+    }
+
     return json({ error: "Unknown action" }, 400);
   } catch (err) {
     console.error("truelayer-banking error:", err);
