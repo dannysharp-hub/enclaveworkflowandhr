@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { getCabCompanyId, generateJobRef, insertCabEvent } from "@/lib/cabHelpers";
 import { deleteCabJob } from "@/lib/cabJobDelete";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { canDeleteRecords, canCreateJobs } from "@/lib/rolePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +45,7 @@ const JOB_TYPES = ["Wardrobe", "Home Office", "Commercial Fit-out", "Other"] as 
 const SOURCES = ["Word of mouth", "Website", "Referral", "Social media", "Other"] as const;
 
 export default function LeadsPage() {
+  const { userRole } = useAuth();
   const navigate = useNavigate();
   const [leads, setLeads] = useState<LeadJob[]>([]);
   const [allActiveJobs, setAllActiveJobs] = useState<LeadJob[]>([]);
@@ -350,12 +353,14 @@ export default function LeadsPage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <ArrowRight size={14} className="text-muted-foreground" />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeleteLead(lead); }}
-                          className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {canDeleteRecords(userRole) && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteLead(lead); }}
+                            className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
