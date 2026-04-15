@@ -279,7 +279,7 @@ export default function GhlSettingsPage() {
                 },
               });
               if (error) throw error;
-              console.log("[Drive Reconnect] redirect_uri passed:", "https://enclaveworkflowandhr.lovable.app/settings");
+              console.log("[Drive Reconnect] redirect_uri passed:", window.location.origin + "/settings");
               console.log("[Drive Reconnect] Full OAuth URL returned:", data?.url);
               if (data?.url) {
                 window.location.href = data.url;
