@@ -532,19 +532,6 @@ export default function JobDetailPage() {
                   <div><span className="text-muted-foreground">Email:</span> <span className="text-muted-foreground">—</span></div>
                 </>
               )}
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Email:</span>
-                {editingField === "email" ? (
-                  <span className="flex items-center gap-1">
-                    <Input className="h-6 text-xs w-44" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("email")} />
-                    <button onClick={() => saveCustomerField("email")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
-                    <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">{customer?.email || "—"}<button onClick={() => startEdit("email", customer?.email)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
-                )}
-              </div>
               <div className="flex items-center gap-1">
                 <span className="text-muted-foreground">Postcode:</span>
                 {editingField === "postcode" ? (
@@ -554,30 +541,32 @@ export default function JobDetailPage() {
                     <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1">{customer?.postcode || "—"}<button onClick={() => startEdit("postcode", customer?.postcode)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
+                  <span className="flex items-center gap-1">{customer?.postcode || "—"}{canEditJobDetails(userRole) && <button onClick={() => startEdit("postcode", customer?.postcode)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button>}</span>
                 )}
               </div>
-              <div className="col-span-2">
-                <Label className="text-xs text-muted-foreground">Contract Value</Label>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-sm font-mono text-muted-foreground">£</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="font-mono text-xs h-8 w-40"
-                    defaultValue={job.contract_value ?? ""}
-                    placeholder="0.00"
-                    onBlur={async (e) => {
-                      const val = e.target.value ? parseFloat(e.target.value) : null;
-                      if (val !== job.contract_value) {
-                        await updateJob({ contract_value: val });
-                        setJob((prev: any) => ({ ...prev, contract_value: val }));
-                        toast({ title: "Contract value saved" });
-                      }
-                    }}
-                  />
+              {canSeeFinancials(userRole) && (
+                <div className="col-span-2">
+                  <Label className="text-xs text-muted-foreground">Contract Value</Label>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-sm font-mono text-muted-foreground">£</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="font-mono text-xs h-8 w-40"
+                      defaultValue={job.contract_value ?? ""}
+                      placeholder="0.00"
+                      onBlur={async (e) => {
+                        const val = e.target.value ? parseFloat(e.target.value) : null;
+                        if (val !== job.contract_value) {
+                          await updateJob({ contract_value: val });
+                          setJob((prev: any) => ({ ...prev, contract_value: val }));
+                          toast({ title: "Contract value saved" });
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
