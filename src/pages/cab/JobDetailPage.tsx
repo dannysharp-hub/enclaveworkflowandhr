@@ -6,7 +6,7 @@ import { getCabCompanyId, getCabCompany, insertCabEvent, estimatePostcodeDistanc
 import { deleteCabJob } from "@/lib/cabJobDelete";
 import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import { toast } from "@/hooks/use-toast";
-import { regenerateJobCard } from "@/lib/jobCardHelper";
+import { regenerateJobCard, regenerateJobCardWithFeedback } from "@/lib/jobCardHelper";
 import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
 import { logJobViewed, logJobEdited, logDocumentOpened, logDriveFolderOpened } from "@/lib/activityLogger";
 import {
@@ -1164,6 +1164,16 @@ export default function JobDetailPage() {
                   >
                     <ExternalLink size={12} /> Open in Drive
                   </a>
+                  {userRole === "admin" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs h-7 px-2"
+                      onClick={() => regenerateJobCardWithFeedback(job.id)}
+                    >
+                      <RefreshCw size={12} className="mr-1" /> Regenerate Job Card
+                    </Button>
+                  )}
                 </div>
               </div>
             ) : (
