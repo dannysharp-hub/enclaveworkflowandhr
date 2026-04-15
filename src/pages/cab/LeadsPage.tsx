@@ -7,6 +7,7 @@ import { deleteCabJob } from "@/lib/cabJobDelete";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { canDeleteRecords, canCreateJobs } from "@/lib/rolePermissions";
+import { logJobCreated, logJobDeleted, logPageVisit } from "@/lib/activityLogger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -278,6 +279,7 @@ export default function LeadsPage() {
     setDeleting(true);
     try {
       await deleteCabJob(deleteLead.id);
+      logJobDeleted(deleteLead.job_ref, deleteLead.id);
       toast({ title: "Job deleted", description: `${deleteLead.job_ref} removed` });
       setDeleteLead(null);
       load();

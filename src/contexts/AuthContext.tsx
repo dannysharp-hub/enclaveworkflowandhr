@@ -65,7 +65,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         setTimeout(() => fetchUserData(session.user.id), 0);
+        if (_event === "SIGNED_IN") {
+          import("@/lib/activityLogger").then(m => { m.clearActivityCache(); m.logLogin(); });
+        }
       } else {
+        if (_event === "SIGNED_OUT") {
+          import("@/lib/activityLogger").then(m => { m.clearActivityCache(); });
+        }
         setDbRole(null);
         setRoleOverride(null);
         setProfile(null);
@@ -88,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    try { const { logLogout, clearActivityCache } = await import("@/lib/activityLogger"); await logLogout(); clearActivityCache(); } catch {}
     await supabase.auth.signOut();
   };
 

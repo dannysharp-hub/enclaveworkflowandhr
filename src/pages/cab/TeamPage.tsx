@@ -11,6 +11,7 @@ import { format } from "date-fns";
 export default function TeamPage() {
   const [invites, setInvites] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [lastActive, setLastActive] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("staff");
@@ -30,7 +31,7 @@ export default function TeamPage() {
     if (!profile) return;
     setCompanyId(profile.company_id);
 
-    const [invitesRes, membersRes] = await Promise.all([
+    const [invitesRes, membersRes, activityRes] = await Promise.all([
       (supabase.from("cab_company_invites") as any)
         .select("*")
         .eq("company_id", profile.company_id)
@@ -39,10 +40,21 @@ export default function TeamPage() {
         .select("id, name, email, role, is_active, created_at")
         .eq("company_id", profile.company_id)
         .order("name"),
+      (supabase.from("user_activity_log") as any)
+        .select("user_id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(500),
     ]);
+
+    // Build last-active map from activity logs
+    const lastActiveMap = new Map<string, string>();
+    for (const a of activityRes.data ?? []) {
+      if (!lastActiveMap.has(a.user_id)) lastActiveMap.set(a.user_id, a.created_at);
+    }
 
     setInvites(invitesRes.data ?? []);
     setMembers(membersRes.data ?? []);
+    setLastActive(lastActiveMap);
     setLoading(false);
   }, []);
 
@@ -124,20 +136,28 @@ export default function TeamPage() {
           </h2>
         </div>
         <div className="divide-y divide-border">
-          {members.map(m => (
+          {members.map(m => {
+            const la = lastActive.get(m.id);
+            return (
             <div key={m.id} className="px-4 py-3 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-foreground">{m.name}</p>
                 <p className="text-xs text-muted-foreground">{m.email}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {la && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Clock size={10} /> {format(new Date(la), "dd MMM, HH:mm")}
+                  </span>
+                )}
                 <Badge variant={m.role === "admin" ? "default" : "secondary"}>
                   {m.role}
                 </Badge>
                 {!m.is_active && <Badge variant="outline" className="text-destructive">Inactive</Badge>}
               </div>
             </div>
-          ))}
+            );
+          })}
           {members.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">No members yet</p>
           )}
