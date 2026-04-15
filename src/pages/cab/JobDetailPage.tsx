@@ -672,7 +672,7 @@ export default function JobDetailPage() {
                 {ballparkSending ? "Sending…" : "Send Ballpark to Customer"}
               </Button>
             </div>
-          </div>
+           </div>)}
 
           {/* Appointment Request Status */}
           {(job.appointment_requested_at || job.booking_url) && (
