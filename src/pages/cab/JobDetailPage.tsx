@@ -8,6 +8,7 @@ import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import { toast } from "@/hooks/use-toast";
 import { regenerateJobCard } from "@/lib/jobCardHelper";
 import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
+import { logJobViewed, logJobEdited, logDocumentOpened, logDriveFolderOpened } from "@/lib/activityLogger";
 import {
   canSeeFinancials, canDeleteRecords, canSeeClientContact,
   canManageQuotes, canManageDesignSignoff, canManageDryFit,
@@ -118,10 +119,15 @@ export default function JobDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Log job view once loaded
+  useEffect(() => {
+    if (job?.job_ref && job?.id) logJobViewed(job.job_ref, job.id);
+  }, [job?.id]);
+
   const updateJob = async (updates: Record<string, any>) => {
     await (supabase.from("cab_jobs") as any).update(updates).eq("id", job.id);
+    logJobEdited(job.job_ref, job.id, Object.keys(updates).join(", "));
     regenerateJobCard(job.id);
-    // Sync job.json to Drive in the background
     if (job?.drive_folder_id) {
       supabase.functions.invoke("write-job-json", { body: { job_id: job.id } })
         .catch((e) => console.warn("[write-job-json] sync failed:", e));
