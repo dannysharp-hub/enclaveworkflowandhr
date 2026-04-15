@@ -8,6 +8,11 @@ import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
 import { toast } from "@/hooks/use-toast";
 import { regenerateJobCard } from "@/lib/jobCardHelper";
 import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
+import {
+  canSeeFinancials, canDeleteRecords, canSeeClientContact,
+  canManageQuotes, canManageDesignSignoff, canManageDryFit,
+  canSeeJobSection, canEditJobDetails, canAccessGhlSettings,
+} from "@/lib/rolePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
