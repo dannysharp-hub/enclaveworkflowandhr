@@ -10,6 +10,7 @@ import PayrollSettingsTab from "@/pages/PayrollSettingsTab";
 import GoogleIntegrationSettings from "@/pages/GoogleIntegrationSettings";
 import GoogleDriveIntegrationSettings from "@/pages/GoogleDriveIntegrationSettings";
 import GmailScanSettings from "@/pages/GmailScanSettings";
+import BankConnectionSettings from "@/components/BankConnectionSettings";
 
 // ─── Types ────────────────────────────────────────────
 interface DepartmentConfig {
@@ -159,6 +160,7 @@ export default function SettingsPage() {
               <GoogleIntegrationSettings />
               <GoogleDriveIntegrationSettings />
               <GmailScanSettings />
+              <BankConnectionSettings />
               <BackfillJobJsonSection />
             </div>
           )}
