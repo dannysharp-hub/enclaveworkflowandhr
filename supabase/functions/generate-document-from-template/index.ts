@@ -115,72 +115,47 @@ async function driveSearch(accessToken: string, query: string): Promise<any[]> {
 }
 
 async function findTemplatesFolderId(accessToken: string): Promise<string> {
-  // Search for _Templates folder anywhere in Drive
-  console.log("[DocGen] Searching for _Templates folder...");
+  console.log("[DocGen] Searching for _TemplateDocuments folder...");
   
-  // Strategy 1: Look for _Templates inside _EnclaveCabinetry
+  // Strategy 1: Look for _TemplateDocuments inside _EnclaveCabinetry
   const parentFiles = await driveSearch(accessToken, "name='_EnclaveCabinetry' and mimeType='application/vnd.google-apps.folder' and trashed=false");
   console.log(`[DocGen] Found ${parentFiles.length} '_EnclaveCabinetry' folders:`, parentFiles.map((f: any) => f.id));
   
   if (parentFiles.length > 0) {
     const parentId = parentFiles[0].id;
-    const templateFolders = await driveSearch(accessToken, `name='_Templates' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-    console.log(`[DocGen] Found ${templateFolders.length} '_Templates' folders inside _EnclaveCabinetry:`, templateFolders.map((f: any) => f.id));
+    const templateFolders = await driveSearch(accessToken, `name='_TemplateDocuments' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    console.log(`[DocGen] Found ${templateFolders.length} '_TemplateDocuments' folders inside _EnclaveCabinetry:`, templateFolders.map((f: any) => f.id));
     if (templateFolders.length > 0) {
-      console.log(`[DocGen] ✓ Using _Templates folder: ${templateFolders[0].id}`);
+      console.log(`[DocGen] ✓ Using _TemplateDocuments folder: ${templateFolders[0].id}`);
       return templateFolders[0].id;
     }
   }
 
-  // Strategy 2: Search for _Templates directly
-  const directSearch = await driveSearch(accessToken, "name='_Templates' and mimeType='application/vnd.google-apps.folder' and trashed=false");
-  console.log(`[DocGen] Direct search found ${directSearch.length} '_Templates' folders:`, directSearch.map((f: any) => `${f.id} (${f.name})`));
+  // Strategy 2: Search for _TemplateDocuments directly
+  const directSearch = await driveSearch(accessToken, "name='_TemplateDocuments' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  console.log(`[DocGen] Direct search found ${directSearch.length} '_TemplateDocuments' folders:`, directSearch.map((f: any) => `${f.id} (${f.name})`));
   if (directSearch.length > 0) {
-    console.log(`[DocGen] ✓ Using _Templates folder: ${directSearch[0].id}`);
+    console.log(`[DocGen] ✓ Using _TemplateDocuments folder: ${directSearch[0].id}`);
     return directSearch[0].id;
   }
 
-  // Strategy 3: Search for Templates (without underscore)
-  const altSearch = await driveSearch(accessToken, "name='Templates' and mimeType='application/vnd.google-apps.folder' and trashed=false");
-  console.log(`[DocGen] Alt search found ${altSearch.length} 'Templates' folders:`, altSearch.map((f: any) => `${f.id} (${f.name})`));
-  if (altSearch.length > 0) {
-    console.log(`[DocGen] ✓ Using Templates folder (no underscore): ${altSearch[0].id}`);
-    return altSearch[0].id;
-  }
-
-  throw new Error("Templates folder not found in Google Drive. Looked for '_Templates' inside '_EnclaveCabinetry', then '_Templates' and 'Templates' at root level.");
+  throw new Error("Templates folder not found in Google Drive. Looked for '_TemplateDocuments' inside '_EnclaveCabinetry', then '_TemplateDocuments' at root level.");
 }
 
 async function findTemplateFile(accessToken: string, templatesFolderId: string, fileNameBase: string): Promise<string> {
-  // Search for the template by base name (without extension) — could be .docx or Google Doc
-  console.log(`[DocGen] Searching for template '${fileNameBase}' in folder ${templatesFolderId}...`);
+  console.log(`[DocGen] Searching for template containing '${fileNameBase}' in folder ${templatesFolderId}...`);
   
-  // List all files in templates folder for debugging
   const allFiles = await driveSearch(accessToken, `'${templatesFolderId}' in parents and trashed=false`);
-  console.log(`[DocGen] All files in _Templates folder (${allFiles.length}):`, allFiles.map((f: any) => `${f.name} [${f.mimeType}]`));
+  console.log(`[DocGen] All files in _TemplateDocuments folder (${allFiles.length}):`, allFiles.map((f: any) => `${f.name} [${f.mimeType}]`));
 
-  // Try exact name match with .docx
-  let matches = allFiles.filter((f: any) => f.name === `${fileNameBase}.docx`);
+  // Match any file whose name contains the base name (case-insensitive)
+  const matches = allFiles.filter((f: any) => f.name.toLowerCase().includes(fileNameBase.toLowerCase()));
   if (matches.length > 0) {
-    console.log(`[DocGen] ✓ Found template: ${matches[0].name} (${matches[0].id}) [${matches[0].mimeType}]`);
+    console.log(`[DocGen] ✓ Found template (contains match): ${matches[0].name} (${matches[0].id}) [${matches[0].mimeType}]`);
     return matches[0].id;
   }
 
-  // Try exact name match without extension
-  matches = allFiles.filter((f: any) => f.name === fileNameBase);
-  if (matches.length > 0) {
-    console.log(`[DocGen] ✓ Found template (no ext): ${matches[0].name} (${matches[0].id}) [${matches[0].mimeType}]`);
-    return matches[0].id;
-  }
-
-  // Try partial name match (starts with)
-  matches = allFiles.filter((f: any) => f.name.startsWith(fileNameBase));
-  if (matches.length > 0) {
-    console.log(`[DocGen] ✓ Found template (partial): ${matches[0].name} (${matches[0].id}) [${matches[0].mimeType}]`);
-    return matches[0].id;
-  }
-
-  throw new Error(`Template '${fileNameBase}' not found in _Templates folder. Available files: ${allFiles.map((f: any) => f.name).join(", ") || "none"}`);
+  throw new Error(`Template containing '${fileNameBase}' not found in _TemplateDocuments folder. Available files: ${allFiles.map((f: any) => f.name).join(", ") || "none"}`);
 }
 
 function buildReplaceRequests(docType: string, job: any, customer: any, quote: any): any[] {
