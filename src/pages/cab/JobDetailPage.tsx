@@ -966,22 +966,26 @@ export default function JobDetailPage() {
           )}
 
           {/* Quote — Attach & Send from Drive */}
-          <div data-section="quote-builder">
-            <DriveQuoteAttach companyId={companyId!} job={job} customer={customer} onRefresh={load} />
-          </div>
+          {canManageQuotes(userRole) && (
+            <div data-section="quote-builder">
+              <DriveQuoteAttach companyId={companyId!} job={job} customer={customer} onRefresh={load} />
+            </div>
+          )}
 
           {/* Manual Quote Builder */}
-          <div data-section="manual-quote-builder">
-            <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
-          </div>
+          {canManageQuotes(userRole) && (
+            <div data-section="manual-quote-builder">
+              <QuoteBuilder companyId={companyId!} job={job} onRefresh={load} />
+            </div>
+          )}
 
-          {/* Purchasing Tab — only after project confirmed */}
-          {isProjectConfirmed && (
+          {/* Purchasing Tab — only after project confirmed, admin only */}
+          {isProjectConfirmed && canSeeFinancials(userRole) && (
             <JobPurchasingTab companyId={companyId!} job={job} onRefresh={load} />
           )}
 
-          {/* Profitability Tab — only after project confirmed */}
-          {isProjectConfirmed && (
+          {/* Profitability Tab — only after project confirmed, admin only */}
+          {isProjectConfirmed && canSeeFinancials(userRole) && (
             <JobProfitabilityTab companyId={companyId!} job={job} onRefresh={load} />
           )}
 
@@ -1363,8 +1367,8 @@ export default function JobDetailPage() {
             );
           })()}
 
-          {/* Payment Stages */}
-          {job && (
+          {/* Payment Stages — admin only */}
+          {canSeeFinancials(userRole) && job && (
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="font-mono text-sm font-bold text-foreground mb-3 flex items-center gap-2">
                 <Banknote size={14} className="text-primary" /> Payments
@@ -1818,7 +1822,7 @@ export default function JobDetailPage() {
             );
           })()}
 
-          {invoices.length > 0 && (
+          {canSeeFinancials(userRole) && invoices.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="font-mono text-sm font-bold text-foreground mb-2">Invoices</h3>
               <div className="space-y-2">
