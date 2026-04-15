@@ -195,7 +195,6 @@ async function autoMatch(tenantId: string, transactionIds: string[]) {
         let score = 0;
         const reasons: string[] = [];
 
-        // Amount match
         const amountDiff = Math.abs(absAmount - billTotal);
         if (amountDiff < 0.01) {
           score += 0.5;
@@ -205,7 +204,6 @@ async function autoMatch(tenantId: string, transactionIds: string[]) {
           reasons.push("Close amount match");
         }
 
-        // Date proximity
         const txnDate = new Date(txn.transaction_date);
         const billDate = new Date(bill.issue_date);
         const daysDiff = Math.abs((txnDate.getTime() - billDate.getTime()) / 86400000);
@@ -217,7 +215,6 @@ async function autoMatch(tenantId: string, transactionIds: string[]) {
           reasons.push("Date within 2 weeks");
         }
 
-        // Counterparty name fuzzy match
         if (txn.counterparty_name && bill.bill_reference) {
           const txnName = txn.counterparty_name.toLowerCase();
           const billRef = bill.bill_reference.toLowerCase();
@@ -284,7 +281,7 @@ async function autoMatch(tenantId: string, transactionIds: string[]) {
       }
     }
 
-    // Match against file assets by amount in title or counterparty
+    // Match against file assets by counterparty
     if (fileAssets && !bestMatch) {
       for (const fa of fileAssets) {
         let score = 0;
@@ -299,7 +296,6 @@ async function autoMatch(tenantId: string, transactionIds: string[]) {
           }
         }
 
-        // Check amount in title
         const amountStr = absAmount.toFixed(2);
         if (titleLower.includes(amountStr)) {
           score += 0.3;
@@ -329,6 +325,127 @@ async function autoMatch(tenantId: string, transactionIds: string[]) {
   }
 
   return matches;
+}
+
+// Match debit transactions to cab_jobs by job_ref, supplier name, or bill amount
+async function matchTransactionsToJobs(tenantId: string, companyId: string) {
+  const admin = getAdminClient();
+
+  // Get unmatched debit transactions
+  const { data: transactions } = await admin
+    .from("bank_transactions")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("status", "unmatched")
+    .lt("amount", 0);
+
+  if (!transactions?.length) return { matched: 0, flagged: 0 };
+
+  // Get jobs, suppliers, and bills for matching
+  const [{ data: jobs }, { data: suppliers }, { data: bills }] = await Promise.all([
+    admin.from("cab_jobs").select("id, job_ref, job_title, company_id").eq("company_id", companyId),
+    admin.from("cab_suppliers").select("id, name, company_id").eq("company_id", companyId),
+    admin.from("cab_job_cost_lines").select("id, job_id, description, unit_cost, qty, line_total, company_id").eq("company_id", companyId),
+  ]);
+
+  let matched = 0;
+  let flagged = 0;
+
+  for (const txn of transactions) {
+    const absAmount = Math.abs(txn.amount);
+    const desc = (txn.description || "").toLowerCase();
+    const counterparty = (txn.counterparty_name || "").toLowerCase();
+    let bestJobId: string | null = null;
+    let bestScore = 0;
+    const reasons: string[] = [];
+
+    // Strategy A: Job ref in payment reference
+    if (jobs) {
+      for (const job of jobs) {
+        const ref = job.job_ref.toLowerCase();
+        const numMatch = ref.match(/^(\d+)/);
+        const numPrefix = numMatch ? numMatch[1] : null;
+
+        if (desc.includes(ref) || counterparty.includes(ref)) {
+          bestJobId = job.id;
+          bestScore = 0.95;
+          reasons.push(`Job ref "${job.job_ref}" found in reference`);
+          break;
+        }
+        // Check numeric prefix (e.g. "065")
+        if (numPrefix && numPrefix.length >= 3 && (desc.includes(numPrefix) || counterparty.includes(numPrefix))) {
+          if (bestScore < 0.7) {
+            bestJobId = job.id;
+            bestScore = 0.7;
+            reasons.push(`Job number "${numPrefix}" found in reference`);
+          }
+        }
+      }
+    }
+
+    // Strategy B: Counterparty matches a known supplier
+    if (suppliers && !bestJobId) {
+      for (const sup of suppliers) {
+        const supName = sup.name.toLowerCase();
+        if (counterparty.includes(supName) || supName.includes(counterparty)) {
+          reasons.push(`Counterparty matches supplier "${sup.name}"`);
+          bestScore = Math.max(bestScore, 0.5);
+          // Try to find which job this supplier is linked to via cost lines
+          const supplierCosts = (bills || []).filter(b => b.description?.toLowerCase().includes(supName));
+          if (supplierCosts.length === 1) {
+            bestJobId = supplierCosts[0].job_id;
+            bestScore = 0.75;
+            reasons.push("Single job match via supplier costs");
+          }
+          break;
+        }
+      }
+    }
+
+    // Strategy C: Amount matches existing bill
+    if (bills && !bestJobId) {
+      const amountMatches = (bills || []).filter(b => {
+        const billTotal = b.line_total ?? (b.qty * b.unit_cost);
+        return Math.abs(absAmount - billTotal) < 0.01;
+      });
+      if (amountMatches.length === 1) {
+        bestJobId = amountMatches[0].job_id;
+        bestScore = Math.max(bestScore, 0.65);
+        reasons.push("Exact amount match to single cost line");
+      }
+    }
+
+    if (bestScore >= 0.85 && bestJobId) {
+      // High confidence — auto-link as cost line
+      await admin.from("cab_job_cost_lines").insert({
+        company_id: companyId,
+        job_id: bestJobId,
+        cost_type: "other",
+        description: txn.description || txn.counterparty_name || "Bank transaction",
+        qty: 1,
+        unit_cost: absAmount,
+        line_total: absAmount,
+        source: "bank_auto",
+        external_ref: `bank_txn:${txn.id}`,
+        incurred_at: txn.transaction_date,
+      });
+      await admin.from("bank_transactions").update({ status: "matched" }).eq("id", txn.id);
+      matched++;
+    } else if (bestScore >= 0.4) {
+      // Low confidence — flag for review
+      await admin.from("bank_document_matches").insert({
+        tenant_id: tenantId,
+        bank_transaction_id: txn.id,
+        match_type: "auto_job",
+        confidence_score: bestScore,
+        match_reason: reasons.join("; "),
+        status: "low_confidence",
+      });
+      flagged++;
+    }
+  }
+
+  return { matched, flagged };
 }
 
 Deno.serve(async (req) => {
