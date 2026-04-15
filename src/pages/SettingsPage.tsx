@@ -162,6 +162,7 @@ export default function SettingsPage() {
               <GmailScanSettings />
               <BankConnectionSettings />
               <BackfillJobJsonSection />
+              <TestDocumentGenerationSection />
             </div>
           )}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
@@ -1072,6 +1073,103 @@ function BackfillJobJsonSection() {
         {results && (
           <div className="text-sm text-muted-foreground">
             job.json written to {results.success} jobs successfully, {results.failed} failed
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Test Document Generation Section ─────────────────
+function TestDocumentGenerationSection() {
+  const [jobId, setJobId] = useState("");
+  const [docType, setDocType] = useState("quote");
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const docTypes = [
+    { value: "quote", label: "Quote" },
+    { value: "sign_off", label: "Design Sign-Off" },
+    { value: "invoice_deposit", label: "Deposit Invoice" },
+    { value: "invoice_progress", label: "Progress Invoice" },
+    { value: "invoice_final", label: "Final Invoice" },
+    { value: "fitter_form", label: "Fitter Form" },
+  ];
+
+  const handleTest = async () => {
+    if (!jobId.trim()) {
+      toast({ title: "Enter a job ID", variant: "destructive" });
+      return;
+    }
+    setTesting(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-document-from-template", {
+        body: { job_id: jobId.trim(), document_type: docType },
+      });
+      if (error) {
+        setResult({ ok: false, message: error.message });
+        toast({ title: "Document generation failed", description: error.message, variant: "destructive" });
+      } else if (!data?.ok) {
+        const msg = `${data?.error || "Unknown error"} (stage: ${data?.stage || "unknown"})`;
+        setResult({ ok: false, message: msg });
+        toast({ title: "Document generation failed", description: msg, variant: "destructive" });
+      } else {
+        const msg = `Created: ${data.file_name}`;
+        setResult({ ok: true, message: msg });
+        toast({ title: "Document generated successfully", description: data.file_name });
+      }
+    } catch (err: any) {
+      setResult({ ok: false, message: err.message || "Network error" });
+      toast({ title: "Document generation failed", description: err.message, variant: "destructive" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-mono text-sm font-bold text-foreground">Test Document Generation</h3>
+      <div className="glass-panel rounded-lg p-6 space-y-4 max-w-2xl">
+        <p className="text-sm text-muted-foreground">
+          Test the Google Drive document template engine by generating a document for a specific job.
+          Check edge function logs for detailed diagnostics.
+        </p>
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Job ID (UUID)</label>
+            <input
+              type="text"
+              value={jobId}
+              onChange={(e) => setJobId(e.target.value)}
+              placeholder="paste job UUID here…"
+              className="w-72 h-9 rounded-md border border-input bg-background px-3 text-xs text-foreground"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Document Type</label>
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+            >
+              {docTypes.map(dt => (
+                <option key={dt.value} value={dt.value}>{dt.label}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="flex items-center gap-1.5 px-4 py-2 h-9 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            <FileText size={14} />
+            {testing ? "Generating…" : "Test Generate"}
+          </button>
+        </div>
+        {result && (
+          <div className={`text-sm rounded-md p-3 ${result.ok ? "bg-emerald-500/10 text-emerald-400" : "bg-destructive/10 text-destructive"}`}>
+            {result.ok ? "✓ " : "✗ "}{result.message}
           </div>
         )}
       </div>
