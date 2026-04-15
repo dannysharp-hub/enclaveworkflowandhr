@@ -11,6 +11,7 @@ import { format } from "date-fns";
 export default function TeamPage() {
   const [invites, setInvites] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [lastActive, setLastActive] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("staff");
@@ -53,6 +54,7 @@ export default function TeamPage() {
 
     setInvites(invitesRes.data ?? []);
     setMembers(membersRes.data ?? []);
+    setLastActive(lastActiveMap);
     setLoading(false);
   }, []);
 
