@@ -136,20 +136,28 @@ export default function TeamPage() {
           </h2>
         </div>
         <div className="divide-y divide-border">
-          {members.map(m => (
+          {members.map(m => {
+            const la = lastActive.get(m.id);
+            return (
             <div key={m.id} className="px-4 py-3 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-foreground">{m.name}</p>
                 <p className="text-xs text-muted-foreground">{m.email}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {la && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Clock size={10} /> {format(new Date(la), "dd MMM, HH:mm")}
+                  </span>
+                )}
                 <Badge variant={m.role === "admin" ? "default" : "secondary"}>
                   {m.role}
                 </Badge>
                 {!m.is_active && <Badge variant="outline" className="text-destructive">Inactive</Badge>}
               </div>
             </div>
-          ))}
+            );
+          })}
           {members.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">No members yet</p>
           )}
