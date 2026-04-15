@@ -162,6 +162,7 @@ export default function SettingsPage() {
               <GmailScanSettings />
               <BankConnectionSettings />
               <BackfillJobJsonSection />
+              <TestDocumentGenerationSection />
             </div>
           )}
           {tab === "flags" && <FlagsTab data={flags} onRefresh={fetchAll} />}
