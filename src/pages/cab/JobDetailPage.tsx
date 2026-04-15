@@ -1222,8 +1222,7 @@ export default function JobDetailPage() {
 
           {/* Site Visit 2 (Post-Deposit Technical Survey) */}
           {job && (() => {
-            const SV2_VISIBLE_STAGES = ["awaiting_deposit", "deposit", "deposit_received", "design", "design_signed_off", "in_production", "manufacturing", "manufacturing_started", "project_confirmed", "materials_ordered", "cabinetry_assembled", "ready_to_install", "ready_for_installation", "install", "install_booked", "installation_complete", "complete", "practical_completed", "closed_paid"];
-            if (!SV2_VISIBLE_STAGES.includes(stageKey || "")) return null;
+            // Site Visit 2 is always visible once a job exists
             const isCompleted = !!job.site_visit_2_completed;
             return (
               <div className="rounded-lg border border-border bg-card p-4">
@@ -1465,7 +1464,7 @@ export default function JobDetailPage() {
 
           {/* Dry Fit & Progress Payment */}
           {job && (() => {
-            const DRYFIT_VISIBLE_STAGES = ["assembly", "cabinetry_assembled", "ready_for_installation", "install_booked", "installation_complete", "practical_completed", "closed_paid"];
+            const DRYFIT_VISIBLE_STAGES = ["assembly", "qc_check", "packaging", "cabinetry_assembled", "ready_for_install", "ready_for_installation", "installing", "install_booked", "install_complete", "installation_complete", "practical_completed", "closed_paid", "complete"];
             const prodKey = job.production_stage_key || job.production_stage || "";
             if (!DRYFIT_VISIBLE_STAGES.includes(prodKey) && !DRYFIT_VISIBLE_STAGES.includes(stageKey || "")) return null;
             const isDryFitDone = !!job.dry_fit_completed;
@@ -1583,9 +1582,9 @@ export default function JobDetailPage() {
 
           {/* Installation & Completion */}
           {job && (() => {
-            const IC_VISIBLE_STAGES = ["install", "installing", "ready_for_install", "install_complete", "installation_complete", "practical_completed", "closed_paid", "complete"];
+            const IC_VISIBLE_STAGES = ["assembly", "qc_check", "packaging", "cabinetry_assembled", "ready_for_install", "ready_for_installation", "install", "installing", "install_complete", "installation_complete", "practical_completed", "closed_paid", "complete"];
             const icProdKey = job.production_stage_key || job.production_stage || "";
-            if (!IC_VISIBLE_STAGES.includes(icProdKey) && !IC_VISIBLE_STAGES.includes(stageKey || "")) return null;
+            if (!IC_VISIBLE_STAGES.includes(icProdKey) && !IC_VISIBLE_STAGES.includes(stageKey || "") && !job.install_date) return null;
 
             const isInstallDone = !!job.install_completed_at;
             const hasSignoff = !!job.final_signoff_url;
