@@ -30,7 +30,7 @@ export default function TeamPage() {
     if (!profile) return;
     setCompanyId(profile.company_id);
 
-    const [invitesRes, membersRes] = await Promise.all([
+    const [invitesRes, membersRes, activityRes] = await Promise.all([
       (supabase.from("cab_company_invites") as any)
         .select("*")
         .eq("company_id", profile.company_id)
@@ -39,7 +39,17 @@ export default function TeamPage() {
         .select("id, name, email, role, is_active, created_at")
         .eq("company_id", profile.company_id)
         .order("name"),
+      (supabase.from("user_activity_log") as any)
+        .select("user_id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(500),
     ]);
+
+    // Build last-active map from activity logs
+    const lastActiveMap = new Map<string, string>();
+    for (const a of activityRes.data ?? []) {
+      if (!lastActiveMap.has(a.user_id)) lastActiveMap.set(a.user_id, a.created_at);
+    }
 
     setInvites(invitesRes.data ?? []);
     setMembers(membersRes.data ?? []);

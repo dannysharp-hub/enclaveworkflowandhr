@@ -48,6 +48,7 @@ const cabAdminItems: NavItem[] = [
   { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
   { to: "/admin/ghl", label: "GHL Settings", icon: Settings },
   { to: "/admin/team", label: "Team & Invites", icon: Users },
+  { to: "/admin/activity-log", label: "Activity Log", icon: Activity },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
