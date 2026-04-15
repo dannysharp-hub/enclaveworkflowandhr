@@ -76,7 +76,7 @@ import AcceptQuotePage from "./pages/AcceptQuotePage";
 import PublicSignOffPage from "./pages/cab/PublicSignOffPage";
 import RequestInstallDatesPage from "./pages/cab/RequestInstallDatesPage";
 import ConfirmInstallDatePage from "./pages/cab/ConfirmInstallDatePage";
-import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES } from "@/lib/roleVisibility";
+import { ADMIN_ROLES, FINANCE_ROLES, PRODUCTION_MGMT_ROLES, REPORTING_ROLES, AI_INBOX_ROLES, SETTINGS_ROLES } from "@/lib/roleVisibility";
 
 const queryClient = new QueryClient();
 
@@ -125,15 +125,15 @@ const AppRoutes = () => (
           <AppLayout>
             <Routes>
               {/* Cab admin routes */}
-              <Route path="/admin/bootstrap" element={<BootstrapPage />} />
-              <Route path="/admin/leads" element={<LeadsPage />} />
-              <Route path="/admin/jobs/:jobRef" element={<JobDetailPage />} />
-              <Route path="/admin/profit-watch" element={<ProfitWatchPage />} />
-              <Route path="/admin/ghl" element={<GhlSettingsPage />} />
-              <Route path="/admin/webhooks" element={<WebhookLogsPage />} />
-              <Route path="/admin/team" element={<TeamPage />} />
-              <Route path="/admin/suppliers" element={<CabSuppliersPage />} />
-              <Route path="/admin/production" element={<ProductionBoardPage />} />
+              <Route path="/admin/bootstrap" element={<RoleGate allowedRoles={["admin"]}><BootstrapPage /></RoleGate>} />
+              <Route path="/admin/leads" element={<RoleGate allowedRoles={["admin", "office", "supervisor"]}><LeadsPage /></RoleGate>} />
+              <Route path="/admin/jobs/:jobRef" element={<RoleGate allowedRoles={["admin", "office", "supervisor"]}><JobDetailPage /></RoleGate>} />
+              <Route path="/admin/profit-watch" element={<RoleGate allowedRoles={["admin"]}><ProfitWatchPage /></RoleGate>} />
+              <Route path="/admin/ghl" element={<RoleGate allowedRoles={["admin"]}><GhlSettingsPage /></RoleGate>} />
+              <Route path="/admin/webhooks" element={<RoleGate allowedRoles={["admin"]}><WebhookLogsPage /></RoleGate>} />
+              <Route path="/admin/team" element={<RoleGate allowedRoles={["admin"]}><TeamPage /></RoleGate>} />
+              <Route path="/admin/suppliers" element={<RoleGate allowedRoles={["admin"]}><CabSuppliersPage /></RoleGate>} />
+              <Route path="/admin/production" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionBoardPage /></RoleGate>} />
               <Route path="/admin/test-cleanup" element={<RoleGate allowedRoles={["admin"]}><TestCleanupPage /></RoleGate>} />
               {/* Installer routes */}
               <Route path="/installer/jobs" element={<InstallerJobsPage />} />
