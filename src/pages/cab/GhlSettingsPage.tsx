@@ -275,11 +275,11 @@ export default function GhlSettingsPage() {
               const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
                 body: {
                   action: "initiate_drive",
-                  redirect_uri: "https://enclaveworkflowandhr.lovable.app/settings",
+                  redirect_uri: window.location.origin + "/settings",
                 },
               });
               if (error) throw error;
-              console.log("[Drive Reconnect] redirect_uri passed:", "https://enclaveworkflowandhr.lovable.app/settings");
+              console.log("[Drive Reconnect] redirect_uri passed:", window.location.origin + "/settings");
               console.log("[Drive Reconnect] Full OAuth URL returned:", data?.url);
               if (data?.url) {
                 window.location.href = data.url;
