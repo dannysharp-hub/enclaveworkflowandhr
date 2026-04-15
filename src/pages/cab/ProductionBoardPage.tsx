@@ -9,6 +9,7 @@ import {
   Factory, ChevronRight, ChevronLeft, RefreshCw,
 } from "lucide-react";
 import { buildInvoiceEmailHtml } from "@/lib/invoiceEmailTemplate";
+import { logStageChanged, logPageVisit } from "@/lib/activityLogger";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -149,6 +150,8 @@ export default function ProductionBoardPage() {
       await (supabase.from("cab_jobs") as any)
         .update({ production_stage: toKey, production_stage_key: toKey, updated_at: new Date().toISOString() })
         .eq("id", job.id);
+
+      logStageChanged(job.job_ref, job.id, job.production_stage || "unknown", toKey);
 
       // Insert stage change event
       await insertCabEvent({
