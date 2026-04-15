@@ -2016,7 +2016,7 @@ export default function JobDetailPage() {
                 </a>
               )}
             </div>
-          </div>
+          </div>)}
 
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-mono text-sm font-bold text-foreground mb-3">Event Log</h3>
@@ -2145,7 +2145,7 @@ export default function JobDetailPage() {
       </Dialog>
 
       {/* Delete Job - admin only */}
-      {userRole === "admin" && job && (
+      {canDeleteRecords(userRole) && job && (
         <>
            <div className="border-t border-border pt-8 mt-8 space-y-3">
             <Button variant="destructive" onClick={() => setDeleteOpen(true)} className="flex items-center gap-2">
