@@ -72,6 +72,7 @@ import ProductionBoardPage from "./pages/cab/ProductionBoardPage";
 import InstallerJobsPage from "./pages/cab/InstallerJobsPage";
 import ProfitWatchPage from "./pages/cab/ProfitWatchPage";
 import TestCleanupPage from "./pages/cab/TestCleanupPage";
+import ActivityLogPage from "./pages/cab/ActivityLogPage";
 import AcceptQuotePage from "./pages/AcceptQuotePage";
 import PublicSignOffPage from "./pages/cab/PublicSignOffPage";
 import RequestInstallDatesPage from "./pages/cab/RequestInstallDatesPage";
@@ -135,6 +136,7 @@ const AppRoutes = () => (
               <Route path="/admin/suppliers" element={<RoleGate allowedRoles={["admin"]}><CabSuppliersPage /></RoleGate>} />
               <Route path="/admin/production" element={<RoleGate allowedRoles={["admin", "supervisor", "office"]}><ProductionBoardPage /></RoleGate>} />
               <Route path="/admin/test-cleanup" element={<RoleGate allowedRoles={["admin"]}><TestCleanupPage /></RoleGate>} />
+              <Route path="/admin/activity-log" element={<RoleGate allowedRoles={["admin"]}><ActivityLogPage /></RoleGate>} />
               {/* Installer routes */}
               <Route path="/installer/jobs" element={<InstallerJobsPage />} />
               {/* Open to all authenticated */}
