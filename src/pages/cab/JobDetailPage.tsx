@@ -1854,8 +1854,8 @@ export default function JobDetailPage() {
 
         {/* Right column — GHL Admin + Event log */}
         <div className="space-y-4">
-          {/* GHL Admin Actions */}
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          {/* GHL Admin Actions — admin only */}
+          {canAccessGhlSettings(userRole) && (<div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
               <Link size={14} className="text-primary" /> GHL Admin
             </h3>
