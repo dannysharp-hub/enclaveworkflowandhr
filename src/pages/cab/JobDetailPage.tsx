@@ -423,7 +423,7 @@ export default function JobDetailPage() {
             <span className="font-mono text-xs text-muted-foreground">{job.job_ref}</span>
             <Badge variant="outline">{job.status}</Badge>
             <Badge variant="secondary" className="text-[10px]">{stageKey?.replace(/_/g, " ")}</Badge>
-            {job.contract_value && (
+            {canSeeFinancials(userRole) && job.contract_value && (
               <Badge variant="default" className="text-[10px]">£{Number(job.contract_value).toLocaleString()}</Badge>
             )}
             {isProjectConfirmed && (
@@ -444,7 +444,7 @@ export default function JobDetailPage() {
             </div>
           )}
         </div>
-        {userRole === "admin" && (
+        {canDeleteRecords(userRole) && (
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)} className="flex items-center gap-1.5">
             <Trash2 size={14} /> Delete
           </Button>
@@ -499,17 +499,39 @@ export default function JobDetailPage() {
             <h3 className="font-mono text-sm font-bold text-foreground mb-2">Customer</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div><span className="text-muted-foreground">Name:</span> {customer?.first_name} {customer?.last_name}</div>
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Phone:</span>
-                {editingField === "phone" ? (
-                  <span className="flex items-center gap-1">
-                    <Input className="h-6 text-xs w-32" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("phone")} />
-                    <button onClick={() => saveCustomerField("phone")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
-                    <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">{customer?.phone || "—"}<button onClick={() => startEdit("phone", customer?.phone)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button></span>
-                )}
+              {canSeeClientContact(userRole) ? (
+                <>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Phone:</span>
+                    {editingField === "phone" ? (
+                      <span className="flex items-center gap-1">
+                        <Input className="h-6 text-xs w-32" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("phone")} />
+                        <button onClick={() => saveCustomerField("phone")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
+                        <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">{customer?.phone || "—"}{canEditJobDetails(userRole) && <button onClick={() => startEdit("phone", customer?.phone)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button>}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Email:</span>
+                    {editingField === "email" ? (
+                      <span className="flex items-center gap-1">
+                        <Input className="h-6 text-xs w-44" value={editValue} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => e.key === "Enter" && saveCustomerField("email")} />
+                        <button onClick={() => saveCustomerField("email")} className="text-primary hover:text-primary/80"><Check size={14} /></button>
+                        <button onClick={() => setEditingField(null)} className="text-muted-foreground hover:text-foreground"><XIcon size={14} /></button>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">{customer?.email || "—"}{canEditJobDetails(userRole) && <button onClick={() => startEdit("email", customer?.email)} className="text-muted-foreground hover:text-foreground"><Pencil size={12} /></button>}</span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div><span className="text-muted-foreground">Phone:</span> <span className="text-muted-foreground">—</span></div>
+                  <div><span className="text-muted-foreground">Email:</span> <span className="text-muted-foreground">—</span></div>
+                </>
+              )}
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-muted-foreground">Email:</span>
