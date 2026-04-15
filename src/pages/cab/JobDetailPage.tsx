@@ -28,6 +28,7 @@ import QuoteBuilder from "@/components/QuoteBuilder";
 import JobPurchasingTab from "@/components/cab/JobPurchasingTab";
 import RfqGenerator from "@/components/cab/RfqGenerator";
 import JobProfitabilityTab from "@/components/cab/JobProfitabilityTab";
+import JobCostsSection from "@/components/cab/JobCostsSection";
 import StagePipeline from "@/components/cab/StagePipeline";
 import NextActionsPanel from "@/components/cab/NextActionsPanel";
 import { format } from "date-fns";
@@ -993,6 +994,11 @@ export default function JobDetailPage() {
           {/* Profitability Tab — only after project confirmed, admin only */}
           {isProjectConfirmed && canSeeFinancials(userRole) && (
             <JobProfitabilityTab companyId={companyId!} job={job} onRefresh={load} />
+          )}
+
+          {/* Costs Section — admin only */}
+          {canSeeFinancials(userRole) && (
+            <JobCostsSection companyId={companyId!} job={job} onRefresh={load} />
           )}
 
           {/* Site Visit Debug Panel */}
