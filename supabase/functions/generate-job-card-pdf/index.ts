@@ -59,15 +59,36 @@ async function getAccessToken(supabaseAdmin: any, tenantId: string): Promise<str
   return data.access_token;
 }
 
-function fmt(val: number | null | undefined, prefix = "£"): string {
-  if (val == null) return "—";
+function fmt(val: number | null | undefined, prefix = "\u00A3"): string {
+  if (val == null) return "N/A";
   return `${prefix}${Number(val).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtDate(val: string | null | undefined): string {
-  if (!val) return "—";
+  if (!val) return "N/A";
   try { return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
   catch { return val; }
+}
+
+/** Encode a JS string into bytes compatible with PDF WinAnsiEncoding (single-byte). */
+function pdfEncode(input: string): Uint8Array {
+  const bytes: number[] = [];
+  for (let i = 0; i < input.length; i++) {
+    let code = input.charCodeAt(i);
+    // Map common Unicode chars to WinAnsi equivalents
+    if (code === 0x2014) code = 0x97;       // em dash
+    else if (code === 0x2013) code = 0x96;  // en dash
+    else if (code === 0x2018) code = 0x91;  // left single quote
+    else if (code === 0x2019) code = 0x92;  // right single quote
+    else if (code === 0x201C) code = 0x93;  // left double quote
+    else if (code === 0x201D) code = 0x94;  // right double quote
+    else if (code === 0x2026) code = 0x85;  // ellipsis
+    else if (code === 0x2022) code = 0x95;  // bullet
+    else if (code === 0x2122) code = 0x99;  // trademark
+    if (code > 255) code = 0x3F; // '?' for unmappable
+    bytes.push(code);
+  }
+  return new Uint8Array(bytes);
 }
 
 function buildJobCardHtml(job: any, customer: any): string {
