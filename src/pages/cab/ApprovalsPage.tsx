@@ -197,6 +197,55 @@ export default function ApprovalsPage() {
         break;
       }
       case "invoice_send": {
+        // Handle deposit received + invoice
+        if (payload.deposit_amount && payload.company_id) {
+          await (supabase.from("cab_jobs") as any).update({
+            current_stage_key: "project_confirmed",
+            state: "active_production",
+            status: "active",
+            updated_at: new Date().toISOString(),
+          }).eq("id", req.target_id);
+
+          await (supabase.from("cab_invoices") as any).insert({
+            company_id: payload.company_id,
+            job_id: req.target_id,
+            milestone: "deposit",
+            reference: (req.target_ref || "") + "_DEP",
+            amount: payload.deposit_amount,
+            currency: "GBP",
+            status: "paid",
+            issued_at: new Date().toISOString(),
+            paid_at: new Date().toISOString(),
+            payment_method: "bank_transfer",
+          });
+
+          await (supabase.from("cab_events") as any).insert({
+            company_id: payload.company_id,
+            event_type: "deposit.received",
+            job_id: req.target_id,
+            payload_json: { amount: payload.deposit_amount, job_ref: req.target_ref },
+            status: "pending",
+          });
+        }
+
+        // Handle mark complete + final invoice
+        if (payload.mark_complete && payload.company_id) {
+          await (supabase.from("cab_jobs") as any).update({
+            status: "complete",
+            production_stage_key: "complete",
+            production_stage: "complete",
+            updated_at: new Date().toISOString(),
+          }).eq("id", req.target_id);
+
+          await (supabase.from("cab_events") as any).insert({
+            company_id: payload.company_id,
+            event_type: "job.completed",
+            job_id: req.target_id,
+            payload_json: {},
+            status: "pending",
+          });
+        }
+
         // Re-trigger invoice generation from template
         if (payload.template_type && payload.company_id) {
           await (supabase.from("cab_events") as any).insert({
@@ -209,6 +258,13 @@ export default function ApprovalsPage() {
           supabase.functions.invoke("generate-document-from-template", {
             body: { job_id: req.target_id, template_type: payload.template_type },
           }).catch(() => {});
+
+          // Also generate fitter form for final invoice
+          if (payload.template_type === "invoice_final") {
+            supabase.functions.invoke("generate-document-from-template", {
+              body: { job_id: req.target_id, template_type: "fitter_form" },
+            }).catch(() => {});
+          }
         }
         break;
       }

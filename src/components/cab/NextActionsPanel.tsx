@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useApprovalGate } from "@/hooks/useApprovalGate";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { insertCabEvent } from "@/lib/cabHelpers";
@@ -31,6 +32,7 @@ export default function NextActionsPanel({
   job, companyId, stageKey, onRefresh, onRequestAppointment, onMarkInstallComplete, emitting,
 }: NextActionsPanelProps) {
   const navigate = useNavigate();
+  const { requiresApproval, createApprovalRequest } = useApprovalGate();
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositSaving, setDepositSaving] = useState(false);
@@ -209,6 +211,22 @@ export default function NextActionsPanel({
     setDepositSaving(true);
     try {
       const amount = parseFloat(depositAmount);
+
+      if (requiresApproval) {
+        await createApprovalRequest({
+          companyId,
+          actionType: "invoice_send",
+          targetId: job.id,
+          targetRef: job.job_ref,
+          summary: `Record deposit (£${amount.toFixed(2)}) & generate deposit invoice for ${job.job_ref}`,
+          payload: { company_id: companyId, template_type: "invoice_deposit", event_type: "deposit.received", deposit_amount: amount },
+        });
+        setDepositSaving(false);
+        setDepositOpen(false);
+        setDepositAmount("");
+        return;
+      }
+
       await (supabase.from("cab_jobs") as any).update({
         current_stage_key: "project_confirmed",
         state: "active_production",

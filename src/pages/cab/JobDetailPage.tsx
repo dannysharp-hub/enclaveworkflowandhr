@@ -1711,6 +1711,18 @@ export default function JobDetailPage() {
             const handleMarkJobComplete = async () => {
               setIcCompleting(true);
               try {
+                if (requiresApproval) {
+                  await createApprovalRequest({
+                    companyId: companyId!,
+                    actionType: "invoice_send",
+                    targetId: job.id,
+                    targetRef: job.job_ref,
+                    summary: `Mark job complete & send final invoice for ${job.job_ref}`,
+                    payload: { company_id: companyId, template_type: "invoice_final", event_type: "invoice.final_requested", mark_complete: true },
+                  });
+                  setIcCompleting(false);
+                  return;
+                }
                 await (supabase.from("cab_jobs") as any).update({
                   status: "complete",
                   production_stage_key: "complete",
