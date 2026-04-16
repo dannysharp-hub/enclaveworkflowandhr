@@ -67,7 +67,7 @@ export default function ProductionBoardPage() {
     console.log("[ProductionBoard] exact query:", queryDebug);
 
     const { data, error } = await (supabase.from("cab_jobs") as any)
-      .select("id, job_ref, job_title, production_stage, production_stage_key, contract_value, company_id, customer_id, room_type, updated_at")
+      .select("id, job_ref, job_title, production_stage, production_stage_key, contract_value, company_id, customer_id, room_type, dry_fit_completed, updated_at")
       .eq("company_id", cid)
       .or(`production_stage.not.is.null,production_stage_key.in.(${stageKeys.join(",")}),current_stage_key.in.(${stageKeys.join(",")})`)
       .order("updated_at", { ascending: false });
