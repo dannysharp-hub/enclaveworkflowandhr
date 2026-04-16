@@ -211,6 +211,22 @@ export default function NextActionsPanel({
     setDepositSaving(true);
     try {
       const amount = parseFloat(depositAmount);
+
+      if (requiresApproval) {
+        await createApprovalRequest({
+          companyId,
+          actionType: "invoice_send",
+          targetId: job.id,
+          targetRef: job.job_ref,
+          summary: `Record deposit (£${amount.toFixed(2)}) & generate deposit invoice for ${job.job_ref}`,
+          payload: { company_id: companyId, template_type: "invoice_deposit", event_type: "deposit.received", deposit_amount: amount },
+        });
+        setDepositSaving(false);
+        setDepositOpen(false);
+        setDepositAmount("");
+        return;
+      }
+
       await (supabase.from("cab_jobs") as any).update({
         current_stage_key: "project_confirmed",
         state: "active_production",
