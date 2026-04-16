@@ -300,7 +300,7 @@ serve(async (req) => {
         ]);
         if (processFile) {
           console.log("[send-ballpark-email] Found Our Process:", processFile.name);
-          const bytes = await downloadFileAsBytes(accessToken, processFile.id, processFile.mimeType);
+          const bytes = await downloadFileAsPdfBytes(accessToken, processFile.id, processFile.mimeType);
           attachments.push({
             filename: "Enclave_Cabinetry_Our_Process.pdf",
             content: toBase64(bytes),
@@ -314,7 +314,7 @@ serve(async (req) => {
             // Search within this folder
             const found = await searchFileInFolder(accessToken, altFile.id, "EC_Our_Process");
             if (found) {
-              const bytes = await downloadFileAsBytes(accessToken, found.id, found.mimeType);
+              const bytes = await downloadFileAsPdfBytes(accessToken, found.id, found.mimeType);
               attachments.push({
                 filename: "Enclave_Cabinetry_Our_Process.pdf",
                 content: toBase64(bytes),
