@@ -224,6 +224,76 @@ Deno.serve(async (req) => {
       return json({ success: true, user_id: userId });
     }
 
+    // ── RESEND INVITE ──
+    if (req.method === "POST" && action === "resend-invite") {
+      const { email, send_to } = await req.json();
+      if (!email) return json({ error: "Missing email" }, 400);
+
+      // Generate recovery link
+      const { data: linkData, error: linkError } =
+        await adminClient.auth.admin.generateLink({
+          type: "recovery",
+          email,
+        });
+      if (linkError) throw linkError;
+
+      const rawLink = linkData?.properties?.action_link ?? "";
+      let inviteUrl = `${SITE_URL}/login`;
+
+      if (rawLink) {
+        // Extract the token_hash and type from the raw Supabase link
+        // Raw link format: SUPABASE_URL/auth/v1/verify?token=TOKEN&type=recovery&redirect_to=...
+        const parsed = new URL(rawLink);
+        const token = parsed.searchParams.get("token");
+        const type = parsed.searchParams.get("type") ?? "recovery";
+
+        if (token) {
+          // Build a URL that goes through Supabase auth verification but redirects to our domain
+          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+          const redirectTo = encodeURIComponent(`${SITE_URL}/login`);
+          inviteUrl = `${supabaseUrl}/auth/v1/verify?token=${token}&type=${type}&redirect_to=${redirectTo}`;
+        }
+      }
+
+      // Get user profile for the email
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("full_name")
+        .eq("email", email.toLowerCase())
+        .limit(1)
+        .single();
+
+      const recipientEmail = send_to || email;
+      const userName = profile?.full_name || email;
+
+      // Send invite email
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
+          to: recipientEmail,
+          subject: `Set Your Password — Cabinetry Command`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Welcome to Cabinetry Command</h2>
+              <p>An account has been created for <strong>${userName}</strong> (${email}).</p>
+              <p>Click the button below to set your password and get started:</p>
+              <p style="margin: 24px 0;">
+                <a href="${inviteUrl}" style="display: inline-block; padding: 14px 28px; background: #000; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 500;">Set Password & Sign In</a>
+              </p>
+              <p style="font-size: 12px; color: #999;">If the button doesn't work, copy and paste this URL into your browser:</p>
+              <p style="font-size: 11px; color: #999; word-break: break-all;">${inviteUrl}</p>
+            </div>
+          `,
+        }),
+      });
+
+      return json({ success: true, sent_to: recipientEmail });
+    }
+
     // ── UPDATE ROLE ──
     if (req.method === "POST" && action === "update-role") {
       const { user_id, role } = await req.json();
