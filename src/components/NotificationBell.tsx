@@ -38,6 +38,20 @@ export default function NotificationBell() {
 
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
+  // Fetch pending approval count for admins
+  useEffect(() => {
+    if (!user || userRole !== "admin") return;
+    const fetchApprovals = async () => {
+      const { count } = await (supabase.from("cab_approval_requests") as any)
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      setPendingApprovals(count || 0);
+    };
+    fetchApprovals();
+    const interval = setInterval(fetchApprovals, 30000);
+    return () => clearInterval(interval);
+  }, [user, userRole]);
+
   // Realtime subscription for new notifications
   useEffect(() => {
     if (!user) return;
