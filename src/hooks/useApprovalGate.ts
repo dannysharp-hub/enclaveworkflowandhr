@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
-export type ApprovalActionType = "job_edit" | "quote_send" | "design_signoff_send" | "invoice_send";
+export type ApprovalActionType = "job_edit" | "quote_send" | "design_signoff_send" | "invoice_send" | "ballpark_send";
 
 interface CreateApprovalParams {
   companyId: string;
@@ -79,6 +79,7 @@ function buildApprovalEmailHtml(params: {
     quote_send: "Send Quote",
     design_signoff_send: "Design Sign-Off",
     invoice_send: "Send Invoice",
+    ballpark_send: "Send Ballpark Estimate",
   };
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
