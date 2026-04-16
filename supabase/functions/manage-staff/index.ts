@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const SITE_URL = "https://www.cabinetrycommand.com";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -247,7 +248,7 @@ Deno.serve(async (req) => {
       const { data, error } = await adminClient.auth.admin.generateLink({
         type: "recovery",
         email,
-        options: { redirectTo: `${req.headers.get("origin") || "https://www.cabinetrycommand.com"}/login` },
+        options: { redirectTo: `${SITE_URL}/login` },
       });
 
       if (error) throw error;
@@ -353,7 +354,7 @@ Deno.serve(async (req) => {
       const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
         type: "recovery",
         email,
-        options: { redirectTo: `${req.headers.get("origin") || "https://www.cabinetrycommand.com"}/login` },
+        options: { redirectTo: `${SITE_URL}/login` },
       });
 
       if (linkError) throw linkError;
