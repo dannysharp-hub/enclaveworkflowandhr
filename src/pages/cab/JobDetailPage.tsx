@@ -144,6 +144,21 @@ export default function JobDetailPage() {
 
   const saveCustomerField = async (field: string) => {
     if (!customer) return;
+
+    // Office role requires approval for edits
+    if (requiresApproval && companyId) {
+      await createApprovalRequest({
+        companyId,
+        actionType: "job_edit",
+        targetId: job.id,
+        targetRef: job.job_ref,
+        summary: `Edit customer ${field}: "${editValue}"`,
+        payload: { table: "cab_customers", customerId: customer.id, changes: { [field]: editValue || null } },
+      });
+      setEditingField(null);
+      return;
+    }
+
     const { error } = await (supabase.from("cab_customers") as any)
       .update({ [field]: editValue || null })
       .eq("id", customer.id);
