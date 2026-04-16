@@ -58,6 +58,7 @@ import ClientPortalJobPage from "./pages/portal/ClientPortalJobPage";
 import SupplierPortalLoginPage from "./pages/portal/SupplierPortalLoginPage";
 import SupplierPortalDashboardPage from "./pages/portal/SupplierPortalDashboardPage";
 import NotFound from "./pages/NotFound";
+import MyAccountPage from "./pages/MyAccountPage";
 import BootstrapPage from "./pages/cab/BootstrapPage";
 import LeadsPage from "./pages/cab/LeadsPage";
 import JobDetailPage from "./pages/cab/JobDetailPage";
@@ -143,6 +144,7 @@ const AppRoutes = () => (
               <Route path="/installer/jobs" element={<InstallerJobsPage />} />
               {/* Open to all authenticated */}
               <Route path="/" element={<Index />} />
+              <Route path="/my-account" element={<MyAccountPage />} />
               <Route path="/my-work" element={<MyWorkPage />} />
               <Route path="/my-hours" element={<MyHoursPage />} />
               <Route path="/my-pay" element={<MyPayPage />} />
