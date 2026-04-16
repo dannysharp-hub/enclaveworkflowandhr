@@ -185,11 +185,10 @@ export default function TeamPage() {
         role: invRole,
       });
 
-      // Create user account and send invite email via edge function
       const res = await supabase.functions.invoke("manage-staff?action=invite", {
         body: {
           email: invEmail.trim().toLowerCase(),
-          full_name: invEmail.trim().split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+          full_name: invName.trim(),
           role: invRole,
           company_id: companyId,
         },
