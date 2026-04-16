@@ -167,7 +167,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </NavLink>
                 );
               })}
-              <div className="border-t border-border pt-2 mt-2">
+              <div className="border-t border-border pt-2 mt-2 space-y-1">
+                <Link to="/my-account" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent/50 w-full">
+                  <UserCog size={18} />
+                  <span>My Account</span>
+                </Link>
                 <button onClick={signOut} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10 w-full">
                   <LogOut size={18} />
                   <span>Sign Out</span>
@@ -322,15 +326,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Footer */}
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-              <span className="text-xs font-mono font-bold text-secondary-foreground">{collapsed ? initials[0] : initials}</span>
-            </div>
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
-                <p className="text-[10px] text-muted-foreground">{displayRole}</p>
+            <Link to="/my-account" className="flex items-center gap-3 cursor-pointer">
+              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                <span className="text-xs font-mono font-bold text-secondary-foreground">{collapsed ? initials[0] : initials}</span>
               </div>
-            )}
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+                  <p className="text-[10px] text-muted-foreground">{displayRole}</p>
+                </div>
+              )}
+            </Link>
             {!collapsed && (
               <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors" title="Sign out">
                 <LogOut size={14} />
