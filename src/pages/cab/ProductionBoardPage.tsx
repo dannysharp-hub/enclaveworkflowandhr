@@ -38,6 +38,7 @@ interface ProdCard {
   customer_email: string | null;
   room_type: string | null;
   deposit_received_at: string | null;
+  dry_fit_completed: boolean;
 }
 
 export default function ProductionBoardPage() {
@@ -66,7 +67,7 @@ export default function ProductionBoardPage() {
     console.log("[ProductionBoard] exact query:", queryDebug);
 
     const { data, error } = await (supabase.from("cab_jobs") as any)
-      .select("id, job_ref, job_title, production_stage, production_stage_key, contract_value, company_id, customer_id, room_type, updated_at")
+      .select("id, job_ref, job_title, production_stage, production_stage_key, contract_value, company_id, customer_id, room_type, dry_fit_completed, updated_at")
       .eq("company_id", cid)
       .or(`production_stage.not.is.null,production_stage_key.in.(${stageKeys.join(",")}),current_stage_key.in.(${stageKeys.join(",")})`)
       .order("updated_at", { ascending: false });
@@ -134,6 +135,12 @@ export default function ProductionBoardPage() {
     const newIdx = currentIdx + direction;
     if (newIdx < 0 || newIdx >= PRODUCTION_COLUMNS.length) return;
     const toKey = PRODUCTION_COLUMNS[newIdx].key;
+
+    // Gate: dry fit must be completed before QC
+    if (toKey === "qc_check" && !job.dry_fit_completed) {
+      toast({ title: "Dry fit required", description: "Dry fit must be completed before moving to QC", variant: "destructive" });
+      return;
+    }
 
     if (toKey === "ready_for_install") {
       setConfirmMove({ job, toKey });
