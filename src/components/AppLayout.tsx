@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, Link } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useTenantBranding } from "@/hooks/useTenantBranding";
@@ -18,6 +18,7 @@ import ClockAnomalyPrompt from "@/components/ClockAnomalyPrompt";
 import RoleSwitcher from "@/components/RoleSwitcher";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { canRoleAccessRoute } from "@/lib/roleVisibility";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
 // ── Types ──
 
@@ -48,7 +49,7 @@ const cabAdminItems: NavItem[] = [
   { to: "/admin/production", label: "Production Board", icon: Factory },
   { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
   { to: "/admin/ghl", label: "GHL Settings", icon: Settings },
-  { to: "/admin/team", label: "Team & Invites", icon: Users },
+  { to: "/admin/team", label: "User Management", icon: UserCog },
   { to: "/admin/activity-log", label: "Activity Log", icon: Activity },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -74,6 +75,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { flags } = useFeatureFlags();
   const { branding } = useTenantBranding();
   const isMobile = useIsMobile();
+  useInactivityTimeout();
 
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map((n: string) => n[0]).join("")
@@ -165,7 +167,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </NavLink>
                 );
               })}
-              <div className="border-t border-border pt-2 mt-2">
+              <div className="border-t border-border pt-2 mt-2 space-y-1">
+                <Link to="/my-account" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent/50 w-full">
+                  <UserCog size={18} />
+                  <span>My Account</span>
+                </Link>
                 <button onClick={signOut} className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10 w-full">
                   <LogOut size={18} />
                   <span>Sign Out</span>
@@ -320,15 +326,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Footer */}
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-              <span className="text-xs font-mono font-bold text-secondary-foreground">{collapsed ? initials[0] : initials}</span>
-            </div>
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
-                <p className="text-[10px] text-muted-foreground">{displayRole}</p>
+            <Link to="/my-account" className="flex items-center gap-3 cursor-pointer">
+              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                <span className="text-xs font-mono font-bold text-secondary-foreground">{collapsed ? initials[0] : initials}</span>
               </div>
-            )}
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+                  <p className="text-[10px] text-muted-foreground">{displayRole}</p>
+                </div>
+              )}
+            </Link>
             {!collapsed && (
               <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors" title="Sign out">
                 <LogOut size={14} />

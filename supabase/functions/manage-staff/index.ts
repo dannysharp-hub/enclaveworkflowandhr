@@ -6,19 +6,125 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify caller is admin
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action");
+
+    // ── Public action: check-login (no auth required) ──
+    if (req.method === "POST" && action === "check-login") {
+      const { email } = await req.json();
+      if (!email) return json({ error: "Missing email" }, 400);
+
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
+
+      // Find user by email
+      const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1 });
+      // listUsers doesn't filter by email, so use a different approach
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("user_id, locked, failed_login_attempts")
+        .eq("email", email.toLowerCase())
+        .limit(1)
+        .single();
+
+      if (!profile) return json({ locked: false });
+      return json({ locked: !!profile.locked, failed_login_attempts: profile.failed_login_attempts || 0 });
+    }
+
+    // ── Public action: record-failed-login ──
+    if (req.method === "POST" && action === "record-failed-login") {
+      const { email } = await req.json();
+      if (!email) return json({ error: "Missing email" }, 400);
+
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
+
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("user_id, failed_login_attempts, locked, full_name")
+        .eq("email", email.toLowerCase())
+        .limit(1)
+        .single();
+
+      if (!profile) return json({ locked: false });
+
+      const newAttempts = (profile.failed_login_attempts || 0) + 1;
+      const shouldLock = newAttempts >= 5;
+
+      const updates: Record<string, unknown> = { failed_login_attempts: newAttempts };
+      if (shouldLock) {
+        updates.locked = true;
+        updates.locked_at = new Date().toISOString();
+      }
+
+      await adminClient.from("profiles").update(updates).eq("user_id", profile.user_id);
+
+      // If just locked, send notification email to admin
+      if (shouldLock && !profile.locked) {
+        try {
+          const lockTime = new Date().toLocaleString("en-GB", { timeZone: "Europe/London" });
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({
+              to: "danny@enclavecabinetry.com",
+              subject: `⚠️ Account Locked — ${profile.full_name || email}`,
+              html: `<p>The account <strong>${email}</strong> (${profile.full_name || "Unknown"}) has been automatically locked after 5 failed login attempts.</p><p><strong>Time:</strong> ${lockTime}</p><p>Log in to Cabinetry Command to unlock this account from the Team page.</p>`,
+            }),
+          });
+        } catch { /* fire-and-forget */ }
+      }
+
+      return json({ locked: shouldLock, failed_login_attempts: newAttempts });
+    }
+
+    // ── Public action: reset-login-attempts (called after successful login) ──
+    if (req.method === "POST" && action === "reset-login-attempts") {
+      const { email } = await req.json();
+      if (!email) return json({ error: "Missing email" }, 400);
+
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
+
+      await adminClient
+        .from("profiles")
+        .update({ failed_login_attempts: 0, last_active_at: new Date().toISOString() })
+        .eq("email", email.toLowerCase());
+
+      return json({ success: true });
+    }
+
+    // ══════════════════════════════════════════
+    // All actions below require admin auth
+    // ══════════════════════════════════════════
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: corsHeaders,
-      });
+      return json({ error: "Unauthorized" }, 401);
     }
 
     const callerClient = createClient(
@@ -31,15 +137,11 @@ Deno.serve(async (req) => {
     const { data: claimsData, error: claimsError } =
       await callerClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: corsHeaders,
-      });
+      return json({ error: "Unauthorized" }, 401);
     }
 
     const callerId = claimsData.claims.sub;
 
-    // Check admin role
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -54,26 +156,16 @@ Deno.serve(async (req) => {
       .single();
 
     if (!roleData) {
-      return new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: corsHeaders,
-      });
+      return json({ error: "Admin access required" }, 403);
     }
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get("action");
-
+    // ── CREATE USER ──
     if (req.method === "POST" && action === "create") {
       const { email, password, full_name, role, department } = await req.json();
-
       if (!email || !password || !full_name || !role) {
-        return new Response(
-          JSON.stringify({ error: "Missing required fields" }),
-          { status: 400, headers: corsHeaders }
-        );
+        return json({ error: "Missing required fields" }, 400);
       }
 
-      // Create user
       const { data: userData, error: createError } =
         await adminClient.auth.admin.createUser({
           email,
@@ -83,39 +175,25 @@ Deno.serve(async (req) => {
         });
 
       if (createError) throw createError;
-
       const userId = userData.user.id;
 
-      // Update profile
       await adminClient
         .from("profiles")
-        .update({
-          full_name,
-          department: department || "Office",
-        })
+        .update({ full_name, department: department || "Office" })
         .eq("user_id", userId);
 
-      // Set role (replace default viewer)
       await adminClient
         .from("user_roles")
         .update({ role })
         .eq("user_id", userId);
 
-      return new Response(
-        JSON.stringify({ success: true, user_id: userId }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ success: true, user_id: userId });
     }
 
+    // ── UPDATE ROLE ──
     if (req.method === "POST" && action === "update-role") {
       const { user_id, role } = await req.json();
-
-      if (!user_id || !role) {
-        return new Response(
-          JSON.stringify({ error: "Missing required fields" }),
-          { status: 400, headers: corsHeaders }
-        );
-      }
+      if (!user_id || !role) return json({ error: "Missing required fields" }, 400);
 
       const { error } = await adminClient
         .from("user_roles")
@@ -123,83 +201,137 @@ Deno.serve(async (req) => {
         .eq("user_id", user_id);
 
       if (error) throw error;
-
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ success: true });
     }
 
+    // ── UPDATE PROFILE ──
     if (req.method === "POST" && action === "update-profile") {
-      const { user_id, full_name, department, employment_type, contracted_hours_per_week, holiday_allowance_days, active, bank_sort_code, bank_account_number, bank_account_name, bank_name, ni_number, passport_number, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pay_type, hourly_rate, annual_salary } = await req.json();
+      const body = await req.json();
+      const { user_id, ...fields } = body;
+      if (!user_id) return json({ error: "Missing user_id" }, 400);
 
-      if (!user_id) {
-        return new Response(
-          JSON.stringify({ error: "Missing user_id" }),
-          { status: 400, headers: corsHeaders }
-        );
-      }
+      const allowedFields = [
+        "full_name", "department", "employment_type", "contracted_hours_per_week",
+        "holiday_allowance_days", "active", "bank_sort_code", "bank_account_number",
+        "bank_account_name", "bank_name", "ni_number", "passport_number",
+        "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
+        "pay_type", "hourly_rate", "annual_salary",
+      ];
 
       const updates: Record<string, unknown> = {};
-      if (full_name !== undefined) updates.full_name = full_name;
-      if (department !== undefined) updates.department = department;
-      if (employment_type !== undefined) updates.employment_type = employment_type;
-      if (contracted_hours_per_week !== undefined) updates.contracted_hours_per_week = contracted_hours_per_week;
-      if (holiday_allowance_days !== undefined) updates.holiday_allowance_days = holiday_allowance_days;
-      if (active !== undefined) updates.active = active;
-      if (bank_sort_code !== undefined) updates.bank_sort_code = bank_sort_code;
-      if (bank_account_number !== undefined) updates.bank_account_number = bank_account_number;
-      if (bank_account_name !== undefined) updates.bank_account_name = bank_account_name;
-      if (bank_name !== undefined) updates.bank_name = bank_name;
-      if (ni_number !== undefined) updates.ni_number = ni_number;
-      if (passport_number !== undefined) updates.passport_number = passport_number;
-      if (emergency_contact_name !== undefined) updates.emergency_contact_name = emergency_contact_name;
-      if (emergency_contact_phone !== undefined) updates.emergency_contact_phone = emergency_contact_phone;
-      if (emergency_contact_relationship !== undefined) updates.emergency_contact_relationship = emergency_contact_relationship;
-      if (pay_type !== undefined) updates.pay_type = pay_type;
-      if (hourly_rate !== undefined) updates.hourly_rate = hourly_rate;
-      if (annual_salary !== undefined) updates.annual_salary = annual_salary;
-
-      const { error } = await adminClient
-        .from("profiles")
-        .update(updates)
-        .eq("user_id", user_id);
-
-      if (error) throw error;
-
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (req.method === "POST" && action === "reset-password") {
-      const { user_id, password } = await req.json();
-
-      if (!user_id || !password) {
-        return new Response(
-          JSON.stringify({ error: "Missing required fields" }),
-          { status: 400, headers: corsHeaders }
-        );
+      for (const key of allowedFields) {
+        if (fields[key] !== undefined) updates[key] = fields[key];
       }
 
-      const { error } = await adminClient.auth.admin.updateUserById(user_id, {
-        password,
+      const { error } = await adminClient.from("profiles").update(updates).eq("user_id", user_id);
+      if (error) throw error;
+      return json({ success: true });
+    }
+
+    // ── RESET PASSWORD ──
+    if (req.method === "POST" && action === "reset-password") {
+      const { user_id, password } = await req.json();
+      if (!user_id || !password) return json({ error: "Missing required fields" }, 400);
+
+      const { error } = await adminClient.auth.admin.updateUserById(user_id, { password });
+      if (error) throw error;
+      return json({ success: true });
+    }
+
+    // ── FORCE PASSWORD RESET EMAIL ──
+    if (req.method === "POST" && action === "force-password-reset") {
+      const { email } = await req.json();
+      if (!email) return json({ error: "Missing email" }, 400);
+
+      // Use the admin client to generate a password reset link
+      const { data, error } = await adminClient.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: { redirectTo: `${req.headers.get("origin") || "https://www.cabinetrycommand.com"}/login` },
       });
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Send the email
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            to: email,
+            subject: "Password Reset — Cabinetry Command",
+            html: `<p>Your administrator has requested a password reset for your account.</p><p><a href="${data.properties?.action_link}">Click here to reset your password</a></p><p>If you didn't expect this, please contact your administrator.</p>`,
+          }),
+        });
+      } catch { /* fire-and-forget */ }
+
+      return json({ success: true });
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), {
-      status: 400,
-      headers: corsHeaders,
-    });
+    // ── LOCK ACCOUNT ──
+    if (req.method === "POST" && action === "lock") {
+      const { user_id } = await req.json();
+      if (!user_id) return json({ error: "Missing user_id" }, 400);
+
+      await adminClient.from("profiles").update({
+        locked: true,
+        locked_at: new Date().toISOString(),
+      }).eq("user_id", user_id);
+
+      return json({ success: true });
+    }
+
+    // ── UNLOCK ACCOUNT ──
+    if (req.method === "POST" && action === "unlock") {
+      const { user_id } = await req.json();
+      if (!user_id) return json({ error: "Missing user_id" }, 400);
+
+      await adminClient.from("profiles").update({
+        locked: false,
+        locked_at: null,
+        failed_login_attempts: 0,
+      }).eq("user_id", user_id);
+
+      return json({ success: true });
+    }
+
+    // ── DELETE USER ──
+    if (req.method === "POST" && action === "delete-user") {
+      const { user_id } = await req.json();
+      if (!user_id) return json({ error: "Missing user_id" }, 400);
+      if (user_id === callerId) return json({ error: "Cannot delete your own account" }, 400);
+
+      const { error } = await adminClient.auth.admin.deleteUser(user_id);
+      if (error) throw error;
+      return json({ success: true });
+    }
+
+    // ── LIST ALL USERS (admin) ──
+    if (req.method === "GET" && action === "list-users") {
+      const { data: profiles } = await adminClient
+        .from("profiles")
+        .select("user_id, full_name, email, department, locked, failed_login_attempts, locked_at, last_active_at, active")
+        .order("full_name");
+
+      const { data: roles } = await adminClient
+        .from("user_roles")
+        .select("user_id, role");
+
+      const roleMap = new Map((roles || []).map(r => [r.user_id, r.role]));
+
+      const users = (profiles || []).map(p => ({
+        ...p,
+        role: roleMap.get(p.user_id) || "viewer",
+      }));
+
+      return json({ users });
+    }
+
+    return json({ error: "Unknown action" }, 400);
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: error.message }, 400);
   }
 });

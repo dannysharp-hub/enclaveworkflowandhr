@@ -7812,11 +7812,15 @@ export type Database = {
           emergency_contact_phone: string | null
           emergency_contact_relationship: string | null
           employment_type: string
+          failed_login_attempts: number
           full_name: string
           holiday_allowance_days: number
           holiday_balance_days: number
           hourly_rate: number | null
           id: string
+          last_active_at: string | null
+          locked: boolean
+          locked_at: string | null
           ni_number: string | null
           passport_number: string | null
           pay_type: string
@@ -7841,11 +7845,15 @@ export type Database = {
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           employment_type?: string
+          failed_login_attempts?: number
           full_name: string
           holiday_allowance_days?: number
           holiday_balance_days?: number
           hourly_rate?: number | null
           id?: string
+          last_active_at?: string | null
+          locked?: boolean
+          locked_at?: string | null
           ni_number?: string | null
           passport_number?: string | null
           pay_type?: string
@@ -7870,11 +7878,15 @@ export type Database = {
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           employment_type?: string
+          failed_login_attempts?: number
           full_name?: string
           holiday_allowance_days?: number
           holiday_balance_days?: number
           hourly_rate?: number | null
           id?: string
+          last_active_at?: string | null
+          locked?: boolean
+          locked_at?: string | null
           ni_number?: string | null
           passport_number?: string | null
           pay_type?: string
