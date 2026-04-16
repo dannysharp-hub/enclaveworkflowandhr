@@ -198,8 +198,9 @@ export default function TeamPage() {
       if (res.data?.error) throw new Error(res.data.error);
 
       toast({ title: "Invite sent", description: `Setup email sent to ${invEmail}` });
-      logActivity({ action: "user_invited", resourceType: "user", resourceName: invEmail });
+      logActivity({ action: "user_invited", resourceType: "user", resourceName: invName.trim() });
       setInvEmail("");
+      setInvName("");
       load();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
