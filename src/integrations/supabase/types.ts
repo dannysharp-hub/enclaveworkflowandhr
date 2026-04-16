@@ -712,6 +712,68 @@ export type Database = {
           },
         ]
       }
+      cab_approval_requests: {
+        Row: {
+          action_type: string
+          company_id: string
+          created_at: string
+          id: string
+          notification_dismissed_by_requester: boolean
+          payload_json: Json | null
+          rejection_reason: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          summary: string
+          target_id: string
+          target_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          company_id: string
+          created_at?: string
+          id?: string
+          notification_dismissed_by_requester?: boolean
+          payload_json?: Json | null
+          rejection_reason?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          summary: string
+          target_id: string
+          target_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          notification_dismissed_by_requester?: boolean
+          payload_json?: Json | null
+          rejection_reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          summary?: string
+          target_id?: string
+          target_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_approval_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_buylist_items: {
         Row: {
           category: string
