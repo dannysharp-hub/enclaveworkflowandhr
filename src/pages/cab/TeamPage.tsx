@@ -160,6 +160,7 @@ export default function TeamPage() {
         password: newPass,
         full_name: newName.trim(),
         role: newRole,
+        company_id: companyId,
       });
       toast({ title: "User created", description: `${newName} added successfully` });
       logActivity({ action: "user_created", resourceType: "user", resourceName: newName });
