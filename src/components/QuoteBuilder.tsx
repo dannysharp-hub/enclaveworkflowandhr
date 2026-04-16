@@ -28,6 +28,7 @@ interface QuoteBuilderProps {
 }
 
 export default function QuoteBuilder({ companyId, job, onRefresh }: QuoteBuilderProps) {
+  const { requiresApproval, createApprovalRequest } = useApprovalGate();
   const [quote, setQuote] = useState<any>(null);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [scope, setScope] = useState("");
