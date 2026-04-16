@@ -218,6 +218,18 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
   };
 
   const handleSendQuote = async () => {
+    // Office role: submit for approval
+    if (requiresApproval) {
+      const ok = await createApprovalRequest({
+        companyId,
+        actionType: "quote_send",
+        targetId: job.id,
+        targetRef: job.job_ref,
+        summary: `Send quote for ${job.job_ref} via Drive attachment`,
+        payload: { quote_id: quote?.id },
+      });
+      if (ok) return;
+    }
     setSending(true);
     try {
       // Ensure a quote record exists
