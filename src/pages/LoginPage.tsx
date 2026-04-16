@@ -2,6 +2,21 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+const PASSWORD_SETUP_TYPES = new Set(["recovery", "invite"]);
+
+const getHashParams = () => {
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+
+  return new URLSearchParams(hash);
+};
+
+const clearHashParams = () => {
+  const nextUrl = `${window.location.pathname}${window.location.search}`;
+  window.history.replaceState({}, document.title, nextUrl);
+};
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,13 +34,68 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Listen for PASSWORD_RECOVERY event from Supabase auth
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+    const handleAuthLink = async () => {
+      const hashParams = getHashParams();
+      const linkType = hashParams.get("type");
+      const errorCode = hashParams.get("error_code");
+
+      if (errorCode === "otp_expired") {
+        setShowReset(false);
+        setShowForgot(false);
+        setError("This password setup link has expired. Please ask your administrator to resend it.");
+        clearHashParams();
+        return;
+      }
+
+      if (!linkType || !PASSWORD_SETUP_TYPES.has(linkType)) {
+        return;
+      }
+
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) {
+          setError("This password setup link is invalid or has expired. Please ask your administrator to resend it.");
+          clearHashParams();
+          return;
+        }
+
         setShowReset(true);
         setShowForgot(false);
         setError("");
+        clearHashParams();
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setShowReset(true);
+        setShowForgot(false);
+        setError("");
+        clearHashParams();
+      }
+    };
+
+    void handleAuthLink();
+  }, []);
+
+  // Listen for PASSWORD_RECOVERY event from Supabase auth
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      const linkType = getHashParams().get("type");
+
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && linkType && PASSWORD_SETUP_TYPES.has(linkType))) {
+        setShowReset(true);
+        setShowForgot(false);
+        setError("");
+        clearHashParams();
       }
     });
     return () => subscription.unsubscribe();
