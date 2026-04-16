@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell, X, ExternalLink } from "lucide-react";
+import { Bell, X, ExternalLink, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
@@ -16,11 +16,12 @@ interface Notification {
 }
 
 export default function NotificationBell() {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -36,6 +37,20 @@ export default function NotificationBell() {
   }, [user]);
 
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  // Fetch pending approval count for admins
+  useEffect(() => {
+    if (!user || userRole !== "admin") return;
+    const fetchApprovals = async () => {
+      const { count } = await (supabase.from("cab_approval_requests") as any)
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      setPendingApprovals(count || 0);
+    };
+    fetchApprovals();
+    const interval = setInterval(fetchApprovals, 30000);
+    return () => clearInterval(interval);
+  }, [user, userRole]);
 
   // Realtime subscription for new notifications
   useEffect(() => {
@@ -110,9 +125,9 @@ export default function NotificationBell() {
         className="relative h-9 w-9 flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground transition-colors"
       >
         <Bell size={16} />
-        {unreadCount > 0 && (
+        {(unreadCount + pendingApprovals) > 0 && (
           <span className="absolute -top-1 -right-1 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-[10px] font-mono font-bold text-destructive-foreground px-1 animate-pulse">
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {(unreadCount + pendingApprovals) > 9 ? "9+" : (unreadCount + pendingApprovals)}
           </span>
         )}
       </button>
@@ -135,9 +150,22 @@ export default function NotificationBell() {
               </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
-              {notifications.length === 0 ? (
+              {/* Pending approvals banner for admins */}
+              {pendingApprovals > 0 && (
+                <button
+                  onClick={() => { navigate("/admin/approvals"); setOpen(false); }}
+                  className="w-full text-left p-3 border-b border-border bg-primary/5 hover:bg-primary/10 transition-colors flex items-center gap-2"
+                >
+                  <ShieldCheck size={14} className="text-primary" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-foreground">{pendingApprovals} pending approval{pendingApprovals !== 1 ? "s" : ""}</p>
+                    <p className="text-[10px] text-muted-foreground">Review and approve team requests</p>
+                  </div>
+                </button>
+              )}
+              {notifications.length === 0 && pendingApprovals === 0 ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">No notifications</div>
-              ) : (
+              ) : notifications.length === 0 ? null : (
                 notifications.map(n => (
                   <button
                     key={n.id}

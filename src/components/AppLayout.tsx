@@ -44,6 +44,7 @@ const topLevelItems: NavItem[] = [
 
 // ── Cabinetry Admin items ──
 const cabAdminItems: NavItem[] = [
+  { to: "/admin/approvals", label: "Approvals", icon: ShieldCheck },
   { to: "/admin/production", label: "Production Board", icon: Factory },
   { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
   { to: "/admin/ghl", label: "GHL Settings", icon: Settings },

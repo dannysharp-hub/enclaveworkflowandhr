@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { regenerateJobCard, regenerateJobCardWithFeedback } from "@/lib/jobCardHelper";
 import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
 import { logJobViewed, logJobEdited, logDocumentOpened, logDriveFolderOpened } from "@/lib/activityLogger";
+import { useApprovalGate } from "@/hooks/useApprovalGate";
 import {
   canSeeFinancials, canDeleteRecords, canSeeClientContact,
   canManageQuotes, canManageDesignSignoff, canManageDryFit,
@@ -37,7 +38,7 @@ import {
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
   CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
   Users, ExternalLink, Trash2,
-  Pencil, Check, X as XIcon, Camera, Loader2,
+  Pencil, Check, X as XIcon, Camera, Loader2, Clock,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -49,6 +50,7 @@ export default function JobDetailPage() {
   const { userRole } = useAuth();
   const { jobRef } = useParams();
   const navigate = useNavigate();
+  const { requiresApproval, createApprovalRequest } = useApprovalGate();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [company, setCompany] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
@@ -78,6 +80,7 @@ export default function JobDetailPage() {
   const [icCompleting, setIcCompleting] = useState(false);
   const [scheduledTasks, setScheduledTasks] = useState<any[]>([]);
   const [reviewSending, setReviewSending] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
@@ -115,6 +118,15 @@ export default function JobDetailPage() {
     setTeamMembers(teamRes.data ?? []);
     setLastSyncLogs(syncLogRes.data ?? []);
     setScheduledTasks(scheduledTasksRes.data ?? []);
+
+    // Fetch pending approvals for this job
+    const { data: approvalsData } = await (supabase.from("cab_approval_requests") as any)
+      .select("*")
+      .eq("target_id", jobData.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setPendingApprovals(approvalsData ?? []);
+
     setLoading(false);
   }, [jobRef, navigate]);
 
@@ -142,6 +154,21 @@ export default function JobDetailPage() {
 
   const saveCustomerField = async (field: string) => {
     if (!customer) return;
+
+    // Office role requires approval for edits
+    if (requiresApproval && companyId) {
+      await createApprovalRequest({
+        companyId,
+        actionType: "job_edit",
+        targetId: job.id,
+        targetRef: job.job_ref,
+        summary: `Edit customer ${field}: "${editValue}"`,
+        payload: { table: "cab_customers", customerId: customer.id, changes: { [field]: editValue || null } },
+      });
+      setEditingField(null);
+      return;
+    }
+
     const { error } = await (supabase.from("cab_customers") as any)
       .update({ [field]: editValue || null })
       .eq("id", customer.id);
@@ -459,6 +486,21 @@ export default function JobDetailPage() {
       </div>
 
       <StagePipeline currentStageKey={stageKey} />
+
+      {/* Pending approval requests banner */}
+      {pendingApprovals.length > 0 && (
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 space-y-2">
+          <p className="text-sm font-bold text-foreground flex items-center gap-2">
+            <AlertTriangle size={14} className="text-yellow-600" />
+            {pendingApprovals.length} pending approval{pendingApprovals.length !== 1 ? "s" : ""}
+          </p>
+          {pendingApprovals.map((a: any) => (
+            <div key={a.id} className="text-xs text-muted-foreground flex items-center gap-2">
+              <Clock size={10} /> {a.summary}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Add to Production Board button */}
       {!job.production_stage && ['deposit_received', 'project_confirmed', 'materials_ordered', 'manufacturing_started', 'cabinetry_assembled', 'ready_for_installation', 'ready_for_install'].includes(stageKey) && (
@@ -1362,6 +1404,17 @@ export default function JobDetailPage() {
                       <Button
                         size="sm"
                         onClick={async () => {
+                          if (requiresApproval && companyId) {
+                            await createApprovalRequest({
+                              companyId,
+                              actionType: "design_signoff_send",
+                              targetId: job.id,
+                              targetRef: job.job_ref,
+                              summary: `Mark design sign-off on ${job.job_ref}`,
+                              payload: { company_id: companyId },
+                            });
+                            return;
+                          }
                           const now = new Date().toISOString();
                           await updateJob({
                             customer_signoff_at: now,
@@ -1374,7 +1427,6 @@ export default function JobDetailPage() {
                             payload: { signed_at: now },
                           });
                           toast({ title: "Design sign-off recorded" });
-                          // Fire-and-forget: generate sign-off document from template
                           fireDocumentGeneration(job.id, "sign_off");
                           load();
                         }}
@@ -1518,10 +1570,21 @@ export default function JobDetailPage() {
             const handleSendProgressInvoice = async () => {
               setDfSending(true);
               try {
+                if (requiresApproval && companyId) {
+                  await createApprovalRequest({
+                    companyId,
+                    actionType: "invoice_send",
+                    targetId: job.id,
+                    targetRef: job.job_ref,
+                    summary: `Send progress invoice for ${job.job_ref}`,
+                    payload: { company_id: companyId, template_type: "invoice_progress", event_type: "invoice.progress_requested" },
+                  });
+                  setDfSending(false);
+                  return;
+                }
                 if (companyId) {
                   await insertCabEvent({ companyId, eventType: "invoice.progress_requested", jobId: job.id, payload: {} });
                 }
-                // Fire-and-forget: generate progress invoice from template
                 fireDocumentGeneration(job.id, "invoice_progress");
                 toast({ title: "Progress invoice requested" });
                 load();

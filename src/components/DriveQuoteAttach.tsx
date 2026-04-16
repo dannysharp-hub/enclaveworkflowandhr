@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { insertCabEvent } from "@/lib/cabHelpers";
+import { useApprovalGate } from "@/hooks/useApprovalGate";
 import { toast } from "@/hooks/use-toast";
 import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ interface DriveQuoteAttachProps {
 }
 
 export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }: DriveQuoteAttachProps) {
+  const { requiresApproval, createApprovalRequest } = useApprovalGate();
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -216,6 +218,18 @@ export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }
   };
 
   const handleSendQuote = async () => {
+    // Office role: submit for approval
+    if (requiresApproval) {
+      const ok = await createApprovalRequest({
+        companyId,
+        actionType: "quote_send",
+        targetId: job.id,
+        targetRef: job.job_ref,
+        summary: `Send quote for ${job.job_ref} via Drive attachment`,
+        payload: { quote_id: quote?.id },
+      });
+      if (ok) return;
+    }
     setSending(true);
     try {
       // Ensure a quote record exists
