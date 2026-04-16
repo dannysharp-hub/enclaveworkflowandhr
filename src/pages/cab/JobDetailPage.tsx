@@ -118,6 +118,15 @@ export default function JobDetailPage() {
     setTeamMembers(teamRes.data ?? []);
     setLastSyncLogs(syncLogRes.data ?? []);
     setScheduledTasks(scheduledTasksRes.data ?? []);
+
+    // Fetch pending approvals for this job
+    const { data: approvalsData } = await (supabase.from("cab_approval_requests") as any)
+      .select("*")
+      .eq("target_id", jobData.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setPendingApprovals(approvalsData ?? []);
+
     setLoading(false);
   }, [jobRef, navigate]);
 
