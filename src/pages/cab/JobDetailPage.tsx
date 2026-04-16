@@ -50,6 +50,7 @@ export default function JobDetailPage() {
   const { userRole } = useAuth();
   const { jobRef } = useParams();
   const navigate = useNavigate();
+  const { requiresApproval, createApprovalRequest } = useApprovalGate();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [company, setCompany] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
