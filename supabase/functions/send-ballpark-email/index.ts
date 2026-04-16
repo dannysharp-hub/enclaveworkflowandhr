@@ -140,16 +140,50 @@ async function findFileInPath(
   return null;
 }
 
-async function downloadFileAsBytes(accessToken: string, fileId: string, mimeType: string): Promise<Uint8Array> {
-  let url: string;
+// Mime types that need copy-to-Google-Docs-then-export-as-PDF
+const OFFICE_DOC_MIMES = [
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/msword", // .doc
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+];
+
+async function downloadFileAsPdfBytes(accessToken: string, fileId: string, mimeType: string): Promise<Uint8Array> {
   if (mimeType.startsWith("application/vnd.google-apps.")) {
-    // Google native file — export as PDF
-    url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf&alt=media`;
-  } else {
-    url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
+    // Google-native file — export directly as PDF
+    const url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw new Error(`Export failed for ${fileId}: ${res.status}`);
+    return new Uint8Array(await res.arrayBuffer());
   }
+
+  if (OFFICE_DOC_MIMES.includes(mimeType)) {
+    // Office file — copy as Google Doc, export as PDF, delete the copy
+    const copyRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ mimeType: "application/vnd.google-apps.document", name: "_tmp_pdf_export" }),
+    });
+    if (!copyRes.ok) throw new Error(`Copy-to-Docs failed for ${fileId}: ${copyRes.status}`);
+    const copy = await copyRes.json();
+
+    try {
+      const exportUrl = `https://www.googleapis.com/drive/v3/files/${copy.id}/export?mimeType=application/pdf`;
+      const pdfRes = await fetch(exportUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!pdfRes.ok) throw new Error(`PDF export failed for copy ${copy.id}: ${pdfRes.status}`);
+      return new Uint8Array(await pdfRes.arrayBuffer());
+    } finally {
+      // Clean up temp copy (fire-and-forget)
+      fetch(`https://www.googleapis.com/drive/v3/files/${copy.id}?supportsAllDrives=true`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => {});
+    }
+  }
+
+  // Already a binary file (PDF, image, etc.) — download directly
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) throw new Error(`Failed to download file ${fileId}: ${res.status}`);
+  if (!res.ok) throw new Error(`Download failed for ${fileId}: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
 
@@ -238,24 +272,14 @@ serve(async (req) => {
     const warnings: string[] = [];
 
     if (accessToken && job.drive_folder_id) {
-      // 4a. Concept layout — search in job's Drive folder
-      const jobNumber = job.job_ref?.split("_")[0] || "";
-      const clientName = (customer.first_name + customer.last_name).replace(/\s/g, "").toLowerCase();
-      const conceptPattern = `${jobNumber}_${clientName}_conceptlayout`.toLowerCase();
-      // Also try partial: just "conceptlayout"
-      console.log("[send-ballpark-email] Searching for concept layout pattern:", conceptPattern);
+      // 4a. Concept layout — search for any file containing "concept" in the name
+      console.log("[send-ballpark-email] Searching for concept layout in folder:", job.drive_folder_id);
 
-      // Try multiple naming patterns: "conceptlayout", "concept layout", "concept_layout", "concept-layout"
-      const conceptPatterns = ["conceptlayout", "concept layout", "concept_layout", "concept-layout"];
-      let conceptFile: { id: string; name: string; mimeType: string } | null = null;
-      for (const pat of conceptPatterns) {
-        conceptFile = await searchFileInFolder(accessToken, job.drive_folder_id, pat);
-        if (conceptFile) break;
-      }
+      let conceptFile = await searchFileInFolder(accessToken, job.drive_folder_id, "concept");
       if (conceptFile) {
-        console.log("[send-ballpark-email] Found concept layout:", conceptFile.name);
+        console.log("[send-ballpark-email] Found concept layout:", conceptFile.name, "mimeType:", conceptFile.mimeType);
         try {
-          const bytes = await downloadFileAsBytes(accessToken, conceptFile.id, conceptFile.mimeType);
+          const bytes = await downloadFileAsPdfBytes(accessToken, conceptFile.id, conceptFile.mimeType);
           attachments.push({
             filename: `${job.job_ref}_ConceptLayout.pdf`,
             content: toBase64(bytes),
@@ -265,7 +289,7 @@ serve(async (req) => {
           warnings.push("Concept layout found but download failed: " + e.message);
         }
       } else {
-        console.warn("[send-ballpark-email] Concept layout not found in Drive folder");
+        console.warn("[send-ballpark-email] No file containing 'concept' found in Drive folder");
         warnings.push("Concept layout file not found in job Drive folder");
       }
 
@@ -276,7 +300,7 @@ serve(async (req) => {
         ]);
         if (processFile) {
           console.log("[send-ballpark-email] Found Our Process:", processFile.name);
-          const bytes = await downloadFileAsBytes(accessToken, processFile.id, processFile.mimeType);
+          const bytes = await downloadFileAsPdfBytes(accessToken, processFile.id, processFile.mimeType);
           attachments.push({
             filename: "Enclave_Cabinetry_Our_Process.pdf",
             content: toBase64(bytes),
@@ -290,7 +314,7 @@ serve(async (req) => {
             // Search within this folder
             const found = await searchFileInFolder(accessToken, altFile.id, "EC_Our_Process");
             if (found) {
-              const bytes = await downloadFileAsBytes(accessToken, found.id, found.mimeType);
+              const bytes = await downloadFileAsPdfBytes(accessToken, found.id, found.mimeType);
               attachments.push({
                 filename: "Enclave_Cabinetry_Our_Process.pdf",
                 content: toBase64(bytes),
