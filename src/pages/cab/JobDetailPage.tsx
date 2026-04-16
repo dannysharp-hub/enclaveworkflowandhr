@@ -13,8 +13,9 @@ import { useApprovalGate } from "@/hooks/useApprovalGate";
 import {
   canSeeFinancials, canDeleteRecords, canSeeClientContact,
   canManageQuotes, canManageDesignSignoff, canManageDryFit,
-  canSeeJobSection, canEditJobDetails, canAccessGhlSettings,
+  canSeeJobSection, canEditJobDetails, canAccessGhlSettings, canFitterSignOff,
 } from "@/lib/rolePermissions";
+import FitterSignOffPanel from "@/components/cab/FitterSignOffPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1713,7 +1714,9 @@ export default function JobDetailPage() {
             if (!IC_VISIBLE_STAGES.includes(icProdKey) && !IC_VISIBLE_STAGES.includes(stageKey || "") && !job.install_date) return null;
 
             const isInstallDone = !!job.install_completed_at;
-            const hasSignoff = !!job.final_signoff_url;
+            const hasFitterSignoff = !!job.fitter_signed_at;
+            const hasCustomerSignoff = !!job.sign_off_completed_at || !!job.customer_signoff_at;
+            const hasSignoff = !!job.final_signoff_url || hasCustomerSignoff;
             const canComplete = isInstallDone && hasSignoff;
 
             const handleIcInstallComplete = async () => {
@@ -1740,17 +1743,12 @@ export default function JobDetailPage() {
                 if (error) throw error;
                 const { data: urlData } = supabase.storage.from("install-signoffs").getPublicUrl(path);
                 await (supabase.from("cab_jobs") as any).update({ final_signoff_url: urlData.publicUrl }).eq("id", job.id);
-
-                // Try uploading to Drive if linked
                 if (job.drive_folder_id) {
                   try {
                     const { uploadToDrive } = await import("@/lib/driveUpload");
                     await uploadToDrive(job.id, `SignOff_${job.job_ref}.${ext}`, file, "Sign-Off", file.type);
-                  } catch (driveErr) {
-                    console.warn("Drive upload failed (non-blocking):", driveErr);
-                  }
+                  } catch (driveErr) { console.warn("Drive upload failed (non-blocking):", driveErr); }
                 }
-
                 toast({ title: "Sign-off document uploaded" });
                 load();
               } catch (err: any) {
@@ -1786,7 +1784,6 @@ export default function JobDetailPage() {
                   await insertCabEvent({ companyId, eventType: "job.completed", jobId: job.id, payload: {} });
                   await insertCabEvent({ companyId, eventType: "invoice.final_requested", jobId: job.id, payload: {} });
                 }
-                // Fire-and-forget: generate final invoice and fitter form from templates
                 fireDocumentGeneration(job.id, "invoice_final");
                 fireDocumentGeneration(job.id, "fitter_form");
                 toast({ title: "Job marked complete — final invoice requested" });
@@ -1827,38 +1824,78 @@ export default function JobDetailPage() {
                   )}
                 </div>
 
-                {/* Fitter Notes */}
-                <div className="space-y-1">
-                  <Label className="text-xs">Fitter Notes</Label>
-                  <textarea
-                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Notes from the installation team…"
-                    defaultValue={job.fitter_notes || ""}
-                    onChange={(e) => setIcFitterNotes(e.target.value)}
-                    onBlur={() => {
-                      if (icFitterNotes && icFitterNotes !== (job.fitter_notes || "")) handleIcFitterNotes();
-                    }}
-                  />
-                </div>
+                {/* Completion Photos */}
+                {isInstallDone && companyId && (
+                  <CompletionPhotos jobId={job.id} companyId={companyId} />
+                )}
 
-                {/* Final Sign-Off Document */}
-                <div className="space-y-2">
-                  <Label className="text-xs">Final Sign-Off Document</Label>
-                  {hasSignoff && (
-                    <a href={job.final_signoff_url} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-primary underline flex items-center gap-1">
-                      <FileText size={12} /> View uploaded document
-                    </a>
-                  )}
-                  <label>
-                    <Button size="sm" variant="outline" asChild disabled={icSignoffUploading}>
-                      <span className="cursor-pointer">
-                        {icSignoffUploading ? <><Loader2 size={14} className="animate-spin mr-1" /> Uploading…</> : <><FileText size={14} className="mr-1" /> {hasSignoff ? "Replace Document" : "Upload Document"}</>}
-                      </span>
-                    </Button>
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleIcSignoffUpload} />
-                  </label>
-                </div>
+                {/* Fitter Sign-Off Panel — Admin & Supervisor only */}
+                {isInstallDone && canFitterSignOff(userRole) && companyId && (
+                  <FitterSignOffPanel
+                    job={job}
+                    customer={customer}
+                    companyId={companyId}
+                    onComplete={load}
+                  />
+                )}
+
+                {/* Customer sign-off status */}
+                {hasFitterSignoff && (
+                  <div className="flex items-center justify-between p-3 rounded border border-border">
+                    <div className="flex items-center gap-2">
+                      {hasCustomerSignoff ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+                      <span className="text-sm font-medium">Customer Sign-Off</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {hasCustomerSignoff ? "Completed" : "Awaiting customer signature"}
+                    </span>
+                  </div>
+                )}
+
+                {/* Completion Certificate */}
+                {job.completion_certificate_url && (
+                  <a href={job.completion_certificate_url} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-primary underline flex items-center gap-1">
+                    <FileText size={12} /> View Completion Certificate
+                  </a>
+                )}
+
+                {/* Legacy: Fitter Notes (fallback) */}
+                {!hasFitterSignoff && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fitter Notes</Label>
+                    <textarea
+                      className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      placeholder="Notes from the installation team…"
+                      defaultValue={job.fitter_notes || ""}
+                      onChange={(e) => setIcFitterNotes(e.target.value)}
+                      onBlur={() => {
+                        if (icFitterNotes && icFitterNotes !== (job.fitter_notes || "")) handleIcFitterNotes();
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Legacy: Final Sign-Off Document */}
+                {!hasFitterSignoff && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Final Sign-Off Document</Label>
+                    {hasSignoff && job.final_signoff_url && (
+                      <a href={job.final_signoff_url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-primary underline flex items-center gap-1">
+                        <FileText size={12} /> View uploaded document
+                      </a>
+                    )}
+                    <label>
+                      <Button size="sm" variant="outline" asChild disabled={icSignoffUploading}>
+                        <span className="cursor-pointer">
+                          {icSignoffUploading ? <><Loader2 size={14} className="animate-spin mr-1" /> Uploading…</> : <><FileText size={14} className="mr-1" /> {hasSignoff ? "Replace Document" : "Upload Document"}</>}
+                        </span>
+                      </Button>
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleIcSignoffUpload} />
+                    </label>
+                  </div>
+                )}
 
                 {/* Mark Job Complete */}
                 <Button
@@ -1872,8 +1909,7 @@ export default function JobDetailPage() {
                 {!canComplete && (
                   <p className="text-[10px] text-muted-foreground">
                     {!isInstallDone && "Mark installation complete"}
-                    {!isInstallDone && !hasSignoff && " and "}
-                    {!hasSignoff && "upload sign-off document"}
+                    {isInstallDone && !hasSignoff && "Awaiting customer sign-off"}
                     {" to enable"}
                   </p>
                 )}

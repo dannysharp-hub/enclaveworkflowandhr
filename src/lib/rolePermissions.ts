@@ -78,6 +78,11 @@ export function canManageDryFit(role: string | null): boolean {
   return role === "admin" || role === "supervisor";
 }
 
+/** Can perform fitter sign-off on installations */
+export function canFitterSignOff(role: string | null): boolean {
+  return role === "admin" || role === "supervisor";
+}
+
 /** Sections the user can see on the job detail page */
 export function canSeeJobSection(role: string | null, section: string): boolean {
   switch (section) {
@@ -97,6 +102,8 @@ export function canSeeJobSection(role: string | null, section: string): boolean 
       return canManageDesignSignoff(role);
     case "dry_fit":
       return canManageDryFit(role);
+    case "fitter_signoff":
+      return canFitterSignOff(role);
     case "production_stage":
       return canViewProduction(role);
     case "customer_contact":
