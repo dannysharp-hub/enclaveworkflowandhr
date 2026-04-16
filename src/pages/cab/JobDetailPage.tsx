@@ -721,7 +721,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Ballpark Card */}
-          {canSeeFinancials(userRole) && (<div data-section="ballpark" className="rounded-lg border border-border bg-card p-4 space-y-3">
+          {(canSeeFinancials(userRole) || userRole === "office") && (<div data-section="ballpark" className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-mono text-sm font-bold text-foreground flex items-center gap-2">
                 <Banknote size={14} className="text-primary" /> Ballpark Estimate
@@ -752,6 +752,7 @@ export default function JobDetailPage() {
                 placeholder="Based on the details provided, we estimate your project at…"
               />
             </div>
+            {canSeeFinancials(userRole) && (
             <div>
               <Label className="text-xs">Internal Notes (admin only)</Label>
               <textarea
@@ -762,6 +763,7 @@ export default function JobDetailPage() {
                 placeholder="Complexity notes, risk flags…"
               />
             </div>
+            )}
             <div className="flex gap-2">
               <Button
                 size="sm"
