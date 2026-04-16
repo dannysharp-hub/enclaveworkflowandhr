@@ -42,7 +42,7 @@ const ACTIVE_STAGES = [
   "appointment_booked", "quote_sent", "quote_viewed", "awaiting_deposit", "project_confirmed",
 ];
 
-const JOB_TYPES = ["Wardrobe", "Home Office", "Commercial Fit-out", "Other"] as const;
+const JOB_TYPES = ["Kitchen", "Wardrobe", "Home Office", "Commercial Fit-out", "Other"] as const;
 const SOURCES = ["Word of mouth", "Website", "Referral", "Social media", "Other"] as const;
 
 export default function LeadsPage() {
