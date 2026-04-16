@@ -29,6 +29,7 @@ interface DriveQuoteAttachProps {
 }
 
 export default function DriveQuoteAttach({ companyId, job, customer, onRefresh }: DriveQuoteAttachProps) {
+  const { requiresApproval, createApprovalRequest } = useApprovalGate();
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
