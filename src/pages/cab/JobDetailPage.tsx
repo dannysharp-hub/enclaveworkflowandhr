@@ -238,6 +238,37 @@ export default function JobDetailPage() {
       toast({ title: "Enter min and max prices before sending", variant: "destructive" });
       return;
     }
+
+    // Office role users need admin approval before sending
+    if (requiresApproval) {
+      const created = await createApprovalRequest({
+        companyId: companyId!,
+        actionType: "ballpark_send",
+        targetId: job.id,
+        targetRef: job.job_ref,
+        summary: `Send ballpark estimate £${parseFloat(ballparkMin).toLocaleString()}–£${parseFloat(ballparkMax).toLocaleString()} for ${job.job_ref}`,
+        payload: {
+          ballpark_min: parseFloat(ballparkMin),
+          ballpark_max: parseFloat(ballparkMax),
+          ballpark_customer_message: ballparkCustomerMsg || null,
+          ballpark_internal_notes: ballparkInternalNotes || null,
+          company_id: companyId,
+        },
+      });
+      if (created) {
+        // Save the values without marking as sent
+        await updateJob({
+          ballpark_min: parseFloat(ballparkMin),
+          ballpark_max: parseFloat(ballparkMax),
+          ballpark_customer_message: ballparkCustomerMsg || null,
+          ballpark_internal_notes: ballparkInternalNotes || null,
+          ballpark_currency: "GBP",
+        });
+        load();
+      }
+      return;
+    }
+
     setBallparkSending(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
