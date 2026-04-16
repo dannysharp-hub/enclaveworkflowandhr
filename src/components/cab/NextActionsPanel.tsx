@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useApprovalGate } from "@/hooks/useApprovalGate";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { insertCabEvent } from "@/lib/cabHelpers";
