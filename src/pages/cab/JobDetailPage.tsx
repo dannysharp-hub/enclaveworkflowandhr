@@ -38,7 +38,7 @@ import {
   Package, Cog, Hammer, Truck, ClipboardCheck, Star, AlertTriangle, RefreshCw,
   CalendarDays, Calendar, Copy, Factory, ChevronRight, UserPlus, Link, RotateCcw,
   Users, ExternalLink, Trash2,
-  Pencil, Check, X as XIcon, Camera, Loader2,
+  Pencil, Check, X as XIcon, Camera, Loader2, Clock,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
