@@ -11,8 +11,25 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Listen for PASSWORD_RECOVERY event from Supabase auth
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setShowReset(true);
+        setShowForgot(false);
+        setError("");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (searchParams.get("reason") === "timeout") {
@@ -38,7 +55,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Check if account is locked first
       const checkResult = await callManageStaff("check-login", { email });
       if (checkResult.locked) {
         setError("Your account has been locked. Please contact your administrator.");
@@ -48,7 +64,6 @@ export default function LoginPage() {
 
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
-        // Record failed attempt
         const failResult = await callManageStaff("record-failed-login", { email });
         if (failResult.locked) {
           setError("Your account has been locked after too many failed attempts. Please contact your administrator.");
@@ -61,7 +76,6 @@ export default function LoginPage() {
           }
         }
       } else {
-        // Reset failed attempts on successful login
         await callManageStaff("reset-login-attempts", { email });
         navigate("/");
       }
@@ -71,12 +85,42 @@ export default function LoginPage() {
     setLoading(false);
   };
 
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setResetSuccess(true);
+      setTimeout(() => {
+        setShowReset(false);
+        setResetSuccess(false);
+        navigate("/");
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `https://www.cabinetrycommand.com/login`,
       });
       if (error) throw error;
       setForgotSent(true);
@@ -87,19 +131,78 @@ export default function LoginPage() {
     }
   };
 
+  const brandHeader = (
+    <div className="flex items-center gap-3 mb-8 justify-center">
+      <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
+        <span className="font-mono text-lg font-bold text-primary-foreground">E</span>
+      </div>
+      <div>
+        <p className="font-mono text-lg font-bold text-foreground leading-none">ENCLAVE</p>
+        <p className="text-[10px] text-muted-foreground tracking-widest">CABINETRY</p>
+      </div>
+    </div>
+  );
+
+  const inputClass = "w-full h-10 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+  const labelClass = "block text-xs font-mono font-medium text-muted-foreground mb-1.5";
+  const btnClass = "w-full h-10 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50";
+
+  // ── SET PASSWORD SCREEN (recovery / invite) ──
+  if (showReset) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-sm glass-panel rounded-lg p-8">
+          {brandHeader}
+
+          {resetSuccess ? (
+            <div className="text-center space-y-3">
+              <p className="text-sm text-foreground font-medium">Password set successfully!</p>
+              <p className="text-xs text-muted-foreground">Redirecting you now…</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSetPassword} className="space-y-4">
+              <p className="text-sm text-muted-foreground text-center">Create your password to get started</p>
+              <div>
+                <label className={labelClass}>NEW PASSWORD</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className={inputClass}
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>CONFIRM PASSWORD</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className={inputClass}
+                  placeholder="Confirm your password"
+                />
+              </div>
+              {error && <p className="text-xs text-destructive font-mono">{error}</p>}
+              <button type="submit" disabled={resetLoading} className={btnClass}>
+                {resetLoading ? "Setting password…" : "Set Password & Sign In"}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── FORGOT PASSWORD SCREEN ──
   if (showForgot) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm glass-panel rounded-lg p-8">
-          <div className="flex items-center gap-3 mb-8 justify-center">
-            <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-              <span className="font-mono text-lg font-bold text-primary-foreground">E</span>
-            </div>
-            <div>
-              <p className="font-mono text-lg font-bold text-foreground leading-none">ENCLAVE</p>
-              <p className="text-[10px] text-muted-foreground tracking-widest">CABINETRY</p>
-            </div>
-          </div>
+          {brandHeader}
 
           {forgotSent ? (
             <div className="text-center space-y-4">
@@ -116,22 +219,18 @@ export default function LoginPage() {
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">Enter your email to receive a password reset link</p>
               <div>
-                <label className="block text-xs font-mono font-medium text-muted-foreground mb-1.5">EMAIL</label>
+                <label className={labelClass}>EMAIL</label>
                 <input
                   type="email"
                   value={forgotEmail}
                   onChange={e => setForgotEmail(e.target.value)}
                   required
-                  className="w-full h-10 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  className={inputClass}
                   placeholder="you@enclave.co.uk"
                 />
               </div>
               {error && <p className="text-xs text-destructive font-mono">{error}</p>}
-              <button
-                type="submit"
-                disabled={forgotLoading}
-                className="w-full h-10 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
+              <button type="submit" disabled={forgotLoading} className={btnClass}>
                 {forgotLoading ? "Sending…" : "Send Reset Link"}
               </button>
               <button
@@ -148,48 +247,37 @@ export default function LoginPage() {
     );
   }
 
+  // ── MAIN LOGIN SCREEN ──
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm glass-panel rounded-lg p-8">
-        <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-            <span className="font-mono text-lg font-bold text-primary-foreground">E</span>
-          </div>
-          <div>
-            <p className="font-mono text-lg font-bold text-foreground leading-none">ENCLAVE</p>
-            <p className="text-[10px] text-muted-foreground tracking-widest">CABINETRY</p>
-          </div>
-        </div>
+        {brandHeader}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-mono font-medium text-muted-foreground mb-1.5">EMAIL</label>
+            <label className={labelClass}>EMAIL</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              className="w-full h-10 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className={inputClass}
               placeholder="you@enclave.co.uk"
             />
           </div>
           <div>
-            <label className="block text-xs font-mono font-medium text-muted-foreground mb-1.5">PASSWORD</label>
+            <label className={labelClass}>PASSWORD</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="w-full h-10 rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className={inputClass}
               placeholder="••••••••"
             />
           </div>
           {error && <p className="text-xs text-destructive font-mono">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-10 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading} className={btnClass}>
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
