@@ -177,13 +177,28 @@ export default function TeamPage() {
     if (!companyId || !invEmail.trim()) return;
     setCreating(true);
     try {
-      const { error } = await (supabase.from("cab_company_invites") as any).insert({
+      // Also insert into cab_company_invites for record keeping
+      await (supabase.from("cab_company_invites") as any).insert({
         company_id: companyId,
         email: invEmail.trim().toLowerCase(),
         role: invRole,
       });
-      if (error) throw error;
-      toast({ title: "Invite created", description: `Invite sent to ${invEmail}` });
+
+      // Create user account and send invite email via edge function
+      const res = await supabase.functions.invoke("manage-staff?action=invite", {
+        body: {
+          email: invEmail.trim().toLowerCase(),
+          full_name: invEmail.trim().split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+          role: invRole,
+          company_id: companyId,
+        },
+      });
+
+      if (res.error) throw new Error(res.error.message);
+      if (res.data?.error) throw new Error(res.data.error);
+
+      toast({ title: "Invite sent", description: `Setup email sent to ${invEmail}` });
+      logActivity({ action: "user_invited", resourceType: "user", resourceName: invEmail });
       setInvEmail("");
       load();
     } catch (err: any) {
