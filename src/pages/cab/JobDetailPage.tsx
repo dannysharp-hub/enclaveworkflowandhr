@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { regenerateJobCard, regenerateJobCardWithFeedback } from "@/lib/jobCardHelper";
 import { fireDocumentGeneration } from "@/lib/generateDocumentFromTemplate";
 import { logJobViewed, logJobEdited, logDocumentOpened, logDriveFolderOpened } from "@/lib/activityLogger";
+import { useApprovalGate } from "@/hooks/useApprovalGate";
 import {
   canSeeFinancials, canDeleteRecords, canSeeClientContact,
   canManageQuotes, canManageDesignSignoff, canManageDryFit,
