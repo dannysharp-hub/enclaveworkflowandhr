@@ -38,6 +38,7 @@ interface ProdCard {
   customer_email: string | null;
   room_type: string | null;
   deposit_received_at: string | null;
+  dry_fit_completed: boolean;
 }
 
 export default function ProductionBoardPage() {
