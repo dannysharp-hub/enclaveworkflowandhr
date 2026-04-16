@@ -268,6 +268,43 @@ export default function ApprovalsPage() {
         }
         break;
       }
+      case "ballpark_send": {
+        // Apply the ballpark values, mark as sent, fire event + email
+        const now = new Date().toISOString();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        await (supabase.from("cab_jobs") as any).update({
+          ballpark_min: payload.ballpark_min,
+          ballpark_max: payload.ballpark_max,
+          ballpark_customer_message: payload.ballpark_customer_message || null,
+          ballpark_internal_notes: payload.ballpark_internal_notes || null,
+          ballpark_currency: "GBP",
+          ballpark_sent_at: now,
+          ballpark_sent_by: user?.id || req.requested_by,
+          current_stage_key: "ballpark_sent",
+          state: "awaiting_appointment_request",
+        }).eq("id", req.target_id);
+
+        await (supabase.from("cab_events") as any).insert({
+          company_id: payload.company_id || req.company_id,
+          event_type: "ballpark.sent",
+          job_id: req.target_id,
+          payload_json: {
+            min: payload.ballpark_min,
+            max: payload.ballpark_max,
+            currency: "GBP",
+            customer_message: payload.ballpark_customer_message || null,
+          },
+          status: "pending",
+        });
+
+        // Send the automated ballpark email
+        supabase.functions.invoke("send-ballpark-email", {
+          body: { job_id: req.target_id, company_id: payload.company_id || req.company_id },
+        }).catch((e: any) => console.warn("[approval] ballpark email failed:", e));
+
+        break;
+      }
     }
   };
 
