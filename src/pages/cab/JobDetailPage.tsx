@@ -487,6 +487,21 @@ export default function JobDetailPage() {
 
       <StagePipeline currentStageKey={stageKey} />
 
+      {/* Pending approval requests banner */}
+      {pendingApprovals.length > 0 && (
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 space-y-2">
+          <p className="text-sm font-bold text-foreground flex items-center gap-2">
+            <AlertTriangle size={14} className="text-yellow-600" />
+            {pendingApprovals.length} pending approval{pendingApprovals.length !== 1 ? "s" : ""}
+          </p>
+          {pendingApprovals.map((a: any) => (
+            <div key={a.id} className="text-xs text-muted-foreground flex items-center gap-2">
+              <Clock size={10} /> {a.summary}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Add to Production Board button */}
       {!job.production_stage && ['deposit_received', 'project_confirmed', 'materials_ordered', 'manufacturing_started', 'cabinetry_assembled', 'ready_for_installation', 'ready_for_install'].includes(stageKey) && (
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between">
