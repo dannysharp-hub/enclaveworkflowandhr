@@ -7,6 +7,31 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function buildRecoveryUrl(link: string | undefined) {
+  if (!link) return `${SITE_URL}/login`;
+
+  try {
+    const parsed = new URL(link);
+    const accessToken = parsed.searchParams.get("access_token");
+    const refreshToken = parsed.searchParams.get("refresh_token");
+    const type = parsed.searchParams.get("type") ?? "recovery";
+
+    if (!accessToken || !refreshToken) {
+      return `${SITE_URL}/login`;
+    }
+
+    const hashParams = new URLSearchParams({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      type,
+    });
+
+    return `${SITE_URL}/login#${hashParams.toString()}`;
+  } catch {
+    return `${SITE_URL}/login`;
+  }
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -255,6 +280,7 @@ Deno.serve(async (req) => {
 
       // Send the email
       try {
+        const recoveryUrl = buildRecoveryUrl(data.properties?.action_link);
         await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
           method: "POST",
           headers: {
@@ -264,7 +290,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             to: email,
             subject: "Password Reset — Cabinetry Command",
-            html: `<p>Your administrator has requested a password reset for your account.</p><p><a href="${data.properties?.action_link}">Click here to reset your password</a></p><p>If you didn't expect this, please contact your administrator.</p>`,
+            html: `<p>Your administrator has requested a password reset for your account.</p><p><a href="${recoveryUrl}">Click here to reset your password</a></p><p>If you didn't expect this, please contact your administrator.</p>`,
           }),
         });
       } catch { /* fire-and-forget */ }
@@ -361,6 +387,7 @@ Deno.serve(async (req) => {
 
       // Send invite email
       try {
+        const recoveryUrl = buildRecoveryUrl(linkData.properties?.action_link);
         await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
           method: "POST",
           headers: {
@@ -370,7 +397,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             to: email,
             subject: "You've been invited to Cabinetry Command",
-            html: `<p>Hi ${full_name},</p><p>You've been invited to join <strong>Cabinetry Command</strong> as a team member.</p><p><a href="${linkData.properties?.action_link}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Set Up Your Password</a></p><p>Click the button above to set your password and log in. This link will expire in 24 hours.</p><p>If you didn't expect this invitation, please ignore this email.</p>`,
+            html: `<p>Hi ${full_name},</p><p>You've been invited to join <strong>Cabinetry Command</strong> as a team member.</p><p><a href="${recoveryUrl}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Set Up Your Password</a></p><p>Click the button above to set your password and log in. This link will expire in 24 hours.</p><p>If you didn't expect this invitation, please ignore this email.</p>`,
           }),
         });
       } catch (emailErr) {
