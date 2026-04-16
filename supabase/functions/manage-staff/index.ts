@@ -309,6 +309,76 @@ Deno.serve(async (req) => {
       return json({ success: true });
     }
 
+    // ── INVITE USER (create + send setup email) ──
+    if (req.method === "POST" && action === "invite") {
+      const { email, full_name, role, company_id } = await req.json();
+      if (!email || !full_name || !role) {
+        return json({ error: "Missing required fields" }, 400);
+      }
+
+      // Generate a temporary password — user will reset via the email link
+      const tempPassword = crypto.randomUUID().slice(0, 16) + "Aa1!";
+
+      const { data: userData, error: createError } =
+        await adminClient.auth.admin.createUser({
+          email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { full_name },
+        });
+
+      if (createError) throw createError;
+      const userId = userData.user.id;
+
+      // Update profile
+      await adminClient
+        .from("profiles")
+        .update({ full_name, department: "Office" })
+        .eq("user_id", userId);
+
+      // Set role
+      await adminClient
+        .from("user_roles")
+        .update({ role })
+        .eq("user_id", userId);
+
+      // If company_id provided, add cab_company_membership
+      if (company_id) {
+        await adminClient
+          .from("cab_company_memberships")
+          .insert({ company_id, user_id: userId, role });
+      }
+
+      // Generate password reset link so user can set their own password
+      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: { redirectTo: `${req.headers.get("origin") || "https://www.cabinetrycommand.com"}/login` },
+      });
+
+      if (linkError) throw linkError;
+
+      // Send invite email
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            to: email,
+            subject: "You've been invited to Cabinetry Command",
+            html: `<p>Hi ${full_name},</p><p>You've been invited to join <strong>Cabinetry Command</strong> as a team member.</p><p><a href="${linkData.properties?.action_link}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Set Up Your Password</a></p><p>Click the button above to set your password and log in. This link will expire in 24 hours.</p><p>If you didn't expect this invitation, please ignore this email.</p>`,
+          }),
+        });
+      } catch (emailErr) {
+        console.error("Failed to send invite email:", emailErr);
+      }
+
+      return json({ success: true, user_id: userId });
+    }
+
     // ── LIST ALL USERS (admin) ──
     if (req.method === "GET" && action === "list-users") {
       const { data: profiles } = await adminClient
