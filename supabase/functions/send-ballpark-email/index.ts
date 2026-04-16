@@ -272,24 +272,14 @@ serve(async (req) => {
     const warnings: string[] = [];
 
     if (accessToken && job.drive_folder_id) {
-      // 4a. Concept layout — search in job's Drive folder
-      const jobNumber = job.job_ref?.split("_")[0] || "";
-      const clientName = (customer.first_name + customer.last_name).replace(/\s/g, "").toLowerCase();
-      const conceptPattern = `${jobNumber}_${clientName}_conceptlayout`.toLowerCase();
-      // Also try partial: just "conceptlayout"
-      console.log("[send-ballpark-email] Searching for concept layout pattern:", conceptPattern);
+      // 4a. Concept layout — search for any file containing "concept" in the name
+      console.log("[send-ballpark-email] Searching for concept layout in folder:", job.drive_folder_id);
 
-      // Try multiple naming patterns: "conceptlayout", "concept layout", "concept_layout", "concept-layout"
-      const conceptPatterns = ["conceptlayout", "concept layout", "concept_layout", "concept-layout"];
-      let conceptFile: { id: string; name: string; mimeType: string } | null = null;
-      for (const pat of conceptPatterns) {
-        conceptFile = await searchFileInFolder(accessToken, job.drive_folder_id, pat);
-        if (conceptFile) break;
-      }
+      let conceptFile = await searchFileInFolder(accessToken, job.drive_folder_id, "concept");
       if (conceptFile) {
-        console.log("[send-ballpark-email] Found concept layout:", conceptFile.name);
+        console.log("[send-ballpark-email] Found concept layout:", conceptFile.name, "mimeType:", conceptFile.mimeType);
         try {
-          const bytes = await downloadFileAsBytes(accessToken, conceptFile.id, conceptFile.mimeType);
+          const bytes = await downloadFileAsPdfBytes(accessToken, conceptFile.id, conceptFile.mimeType);
           attachments.push({
             filename: `${job.job_ref}_ConceptLayout.pdf`,
             content: toBase64(bytes),
@@ -299,7 +289,7 @@ serve(async (req) => {
           warnings.push("Concept layout found but download failed: " + e.message);
         }
       } else {
-        console.warn("[send-ballpark-email] Concept layout not found in Drive folder");
+        console.warn("[send-ballpark-email] No file containing 'concept' found in Drive folder");
         warnings.push("Concept layout file not found in job Drive folder");
       }
 
