@@ -367,6 +367,7 @@ serve(async (req) => {
     const emailPayload: Record<string, unknown> = {
       from: "Enclave Cabinetry <noreply@enclavecabinetry.com>",
       to: [customer.email],
+      cc: ["info@enclavecabinetry.com"],
       subject: `Your Enclave Cabinetry Estimate — ${job.job_ref}`,
       html,
     };
