@@ -80,6 +80,7 @@ export default function JobDetailPage() {
   const [icCompleting, setIcCompleting] = useState(false);
   const [scheduledTasks, setScheduledTasks] = useState<any[]>([]);
   const [reviewSending, setReviewSending] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     const cid = await getCabCompanyId();
