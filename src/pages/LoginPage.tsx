@@ -36,8 +36,18 @@ export default function LoginPage() {
 
   useEffect(() => {
     const handleAuthLink = async () => {
-      // Handle PKCE code exchange (Supabase redirects with ?code=...&type=...)
+      // Handle error params from Supabase redirect
       const urlParams = new URLSearchParams(window.location.search);
+      const errorParam = urlParams.get("error_description") || urlParams.get("error");
+      if (errorParam) {
+        setError(errorParam.includes("expired") 
+          ? "This password setup link has expired. Please ask your administrator to resend it."
+          : errorParam);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      // Handle PKCE code exchange (Supabase redirects with ?code=...&type=...)
       const code = urlParams.get("code");
       if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
