@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
       const { data, error } = await adminClient.auth.admin.generateLink({
         type: "recovery",
         email,
-        options: { redirectTo: `${req.headers.get("origin") || "https://www.cabinetrycommand.com"}/login` },
+        options: { redirectTo: `${SITE_URL}/login` },
       });
 
       if (error) throw error;
@@ -354,7 +354,7 @@ Deno.serve(async (req) => {
       const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
         type: "recovery",
         email,
-        options: { redirectTo: `${req.headers.get("origin") || "https://www.cabinetrycommand.com"}/login` },
+        options: { redirectTo: `${SITE_URL}/login` },
       });
 
       if (linkError) throw linkError;
