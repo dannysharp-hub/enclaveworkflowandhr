@@ -136,6 +136,12 @@ export default function ProductionBoardPage() {
     if (newIdx < 0 || newIdx >= PRODUCTION_COLUMNS.length) return;
     const toKey = PRODUCTION_COLUMNS[newIdx].key;
 
+    // Gate: dry fit must be completed before QC
+    if (toKey === "qc_check" && !job.dry_fit_completed) {
+      toast({ title: "Dry fit required", description: "Dry fit must be completed before moving to QC", variant: "destructive" });
+      return;
+    }
+
     if (toKey === "ready_for_install") {
       setConfirmMove({ job, toKey });
       return;
