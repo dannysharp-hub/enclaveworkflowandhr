@@ -187,6 +187,54 @@ export default function QuoteBuilder({ companyId, job, onRefresh }: QuoteBuilder
     }
     setSending(true);
     try {
+      // Office role: submit for approval instead of sending directly
+      if (requiresApproval) {
+        // Save draft first
+        await (supabase.from("cab_quotes") as any)
+          .update({
+            price_min: calculatedTotal,
+            price_max: effectiveMax,
+            scope_markdown: scope,
+            scope_summary: scope.slice(0, 500),
+            terms_markdown: terms,
+          })
+          .eq("id", quote.id);
+
+        // Save items
+        await (supabase.from("cab_quote_items") as any).delete().eq("quote_id", quote.id);
+        const savedItems = items.map((item, idx) => ({
+          company_id: companyId,
+          quote_id: quote.id,
+          name: item.name,
+          description: item.description || null,
+          qty: item.qty,
+          unit_price: item.unit_price,
+          sort_order: idx,
+        }));
+        if (savedItems.length > 0) {
+          await (supabase.from("cab_quote_items") as any).insert(savedItems);
+        }
+
+        await createApprovalRequest({
+          companyId,
+          actionType: "quote_send",
+          targetId: job.id,
+          targetRef: job.job_ref,
+          summary: `Send quote v${quote.version} for ${job.job_ref} (£${effectiveMax.toLocaleString()})`,
+          payload: {
+            quote_id: quote.id,
+            price_min: calculatedTotal,
+            price_max: effectiveMax,
+            scope_markdown: scope,
+            scope_summary: scope.slice(0, 500),
+            terms_markdown: terms,
+            items: savedItems,
+          },
+        });
+        setSending(false);
+        return;
+      }
+
       // Save first
       await (supabase.from("cab_quotes") as any)
         .update({
