@@ -298,10 +298,46 @@ export default function ApprovalsPage() {
           status: "pending",
         });
 
-        // Send the automated ballpark email
-        supabase.functions.invoke("send-ballpark-email", {
-          body: { job_id: req.target_id, company_id: payload.company_id || req.company_id },
-        }).catch((e: any) => console.warn("[approval] ballpark email failed:", e));
+        // Send the automated ballpark email and capture result
+        try {
+          const { data: emailResult, error: emailErr } = await supabase.functions.invoke("send-ballpark-email", {
+            body: { job_id: req.target_id, company_id: payload.company_id || req.company_id },
+          });
+
+          const attachments = emailResult?.attachments_sent || [];
+          const customerEmail = emailResult?.customer_email || "customer";
+          const hasConceptLayout = attachments.some((a: string) => a.toLowerCase().includes("concept"));
+
+          // Log email delivery event
+          await (supabase.from("cab_events") as any).insert({
+            company_id: payload.company_id || req.company_id,
+            event_type: "ballpark.email_sent",
+            job_id: req.target_id,
+            payload_json: {
+              sent_to: customerEmail,
+              sent_at: new Date().toISOString(),
+              attachments,
+              concept_layout_found: hasConceptLayout,
+              approved_by: user?.id,
+            },
+            status: "processed",
+          });
+
+          if (emailErr) {
+            toast({ title: "Ballpark approved but email failed", description: emailErr.message, variant: "destructive" });
+          } else {
+            const attachmentNote = hasConceptLayout
+              ? `${attachments.length} attachment(s)`
+              : "Our Process only — concept layout not found";
+            toast({
+              title: "Ballpark email sent",
+              description: `Sent to ${customerEmail} with ${attachmentNote}`,
+            });
+          }
+        } catch (e: any) {
+          console.warn("[approval] ballpark email failed:", e);
+          toast({ title: "Ballpark approved but email failed", description: e.message, variant: "destructive" });
+        }
 
         break;
       }
