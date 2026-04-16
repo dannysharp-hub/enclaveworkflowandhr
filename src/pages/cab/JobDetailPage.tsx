@@ -263,7 +263,27 @@ export default function JobDetailPage() {
           customer_message: ballparkCustomerMsg || null,
         },
       });
-      toast({ title: "Ballpark sent to customer", description: "Job moved to awaiting_appointment_request" });
+
+      // Send automated ballpark email to customer
+      try {
+        const { data: emailResult, error: emailErr } = await supabase.functions.invoke("send-ballpark-email", {
+          body: { job_id: job.id, company_id: companyId },
+        });
+        if (emailErr) {
+          console.error("[ballpark-email] Failed:", emailErr);
+          toast({ title: "Ballpark saved but email failed", description: emailErr.message, variant: "destructive" });
+        } else {
+          const warningCount = emailResult?.warnings?.length || 0;
+          const attachCount = emailResult?.attachments_sent?.length || 0;
+          toast({
+            title: "Ballpark sent to customer",
+            description: `Email sent with ${attachCount} attachment(s)${warningCount > 0 ? ` (${warningCount} warning${warningCount > 1 ? "s" : ""})` : ""}`,
+          });
+        }
+      } catch (emailCatchErr: any) {
+        console.error("[ballpark-email] Catch:", emailCatchErr);
+        toast({ title: "Ballpark saved but email failed", description: emailCatchErr.message, variant: "destructive" });
+      }
       load();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
