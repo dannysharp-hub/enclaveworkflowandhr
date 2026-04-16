@@ -245,7 +245,13 @@ serve(async (req) => {
       // Also try partial: just "conceptlayout"
       console.log("[send-ballpark-email] Searching for concept layout pattern:", conceptPattern);
 
-      let conceptFile = await searchFileInFolder(accessToken, job.drive_folder_id, "conceptlayout");
+      // Try multiple naming patterns: "conceptlayout", "concept layout", "concept_layout", "concept-layout"
+      const conceptPatterns = ["conceptlayout", "concept layout", "concept_layout", "concept-layout"];
+      let conceptFile: { id: string; name: string; mimeType: string } | null = null;
+      for (const pat of conceptPatterns) {
+        conceptFile = await searchFileInFolder(accessToken, job.drive_folder_id, pat);
+        if (conceptFile) break;
+      }
       if (conceptFile) {
         console.log("[send-ballpark-email] Found concept layout:", conceptFile.name);
         try {
