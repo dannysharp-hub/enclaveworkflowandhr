@@ -366,6 +366,14 @@ export default function TeamPage() {
         </h2>
         <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
           <Input
+            type="text"
+            placeholder="Full name"
+            value={invName}
+            onChange={e => setInvName(e.target.value)}
+            required
+            className="flex-1"
+          />
+          <Input
             type="email"
             placeholder="email@company.com"
             value={invEmail}
