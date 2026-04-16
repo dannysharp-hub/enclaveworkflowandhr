@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
 
     // ── CREATE USER ──
     if (req.method === "POST" && action === "create") {
-      const { email, password, full_name, role, department } = await req.json();
+      const { email, password, full_name, role, department, company_id } = await req.json();
       if (!email || !password || !full_name || !role) {
         return json({ error: "Missing required fields" }, 400);
       }
@@ -212,6 +212,14 @@ Deno.serve(async (req) => {
         .from("user_roles")
         .update({ role })
         .eq("user_id", userId);
+
+      if (company_id) {
+        const { error: membershipError } = await adminClient
+          .from("cab_company_memberships")
+          .insert({ company_id, user_id: userId, role });
+
+        if (membershipError) throw membershipError;
+      }
 
       return json({ success: true, user_id: userId });
     }
