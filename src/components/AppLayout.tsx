@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, Link } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useTenantBranding } from "@/hooks/useTenantBranding";
@@ -18,6 +18,7 @@ import ClockAnomalyPrompt from "@/components/ClockAnomalyPrompt";
 import RoleSwitcher from "@/components/RoleSwitcher";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { canRoleAccessRoute } from "@/lib/roleVisibility";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
 // ── Types ──
 
@@ -48,7 +49,7 @@ const cabAdminItems: NavItem[] = [
   { to: "/admin/production", label: "Production Board", icon: Factory },
   { to: "/admin/suppliers", label: "Suppliers", icon: Truck },
   { to: "/admin/ghl", label: "GHL Settings", icon: Settings },
-  { to: "/admin/team", label: "Team & Invites", icon: Users },
+  { to: "/admin/team", label: "User Management", icon: UserCog },
   { to: "/admin/activity-log", label: "Activity Log", icon: Activity },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -74,6 +75,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { flags } = useFeatureFlags();
   const { branding } = useTenantBranding();
   const isMobile = useIsMobile();
+  useInactivityTimeout();
 
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map((n: string) => n[0]).join("")
