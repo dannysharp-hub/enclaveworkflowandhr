@@ -36,6 +36,42 @@ export default function LoginPage() {
 
   useEffect(() => {
     const handleAuthLink = async () => {
+      // Handle error params from Supabase redirect
+      const urlParams = new URLSearchParams(window.location.search);
+      const errorParam = urlParams.get("error_description") || urlParams.get("error");
+      if (errorParam) {
+        setError(errorParam.includes("expired") 
+          ? "This password setup link has expired. Please ask your administrator to resend it."
+          : errorParam);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      // Handle PKCE code exchange (Supabase redirects with ?code=...&type=...)
+      const code = urlParams.get("code");
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          setError("This password setup link is invalid or has expired. Please ask your administrator to resend it.");
+          // Clean up query params
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+        // Check if this was a recovery/invite flow
+        const type = urlParams.get("type");
+        if (type && PASSWORD_SETUP_TYPES.has(type)) {
+          setShowReset(true);
+          setShowForgot(false);
+          setError("");
+        } else {
+          // Normal sign-in via code, redirect to app
+          navigate("/");
+          return;
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
       const hashParams = getHashParams();
       const linkType = hashParams.get("type");
       const errorCode = hashParams.get("error_code");
