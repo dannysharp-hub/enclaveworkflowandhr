@@ -385,7 +385,7 @@ Deno.serve(async (req) => {
       const hasDriveScope = grantedScopes.some((s: string) => s.includes("drive"));
 
       if (!hasDriveScope) {
-        // Need incremental consent — return an auth URL with drive.readonly scope
+        // Need incremental consent — return an auth URL with drive scope
         const redirectUri = body.redirect_uri as string;
         if (!redirectUri) {
           return new Response(JSON.stringify({ error: "redirect_uri required for Drive consent" }), {
@@ -395,6 +395,9 @@ Deno.serve(async (req) => {
         const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
         const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
         const state = btoa(JSON.stringify({ tenant_id: tenantId, flow: "drive_setup" }));
+        console.log("[DriveAuth] OAuth setup - client_id:", GOOGLE_CLIENT_ID);
+        console.log("[DriveAuth] OAuth setup - redirect_uri:", redirectUri);
+        console.log("[DriveAuth] OAuth setup - scope:", DRIVE_SCOPE);
         const params = new URLSearchParams({
           client_id: GOOGLE_CLIENT_ID,
           redirect_uri: redirectUri,
@@ -406,6 +409,7 @@ Deno.serve(async (req) => {
           state,
         });
         const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+        console.log("[DriveAuth] OAuth setup - full URL:", url);
         return new Response(JSON.stringify({ needs_consent: true, url }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
