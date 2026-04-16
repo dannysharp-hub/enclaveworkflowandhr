@@ -43,6 +43,7 @@ export default function TeamPage() {
 
   // Invite form
   const [invEmail, setInvEmail] = useState("");
+  const [invName, setInvName] = useState("");
   const [invRole, setInvRole] = useState("office");
   const [creating, setCreating] = useState(false);
 
