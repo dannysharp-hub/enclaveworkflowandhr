@@ -361,8 +361,11 @@ export default function TeamPage() {
             <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="staff">Staff</SelectItem>
+              <SelectItem value="office">Office</SelectItem>
+              <SelectItem value="supervisor">Supervisor</SelectItem>
+              <SelectItem value="production">Production</SelectItem>
               <SelectItem value="installer">Installer</SelectItem>
+              <SelectItem value="finance">Finance</SelectItem>
             </SelectContent>
           </Select>
           <Button type="submit" disabled={creating} size="sm">Send Invite</Button>
