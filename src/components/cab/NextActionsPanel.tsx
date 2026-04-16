@@ -32,6 +32,7 @@ export default function NextActionsPanel({
   job, companyId, stageKey, onRefresh, onRequestAppointment, onMarkInstallComplete, emitting,
 }: NextActionsPanelProps) {
   const navigate = useNavigate();
+  const { requiresApproval, createApprovalRequest } = useApprovalGate();
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositSaving, setDepositSaving] = useState(false);
