@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.generate-job-card-pdf]
 verify_jwt = false
+
+[functions.send-ballpark-email]
+verify_jwt = false
