@@ -1379,6 +1379,17 @@ export default function JobDetailPage() {
                       <Button
                         size="sm"
                         onClick={async () => {
+                          if (requiresApproval && companyId) {
+                            await createApprovalRequest({
+                              companyId,
+                              actionType: "design_signoff_send",
+                              targetId: job.id,
+                              targetRef: job.job_ref,
+                              summary: `Mark design sign-off on ${job.job_ref}`,
+                              payload: { company_id: companyId },
+                            });
+                            return;
+                          }
                           const now = new Date().toISOString();
                           await updateJob({
                             customer_signoff_at: now,
@@ -1391,7 +1402,6 @@ export default function JobDetailPage() {
                             payload: { signed_at: now },
                           });
                           toast({ title: "Design sign-off recorded" });
-                          // Fire-and-forget: generate sign-off document from template
                           fireDocumentGeneration(job.id, "sign_off");
                           load();
                         }}
@@ -1535,10 +1545,21 @@ export default function JobDetailPage() {
             const handleSendProgressInvoice = async () => {
               setDfSending(true);
               try {
+                if (requiresApproval && companyId) {
+                  await createApprovalRequest({
+                    companyId,
+                    actionType: "invoice_send",
+                    targetId: job.id,
+                    targetRef: job.job_ref,
+                    summary: `Send progress invoice for ${job.job_ref}`,
+                    payload: { company_id: companyId, template_type: "invoice_progress", event_type: "invoice.progress_requested" },
+                  });
+                  setDfSending(false);
+                  return;
+                }
                 if (companyId) {
                   await insertCabEvent({ companyId, eventType: "invoice.progress_requested", jobId: job.id, payload: {} });
                 }
-                // Fire-and-forget: generate progress invoice from template
                 fireDocumentGeneration(job.id, "invoice_progress");
                 toast({ title: "Progress invoice requested" });
                 load();
