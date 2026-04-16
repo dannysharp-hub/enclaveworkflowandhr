@@ -140,16 +140,50 @@ async function findFileInPath(
   return null;
 }
 
-async function downloadFileAsBytes(accessToken: string, fileId: string, mimeType: string): Promise<Uint8Array> {
-  let url: string;
+// Mime types that need copy-to-Google-Docs-then-export-as-PDF
+const OFFICE_DOC_MIMES = [
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/msword", // .doc
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+];
+
+async function downloadFileAsPdfBytes(accessToken: string, fileId: string, mimeType: string): Promise<Uint8Array> {
   if (mimeType.startsWith("application/vnd.google-apps.")) {
-    // Google native file — export as PDF
-    url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf&alt=media`;
-  } else {
-    url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
+    // Google-native file — export directly as PDF
+    const url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw new Error(`Export failed for ${fileId}: ${res.status}`);
+    return new Uint8Array(await res.arrayBuffer());
   }
+
+  if (OFFICE_DOC_MIMES.includes(mimeType)) {
+    // Office file — copy as Google Doc, export as PDF, delete the copy
+    const copyRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/copy?supportsAllDrives=true`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ mimeType: "application/vnd.google-apps.document", name: "_tmp_pdf_export" }),
+    });
+    if (!copyRes.ok) throw new Error(`Copy-to-Docs failed for ${fileId}: ${copyRes.status}`);
+    const copy = await copyRes.json();
+
+    try {
+      const exportUrl = `https://www.googleapis.com/drive/v3/files/${copy.id}/export?mimeType=application/pdf`;
+      const pdfRes = await fetch(exportUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!pdfRes.ok) throw new Error(`PDF export failed for copy ${copy.id}: ${pdfRes.status}`);
+      return new Uint8Array(await pdfRes.arrayBuffer());
+    } finally {
+      // Clean up temp copy (fire-and-forget)
+      fetch(`https://www.googleapis.com/drive/v3/files/${copy.id}?supportsAllDrives=true`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => {});
+    }
+  }
+
+  // Already a binary file (PDF, image, etc.) — download directly
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) throw new Error(`Failed to download file ${fileId}: ${res.status}`);
+  if (!res.ok) throw new Error(`Download failed for ${fileId}: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
 
