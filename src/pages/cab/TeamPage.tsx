@@ -43,6 +43,7 @@ export default function TeamPage() {
 
   // Invite form
   const [invEmail, setInvEmail] = useState("");
+  const [invName, setInvName] = useState("");
   const [invRole, setInvRole] = useState("office");
   const [creating, setCreating] = useState(false);
 
@@ -177,14 +178,29 @@ export default function TeamPage() {
     if (!companyId || !invEmail.trim()) return;
     setCreating(true);
     try {
-      const { error } = await (supabase.from("cab_company_invites") as any).insert({
+      // Also insert into cab_company_invites for record keeping
+      await (supabase.from("cab_company_invites") as any).insert({
         company_id: companyId,
         email: invEmail.trim().toLowerCase(),
         role: invRole,
       });
-      if (error) throw error;
-      toast({ title: "Invite created", description: `Invite sent to ${invEmail}` });
+
+      const res = await supabase.functions.invoke("manage-staff?action=invite", {
+        body: {
+          email: invEmail.trim().toLowerCase(),
+          full_name: invName.trim(),
+          role: invRole,
+          company_id: companyId,
+        },
+      });
+
+      if (res.error) throw new Error(res.error.message);
+      if (res.data?.error) throw new Error(res.data.error);
+
+      toast({ title: "Invite sent", description: `Setup email sent to ${invEmail}` });
+      logActivity({ action: "user_invited", resourceType: "user", resourceName: invName.trim() });
       setInvEmail("");
+      setInvName("");
       load();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -349,6 +365,14 @@ export default function TeamPage() {
           <UserPlus size={16} className="text-primary" /> Invite Team Member
         </h2>
         <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
+          <Input
+            type="text"
+            placeholder="Full name"
+            value={invName}
+            onChange={e => setInvName(e.target.value)}
+            required
+            className="flex-1"
+          />
           <Input
             type="email"
             placeholder="email@company.com"
