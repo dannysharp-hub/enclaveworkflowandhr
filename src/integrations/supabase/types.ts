@@ -1547,6 +1547,7 @@ export type Database = {
           budget_overheads: number | null
           budget_subcontract: number | null
           company_id: string
+          completion_certificate_url: string | null
           contract_currency: string | null
           contract_value: number | null
           created_at: string
@@ -1566,7 +1567,11 @@ export type Database = {
           final_payment_amount: number | null
           final_payment_paid_at: string | null
           final_signoff_url: string | null
+          fitter_checklist_json: Json | null
           fitter_notes: string | null
+          fitter_signature_url: string | null
+          fitter_signed_at: string | null
+          fitter_signed_by: string | null
           forecast_cost_total: number | null
           forecast_margin_pct: number | null
           ghl_contact_id: string | null
@@ -1625,6 +1630,7 @@ export type Database = {
           budget_overheads?: number | null
           budget_subcontract?: number | null
           company_id: string
+          completion_certificate_url?: string | null
           contract_currency?: string | null
           contract_value?: number | null
           created_at?: string
@@ -1644,7 +1650,11 @@ export type Database = {
           final_payment_amount?: number | null
           final_payment_paid_at?: string | null
           final_signoff_url?: string | null
+          fitter_checklist_json?: Json | null
           fitter_notes?: string | null
+          fitter_signature_url?: string | null
+          fitter_signed_at?: string | null
+          fitter_signed_by?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
@@ -1703,6 +1713,7 @@ export type Database = {
           budget_overheads?: number | null
           budget_subcontract?: number | null
           company_id?: string
+          completion_certificate_url?: string | null
           contract_currency?: string | null
           contract_value?: number | null
           created_at?: string
@@ -1722,7 +1733,11 @@ export type Database = {
           final_payment_amount?: number | null
           final_payment_paid_at?: string | null
           final_signoff_url?: string | null
+          fitter_checklist_json?: Json | null
           fitter_notes?: string | null
+          fitter_signature_url?: string | null
+          fitter_signed_at?: string | null
+          fitter_signed_by?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
