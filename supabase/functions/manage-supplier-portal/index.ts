@@ -80,7 +80,11 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: suErr.message }), { status: 400, headers: corsHeaders });
       }
 
-      await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email });
+      await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: { redirectTo: 'https://www.cabinetrycommand.com/login' },
+      });
 
       return new Response(JSON.stringify({
         success: true,

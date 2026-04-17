@@ -7,26 +7,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-function buildRecoveryUrl(link: string | undefined) {
-  if (!link) return `${SITE_URL}/login`;
-
+function extractInviteUrl(rawLink: string | undefined, type: string = "recovery") {
+  if (!rawLink) return `${SITE_URL}/login`;
   try {
-    const parsed = new URL(link);
-    const accessToken = parsed.searchParams.get("access_token");
-    const refreshToken = parsed.searchParams.get("refresh_token");
-    const type = parsed.searchParams.get("type") ?? "recovery";
-
-    if (!accessToken || !refreshToken) {
-      return `${SITE_URL}/login`;
-    }
-
-    const hashParams = new URLSearchParams({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      type,
-    });
-
-    return `${SITE_URL}/login#${hashParams.toString()}`;
+    const parsed = new URL(rawLink);
+    const token = parsed.searchParams.get("token") ?? parsed.searchParams.get("token_hash");
+    const linkType = parsed.searchParams.get("type") ?? type;
+    if (!token) return `${SITE_URL}/login`;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const redirectTo = encodeURIComponent(`${SITE_URL}/login`);
+    return `${supabaseUrl}/auth/v1/verify?token=${token}&type=${linkType}&redirect_to=${redirectTo}`;
   } catch {
     return `${SITE_URL}/login`;
   }
@@ -431,7 +421,7 @@ Deno.serve(async (req) => {
 
       // Send the email
       try {
-        const recoveryUrl = buildRecoveryUrl(data.properties?.action_link);
+        const recoveryUrl = extractInviteUrl(data.properties?.action_link, "recovery");
         await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
           method: "POST",
           headers: {
@@ -583,7 +573,7 @@ Deno.serve(async (req) => {
 
       // Send invite email
       try {
-        const recoveryUrl = buildRecoveryUrl(linkData.properties?.action_link);
+        const recoveryUrl = extractInviteUrl(linkData.properties?.action_link, "recovery");
         await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
           method: "POST",
           headers: {
