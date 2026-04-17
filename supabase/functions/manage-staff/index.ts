@@ -39,6 +39,27 @@ function json(data: unknown, status = 200) {
   });
 }
 
+async function findAuthUserByEmail(adminClient: ReturnType<typeof createClient>, email: string) {
+  const target = email.toLowerCase();
+  let page = 1;
+
+  while (page <= 10) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) {
+      console.error("[auth-user-lookup] listUsers failed:", error);
+      return null;
+    }
+
+    const user = (data.users ?? []).find((candidate) => (candidate.email || "").toLowerCase() === target);
+    if (user) return user;
+
+    if (!data.users || data.users.length < 200) break;
+    page += 1;
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
