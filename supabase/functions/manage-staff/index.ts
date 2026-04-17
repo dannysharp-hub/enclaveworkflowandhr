@@ -193,6 +193,10 @@ Deno.serve(async (req) => {
       if (!email || !password || !full_name || !role) {
         return json({ error: "Missing required fields" }, 400);
       }
+      // Only the super admin can mint new admins
+      if (role === "admin" && !isSuperAdmin) {
+        return json({ error: "Only the super admin can create admin accounts" }, 403);
+      }
 
       const { data: userData, error: createError } =
         await adminClient.auth.admin.createUser({
@@ -298,6 +302,9 @@ Deno.serve(async (req) => {
 
     // ── UPDATE ROLE ──
     if (req.method === "POST" && action === "update-role") {
+      if (!isSuperAdmin) {
+        return json({ error: "Only the super admin can change user roles" }, 403);
+      }
       const { user_id, role } = await req.json();
       if (!user_id || !role) return json({ error: "Missing required fields" }, 400);
 
