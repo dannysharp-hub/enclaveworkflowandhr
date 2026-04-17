@@ -9,6 +9,8 @@ interface AuthContextType {
   userRole: string | null;
   /** The real DB role (unaffected by override) */
   realRole: string | null;
+  /** True if the user holds the super_admin role */
+  isSuperAdmin: boolean;
   /** Currently active override, or null */
   roleOverride: string | null;
   setRoleOverride: (role: string | null) => void;
@@ -24,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   userRole: null,
   realRole: null,
+  isSuperAdmin: false,
   roleOverride: null,
   setRoleOverride: () => {},
   profile: null,
@@ -39,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbRole, setDbRole] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [roleOverride, setRoleOverride] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -48,12 +52,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userRole = roleOverride ?? dbRole;
 
   const fetchUserData = async (userId: string) => {
-    const [{ data: roleData }, { data: profileData }, { data: membershipData }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", userId).limit(1).single(),
+    const [{ data: rolesData }, { data: profileData }, { data: membershipData }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", userId),
       supabase.from("profiles").select("*").eq("user_id", userId).single(),
       supabase.from("cab_company_memberships").select("company_id").eq("user_id", userId).limit(1).single(),
     ]);
-    setDbRole(roleData?.role ?? null);
+    const roles = (rolesData ?? []).map(r => r.role);
+    // Pick the highest-privilege role for display (super_admin > admin > anything else)
+    const primaryRole = roles.includes("super_admin")
+      ? "admin" // super_admin acts as admin in the UI; it's a write-permission flag, not a display role
+      : roles.includes("admin")
+        ? "admin"
+        : roles[0] ?? null;
+    setDbRole(primaryRole);
+    setIsSuperAdmin(roles.includes("super_admin"));
     setProfile(profileData ?? null);
     setTenantId(profileData?.tenant_id ?? null);
     setCabCompanyId(membershipData?.company_id ?? null);
@@ -73,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           import("@/lib/activityLogger").then(m => { m.clearActivityCache(); });
         }
         setDbRole(null);
+        setIsSuperAdmin(false);
         setRoleOverride(null);
         setProfile(null);
         setTenantId(null);
@@ -99,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, realRole: dbRole, roleOverride, setRoleOverride, profile, tenantId, cabCompanyId, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, realRole: dbRole, isSuperAdmin, roleOverride, setRoleOverride, profile, tenantId, cabCompanyId, signOut }}>
       {children}
     </AuthContext.Provider>
   );

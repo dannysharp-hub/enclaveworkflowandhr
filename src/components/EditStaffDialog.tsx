@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export default function EditStaffDialog({ open, onOpenChange, staff, onSuccess }: Props) {
+  const { isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     full_name: staff?.full_name ?? "",
@@ -129,11 +131,13 @@ export default function EditStaffDialog({ open, onOpenChange, staff, onSuccess }
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>ROLE</label>
+              <label className={labelClass}>ROLE {!isSuperAdmin && <span className="text-muted-foreground/60">(locked)</span>}</label>
               <select
                 value={form.role}
                 onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 className={selectClass}
+                disabled={!isSuperAdmin}
+                title={!isSuperAdmin ? "Only the super admin can change roles" : undefined}
               >
                 {ROLES.map(r => (
                   <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
