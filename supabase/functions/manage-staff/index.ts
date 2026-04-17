@@ -59,9 +59,6 @@ Deno.serve(async (req) => {
         { auth: { autoRefreshToken: false, persistSession: false } }
       );
 
-      // Find user by email
-      const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1 });
-      // listUsers doesn't filter by email, so use a different approach
       const { data: profile } = await adminClient
         .from("profiles")
         .select("user_id, locked, failed_login_attempts")
@@ -70,7 +67,25 @@ Deno.serve(async (req) => {
         .single();
 
       if (!profile) return json({ locked: false });
-      return json({ locked: !!profile.locked, failed_login_attempts: profile.failed_login_attempts || 0 });
+
+      let authLocked = false;
+      try {
+        const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(profile.user_id);
+        if (userError) {
+          console.error("[check-login] getUserById failed:", userError);
+        } else {
+          const bannedUntil = userData.user?.banned_until;
+          authLocked = !!(bannedUntil && new Date(bannedUntil).getTime() > Date.now());
+        }
+      } catch (err) {
+        console.error("[check-login] auth lookup threw:", err);
+      }
+
+      return json({
+        locked: !!profile.locked || authLocked,
+        failed_login_attempts: profile.failed_login_attempts || 0,
+        auth_locked: authLocked,
+      });
     }
 
     // ── Public action: record-failed-login ──
