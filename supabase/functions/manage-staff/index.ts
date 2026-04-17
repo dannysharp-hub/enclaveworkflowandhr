@@ -444,12 +444,19 @@ Deno.serve(async (req) => {
     // Locks the auth user (banned_until = far future) AND revokes all active sessions
     // so the user is kicked out immediately, not just blocked from logging in again.
     if (req.method === "POST" && action === "lock") {
-      const { user_id } = await req.json();
-      if (!user_id) return json({ error: "Missing user_id" }, 400);
+      const { user_id, email } = await req.json();
+      if (!user_id && !email) return json({ error: "Missing user_id or email" }, 400);
 
-      // 1. Ban the auth user — this stops Supabase auth from accepting their JWT
-      //    and prevents new logins. "876000h" ≈ 100 years.
-      const { error: banError } = await adminClient.auth.admin.updateUserById(user_id, {
+      const authUser = email
+        ? await findAuthUserByEmail(adminClient, String(email).toLowerCase())
+        : null;
+      const targetUserId = authUser?.id ?? user_id;
+
+      if (!targetUserId) {
+        return json({ error: "User not found" }, 404);
+      }
+
+      const { error: banError } = await adminClient.auth.admin.updateUserById(targetUserId, {
         ban_duration: "876000h",
       });
       if (banError) {
@@ -457,28 +464,34 @@ Deno.serve(async (req) => {
         return json({ error: `Failed to ban user: ${banError.message}` }, 500);
       }
 
-      // 2. Revoke ALL active sessions for this user — kicks them out right now
-      const { error: signOutError } = await adminClient.auth.admin.signOut(user_id, "global");
+      const { error: signOutError } = await adminClient.auth.admin.signOut(targetUserId, "global");
       if (signOutError) {
         console.error("[lock] global signOut failed (non-fatal):", signOutError);
       }
 
-      // 3. Mirror state on profiles so the UI badge + LoginPage check work
       await adminClient.from("profiles").update({
         locked: true,
         locked_at: new Date().toISOString(),
-      }).eq("user_id", user_id);
+      }).or(`user_id.eq.${targetUserId}${email ? `,email.eq.${String(email).toLowerCase()}` : ""}`);
 
-      return json({ success: true });
+      return json({ success: true, user_id: targetUserId });
     }
 
     // ── UNLOCK ACCOUNT ──
     if (req.method === "POST" && action === "unlock") {
-      const { user_id } = await req.json();
-      if (!user_id) return json({ error: "Missing user_id" }, 400);
+      const { user_id, email } = await req.json();
+      if (!user_id && !email) return json({ error: "Missing user_id or email" }, 400);
 
-      // 1. Lift the auth ban
-      const { error: unbanError } = await adminClient.auth.admin.updateUserById(user_id, {
+      const authUser = email
+        ? await findAuthUserByEmail(adminClient, String(email).toLowerCase())
+        : null;
+      const targetUserId = authUser?.id ?? user_id;
+
+      if (!targetUserId) {
+        return json({ error: "User not found" }, 404);
+      }
+
+      const { error: unbanError } = await adminClient.auth.admin.updateUserById(targetUserId, {
         ban_duration: "none",
       });
       if (unbanError) {
@@ -486,14 +499,13 @@ Deno.serve(async (req) => {
         return json({ error: `Failed to unban user: ${unbanError.message}` }, 500);
       }
 
-      // 2. Clear profile flags
       await adminClient.from("profiles").update({
         locked: false,
         locked_at: null,
         failed_login_attempts: 0,
-      }).eq("user_id", user_id);
+      }).or(`user_id.eq.${targetUserId}${email ? `,email.eq.${String(email).toLowerCase()}` : ""}`);
 
-      return json({ success: true });
+      return json({ success: true, user_id: targetUserId });
     }
 
     // ── DELETE USER ──
