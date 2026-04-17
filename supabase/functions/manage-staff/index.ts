@@ -386,10 +386,29 @@ Deno.serve(async (req) => {
     }
 
     // ── LOCK ACCOUNT ──
+    // Locks the auth user (banned_until = far future) AND revokes all active sessions
+    // so the user is kicked out immediately, not just blocked from logging in again.
     if (req.method === "POST" && action === "lock") {
       const { user_id } = await req.json();
       if (!user_id) return json({ error: "Missing user_id" }, 400);
 
+      // 1. Ban the auth user — this stops Supabase auth from accepting their JWT
+      //    and prevents new logins. "876000h" ≈ 100 years.
+      const { error: banError } = await adminClient.auth.admin.updateUserById(user_id, {
+        ban_duration: "876000h",
+      });
+      if (banError) {
+        console.error("[lock] auth ban failed:", banError);
+        return json({ error: `Failed to ban user: ${banError.message}` }, 500);
+      }
+
+      // 2. Revoke ALL active sessions for this user — kicks them out right now
+      const { error: signOutError } = await adminClient.auth.admin.signOut(user_id, "global");
+      if (signOutError) {
+        console.error("[lock] global signOut failed (non-fatal):", signOutError);
+      }
+
+      // 3. Mirror state on profiles so the UI badge + LoginPage check work
       await adminClient.from("profiles").update({
         locked: true,
         locked_at: new Date().toISOString(),
@@ -403,6 +422,16 @@ Deno.serve(async (req) => {
       const { user_id } = await req.json();
       if (!user_id) return json({ error: "Missing user_id" }, 400);
 
+      // 1. Lift the auth ban
+      const { error: unbanError } = await adminClient.auth.admin.updateUserById(user_id, {
+        ban_duration: "none",
+      });
+      if (unbanError) {
+        console.error("[unlock] auth unban failed:", unbanError);
+        return json({ error: `Failed to unban user: ${unbanError.message}` }, 500);
+      }
+
+      // 2. Clear profile flags
       await adminClient.from("profiles").update({
         locked: false,
         locked_at: null,
