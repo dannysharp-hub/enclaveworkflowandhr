@@ -10497,6 +10497,7 @@ export type Database = {
         | "production"
         | "installer"
         | "finance"
+        | "super_admin"
       buylist_category:
         | "panels"
         | "hardware"
@@ -10654,6 +10655,7 @@ export const Constants = {
         "production",
         "installer",
         "finance",
+        "super_admin",
       ],
       buylist_category: [
         "panels",
