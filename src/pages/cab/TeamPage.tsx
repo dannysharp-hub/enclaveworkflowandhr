@@ -124,12 +124,13 @@ export default function TeamPage() {
     setActionLoading(true);
     try {
       const { type, userId, name } = confirmAction;
+      const targetUser = users.find((u) => u.user_id === userId);
       if (type === "lock") {
-        await callManageStaff("lock", { user_id: userId });
+        await callManageStaff("lock", { user_id: userId, email: targetUser?.email });
         toast({ title: "Account locked", description: `${name} has been locked` });
         logActivity({ action: "account_locked", resourceType: "user", resourceId: userId, resourceName: name });
       } else if (type === "unlock") {
-        await callManageStaff("unlock", { user_id: userId });
+        await callManageStaff("unlock", { user_id: userId, email: targetUser?.email });
         toast({ title: "Account unlocked", description: `${name} has been unlocked` });
         logActivity({ action: "account_unlocked", resourceType: "user", resourceId: userId, resourceName: name });
       } else if (type === "delete") {
@@ -137,9 +138,8 @@ export default function TeamPage() {
         toast({ title: "User deleted", description: `${name} has been removed` });
         logActivity({ action: "user_deleted", resourceType: "user", resourceId: userId, resourceName: name });
       } else if (type === "force-reset") {
-        const u = users.find(u => u.user_id === userId);
-        await callManageStaff("force-password-reset", { email: u?.email });
-        toast({ title: "Password reset sent", description: `Reset email sent to ${u?.email}` });
+        await callManageStaff("force-password-reset", { email: targetUser?.email });
+        toast({ title: "Password reset sent", description: `Reset email sent to ${targetUser?.email}` });
         logActivity({ action: "force_password_reset", resourceType: "user", resourceId: userId, resourceName: name });
       }
       load();

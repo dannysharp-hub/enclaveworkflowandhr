@@ -39,6 +39,36 @@ function json(data: unknown, status = 200) {
   });
 }
 
+async function findAuthUserByEmail(adminClient: ReturnType<typeof createClient>, email: string) {
+  const target = email.toLowerCase();
+  let page = 1;
+
+  while (page <= 25) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) {
+      console.error("[auth-user-lookup] listUsers failed:", error);
+      return null;
+    }
+
+    const user = (data.users ?? []).find((candidate) => {
+      const directEmail = (candidate.email || "").toLowerCase();
+      const identityEmail = candidate.identities?.some((identity: any) => {
+        const value = identity?.identity_data?.email || identity?.email || "";
+        return String(value).toLowerCase() === target;
+      });
+      const metadataEmail = String(candidate.user_metadata?.email || "").toLowerCase();
+      return directEmail === target || metadataEmail === target || !!identityEmail;
+    });
+    if (user) return user;
+
+    if (!data.users || data.users.length < 1000) break;
+    page += 1;
+  }
+
+  console.error("[auth-user-lookup] user not found for email:", email);
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -46,7 +76,8 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const action = url.searchParams.get("action");
+    const body = req.method !== "GET" && req.method !== "HEAD" ? await req.clone().json().catch(() => null) : null;
+    const action = url.searchParams.get("action") ?? body?.action ?? null;
 
     // ── Public action: check-login (no auth required) ──
     if (req.method === "POST" && action === "check-login") {
@@ -59,31 +90,27 @@ Deno.serve(async (req) => {
         { auth: { autoRefreshToken: false, persistSession: false } }
       );
 
+      const normalizedEmail = email.toLowerCase();
       const { data: profile } = await adminClient
         .from("profiles")
         .select("user_id, locked, failed_login_attempts")
-        .eq("email", email.toLowerCase())
+        .eq("email", normalizedEmail)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (!profile) return json({ locked: false });
+      const authUser = profile?.user_id
+        ? (await adminClient.auth.admin.getUserById(profile.user_id)).data.user ?? null
+        : await findAuthUserByEmail(adminClient, normalizedEmail);
 
       let authLocked = false;
-      try {
-        const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(profile.user_id);
-        if (userError) {
-          console.error("[check-login] getUserById failed:", userError);
-        } else {
-          const bannedUntil = userData.user?.banned_until;
-          authLocked = !!(bannedUntil && new Date(bannedUntil).getTime() > Date.now());
-        }
-      } catch (err) {
-        console.error("[check-login] auth lookup threw:", err);
+      const bannedUntil = authUser?.banned_until;
+      if (bannedUntil) {
+        authLocked = new Date(bannedUntil).getTime() > Date.now();
       }
 
       return json({
-        locked: !!profile.locked || authLocked,
-        failed_login_attempts: profile.failed_login_attempts || 0,
+        locked: !!profile?.locked || authLocked,
+        failed_login_attempts: profile?.failed_login_attempts || 0,
         auth_locked: authLocked,
       });
     }
@@ -99,42 +126,50 @@ Deno.serve(async (req) => {
         { auth: { autoRefreshToken: false, persistSession: false } }
       );
 
+      const normalizedEmail = email.toLowerCase();
       const { data: profile } = await adminClient
         .from("profiles")
         .select("user_id, failed_login_attempts, locked, full_name")
-        .eq("email", email.toLowerCase())
+        .eq("email", normalizedEmail)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (!profile) return json({ locked: false });
+      const authUser = profile?.user_id
+        ? (await adminClient.auth.admin.getUserById(profile.user_id)).data.user ?? null
+        : await findAuthUserByEmail(adminClient, normalizedEmail);
 
-      const newAttempts = (profile.failed_login_attempts || 0) + 1;
+      if (!authUser && !profile) return json({ locked: false });
+
+      const userId = profile?.user_id ?? authUser?.id;
+      if (!userId) return json({ locked: false });
+
+      const newAttempts = (profile?.failed_login_attempts || 0) + 1;
       const shouldLock = newAttempts >= 5;
 
-      const updates: Record<string, unknown> = { failed_login_attempts: newAttempts };
-      if (shouldLock) {
-        updates.locked = true;
-        updates.locked_at = new Date().toISOString();
+      if (profile) {
+        const updates: Record<string, unknown> = { failed_login_attempts: newAttempts };
+        if (shouldLock) {
+          updates.locked = true;
+          updates.locked_at = new Date().toISOString();
+        }
+        await adminClient.from("profiles").update(updates).eq("user_id", userId);
       }
 
-      await adminClient.from("profiles").update(updates).eq("user_id", profile.user_id);
-
       if (shouldLock) {
-        const { error: banError } = await adminClient.auth.admin.updateUserById(profile.user_id, {
+        const { error: banError } = await adminClient.auth.admin.updateUserById(userId, {
           ban_duration: "876000h",
         });
         if (banError) {
           console.error("[record-failed-login] auth ban failed:", banError);
         }
 
-        const { error: signOutError } = await adminClient.auth.admin.signOut(profile.user_id, "global");
+        const { error: signOutError } = await adminClient.auth.admin.signOut(userId, "global");
         if (signOutError) {
           console.error("[record-failed-login] global signOut failed (non-fatal):", signOutError);
         }
       }
 
-      // If just locked, send notification email to admin
-      if (shouldLock && !profile.locked) {
+      if (shouldLock && !profile?.locked) {
         try {
           const lockTime = new Date().toLocaleString("en-GB", { timeZone: "Europe/London" });
           await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
@@ -145,8 +180,8 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               to: "danny@enclavecabinetry.com",
-              subject: `⚠️ Account Locked — ${profile.full_name || email}`,
-              html: `<p>The account <strong>${email}</strong> (${profile.full_name || "Unknown"}) has been automatically locked after 5 failed login attempts.</p><p><strong>Time:</strong> ${lockTime}</p><p>Log in to Cabinetry Command to unlock this account from the Team page.</p>`,
+              subject: `⚠️ Account Locked — ${profile?.full_name || authUser?.user_metadata?.full_name || email}`,
+              html: `<p>The account <strong>${email}</strong> (${profile?.full_name || authUser?.user_metadata?.full_name || "Unknown"}) has been automatically locked after 5 failed login attempts.</p><p><strong>Time:</strong> ${lockTime}</p><p>Log in to Cabinetry Command to unlock this account from the Team page.</p>`,
             }),
           });
         } catch { /* fire-and-forget */ }
@@ -418,12 +453,19 @@ Deno.serve(async (req) => {
     // Locks the auth user (banned_until = far future) AND revokes all active sessions
     // so the user is kicked out immediately, not just blocked from logging in again.
     if (req.method === "POST" && action === "lock") {
-      const { user_id } = await req.json();
-      if (!user_id) return json({ error: "Missing user_id" }, 400);
+      const { user_id, email } = await req.json();
+      if (!user_id && !email) return json({ error: "Missing user_id or email" }, 400);
 
-      // 1. Ban the auth user — this stops Supabase auth from accepting their JWT
-      //    and prevents new logins. "876000h" ≈ 100 years.
-      const { error: banError } = await adminClient.auth.admin.updateUserById(user_id, {
+      const authUser = email
+        ? await findAuthUserByEmail(adminClient, String(email).toLowerCase())
+        : null;
+      const targetUserId = authUser?.id ?? user_id;
+
+      if (!targetUserId) {
+        return json({ error: "User not found" }, 404);
+      }
+
+      const { error: banError } = await adminClient.auth.admin.updateUserById(targetUserId, {
         ban_duration: "876000h",
       });
       if (banError) {
@@ -431,28 +473,34 @@ Deno.serve(async (req) => {
         return json({ error: `Failed to ban user: ${banError.message}` }, 500);
       }
 
-      // 2. Revoke ALL active sessions for this user — kicks them out right now
-      const { error: signOutError } = await adminClient.auth.admin.signOut(user_id, "global");
+      const { error: signOutError } = await adminClient.auth.admin.signOut(targetUserId, "global");
       if (signOutError) {
         console.error("[lock] global signOut failed (non-fatal):", signOutError);
       }
 
-      // 3. Mirror state on profiles so the UI badge + LoginPage check work
       await adminClient.from("profiles").update({
         locked: true,
         locked_at: new Date().toISOString(),
-      }).eq("user_id", user_id);
+      }).or(`user_id.eq.${targetUserId}${email ? `,email.eq.${String(email).toLowerCase()}` : ""}`);
 
-      return json({ success: true });
+      return json({ success: true, user_id: targetUserId });
     }
 
     // ── UNLOCK ACCOUNT ──
     if (req.method === "POST" && action === "unlock") {
-      const { user_id } = await req.json();
-      if (!user_id) return json({ error: "Missing user_id" }, 400);
+      const { user_id, email } = await req.json();
+      if (!user_id && !email) return json({ error: "Missing user_id or email" }, 400);
 
-      // 1. Lift the auth ban
-      const { error: unbanError } = await adminClient.auth.admin.updateUserById(user_id, {
+      const authUser = email
+        ? await findAuthUserByEmail(adminClient, String(email).toLowerCase())
+        : null;
+      const targetUserId = authUser?.id ?? user_id;
+
+      if (!targetUserId) {
+        return json({ error: "User not found" }, 404);
+      }
+
+      const { error: unbanError } = await adminClient.auth.admin.updateUserById(targetUserId, {
         ban_duration: "none",
       });
       if (unbanError) {
@@ -460,14 +508,13 @@ Deno.serve(async (req) => {
         return json({ error: `Failed to unban user: ${unbanError.message}` }, 500);
       }
 
-      // 2. Clear profile flags
       await adminClient.from("profiles").update({
         locked: false,
         locked_at: null,
         failed_login_attempts: 0,
-      }).eq("user_id", user_id);
+      }).or(`user_id.eq.${targetUserId}${email ? `,email.eq.${String(email).toLowerCase()}` : ""}`);
 
-      return json({ success: true });
+      return json({ success: true, user_id: targetUserId });
     }
 
     // ── DELETE USER ──
