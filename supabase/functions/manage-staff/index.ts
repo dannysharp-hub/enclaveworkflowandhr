@@ -174,14 +174,16 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { data: roleData } = await adminClient
+    const { data: callerRoles } = await adminClient
       .from("user_roles")
       .select("role")
-      .eq("user_id", callerId)
-      .eq("role", "admin")
-      .single();
+      .eq("user_id", callerId);
 
-    if (!roleData) {
+    const callerRoleSet = new Set((callerRoles ?? []).map((r: { role: string }) => r.role));
+    const isAdmin = callerRoleSet.has("admin") || callerRoleSet.has("super_admin");
+    const isSuperAdmin = callerRoleSet.has("super_admin");
+
+    if (!isAdmin) {
       return json({ error: "Admin access required" }, 403);
     }
 
