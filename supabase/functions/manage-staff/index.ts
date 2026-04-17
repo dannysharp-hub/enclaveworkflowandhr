@@ -67,7 +67,8 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const action = url.searchParams.get("action");
+    const body = req.method !== "GET" && req.method !== "HEAD" ? await req.clone().json().catch(() => null) : null;
+    const action = url.searchParams.get("action") ?? body?.action ?? null;
 
     // ── Public action: check-login (no auth required) ──
     if (req.method === "POST" && action === "check-login") {
