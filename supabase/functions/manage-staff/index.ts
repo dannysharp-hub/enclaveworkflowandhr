@@ -429,6 +429,10 @@ Deno.serve(async (req) => {
       if (!email || !full_name || !role) {
         return json({ error: "Missing required fields" }, 400);
       }
+      // Only the super admin can mint new admins
+      if (role === "admin" && !isSuperAdmin) {
+        return json({ error: "Only the super admin can invite admin users" }, 403);
+      }
 
       // Generate a temporary password — user will reset via the email link
       const tempPassword = crypto.randomUUID().slice(0, 16) + "Aa1!";
