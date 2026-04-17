@@ -43,20 +43,29 @@ async function findAuthUserByEmail(adminClient: ReturnType<typeof createClient>,
   const target = email.toLowerCase();
   let page = 1;
 
-  while (page <= 10) {
-    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 200 });
+  while (page <= 25) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 1000 });
     if (error) {
       console.error("[auth-user-lookup] listUsers failed:", error);
       return null;
     }
 
-    const user = (data.users ?? []).find((candidate) => (candidate.email || "").toLowerCase() === target);
+    const user = (data.users ?? []).find((candidate) => {
+      const directEmail = (candidate.email || "").toLowerCase();
+      const identityEmail = candidate.identities?.some((identity: any) => {
+        const value = identity?.identity_data?.email || identity?.email || "";
+        return String(value).toLowerCase() === target;
+      });
+      const metadataEmail = String(candidate.user_metadata?.email || "").toLowerCase();
+      return directEmail === target || metadataEmail === target || !!identityEmail;
+    });
     if (user) return user;
 
-    if (!data.users || data.users.length < 200) break;
+    if (!data.users || data.users.length < 1000) break;
     page += 1;
   }
 
+  console.error("[auth-user-lookup] user not found for email:", email);
   return null;
 }
 
