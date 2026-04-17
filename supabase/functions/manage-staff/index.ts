@@ -80,31 +80,27 @@ Deno.serve(async (req) => {
         { auth: { autoRefreshToken: false, persistSession: false } }
       );
 
+      const normalizedEmail = email.toLowerCase();
       const { data: profile } = await adminClient
         .from("profiles")
         .select("user_id, locked, failed_login_attempts")
-        .eq("email", email.toLowerCase())
+        .eq("email", normalizedEmail)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (!profile) return json({ locked: false });
+      const authUser = profile?.user_id
+        ? (await adminClient.auth.admin.getUserById(profile.user_id)).data.user ?? null
+        : await findAuthUserByEmail(adminClient, normalizedEmail);
 
       let authLocked = false;
-      try {
-        const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(profile.user_id);
-        if (userError) {
-          console.error("[check-login] getUserById failed:", userError);
-        } else {
-          const bannedUntil = userData.user?.banned_until;
-          authLocked = !!(bannedUntil && new Date(bannedUntil).getTime() > Date.now());
-        }
-      } catch (err) {
-        console.error("[check-login] auth lookup threw:", err);
+      const bannedUntil = authUser?.banned_until;
+      if (bannedUntil) {
+        authLocked = new Date(bannedUntil).getTime() > Date.now();
       }
 
       return json({
-        locked: !!profile.locked || authLocked,
-        failed_login_attempts: profile.failed_login_attempts || 0,
+        locked: !!profile?.locked || authLocked,
+        failed_login_attempts: profile?.failed_login_attempts || 0,
         auth_locked: authLocked,
       });
     }
@@ -120,42 +116,50 @@ Deno.serve(async (req) => {
         { auth: { autoRefreshToken: false, persistSession: false } }
       );
 
+      const normalizedEmail = email.toLowerCase();
       const { data: profile } = await adminClient
         .from("profiles")
         .select("user_id, failed_login_attempts, locked, full_name")
-        .eq("email", email.toLowerCase())
+        .eq("email", normalizedEmail)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (!profile) return json({ locked: false });
+      const authUser = profile?.user_id
+        ? (await adminClient.auth.admin.getUserById(profile.user_id)).data.user ?? null
+        : await findAuthUserByEmail(adminClient, normalizedEmail);
 
-      const newAttempts = (profile.failed_login_attempts || 0) + 1;
+      if (!authUser && !profile) return json({ locked: false });
+
+      const userId = profile?.user_id ?? authUser?.id;
+      if (!userId) return json({ locked: false });
+
+      const newAttempts = (profile?.failed_login_attempts || 0) + 1;
       const shouldLock = newAttempts >= 5;
 
-      const updates: Record<string, unknown> = { failed_login_attempts: newAttempts };
-      if (shouldLock) {
-        updates.locked = true;
-        updates.locked_at = new Date().toISOString();
+      if (profile) {
+        const updates: Record<string, unknown> = { failed_login_attempts: newAttempts };
+        if (shouldLock) {
+          updates.locked = true;
+          updates.locked_at = new Date().toISOString();
+        }
+        await adminClient.from("profiles").update(updates).eq("user_id", userId);
       }
 
-      await adminClient.from("profiles").update(updates).eq("user_id", profile.user_id);
-
       if (shouldLock) {
-        const { error: banError } = await adminClient.auth.admin.updateUserById(profile.user_id, {
+        const { error: banError } = await adminClient.auth.admin.updateUserById(userId, {
           ban_duration: "876000h",
         });
         if (banError) {
           console.error("[record-failed-login] auth ban failed:", banError);
         }
 
-        const { error: signOutError } = await adminClient.auth.admin.signOut(profile.user_id, "global");
+        const { error: signOutError } = await adminClient.auth.admin.signOut(userId, "global");
         if (signOutError) {
           console.error("[record-failed-login] global signOut failed (non-fatal):", signOutError);
         }
       }
 
-      // If just locked, send notification email to admin
-      if (shouldLock && !profile.locked) {
+      if (shouldLock && !profile?.locked) {
         try {
           const lockTime = new Date().toLocaleString("en-GB", { timeZone: "Europe/London" });
           await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
@@ -166,8 +170,8 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               to: "danny@enclavecabinetry.com",
-              subject: `⚠️ Account Locked — ${profile.full_name || email}`,
-              html: `<p>The account <strong>${email}</strong> (${profile.full_name || "Unknown"}) has been automatically locked after 5 failed login attempts.</p><p><strong>Time:</strong> ${lockTime}</p><p>Log in to Cabinetry Command to unlock this account from the Team page.</p>`,
+              subject: `⚠️ Account Locked — ${profile?.full_name || authUser?.user_metadata?.full_name || email}`,
+              html: `<p>The account <strong>${email}</strong> (${profile?.full_name || authUser?.user_metadata?.full_name || "Unknown"}) has been automatically locked after 5 failed login attempts.</p><p><strong>Time:</strong> ${lockTime}</p><p>Log in to Cabinetry Command to unlock this account from the Team page.</p>`,
             }),
           });
         } catch { /* fire-and-forget */ }
