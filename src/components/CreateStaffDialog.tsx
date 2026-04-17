@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function CreateStaffDialog({ open, onOpenChange, onSuccess }: Props) {
-  const { session } = useAuth();
+  const { session, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
@@ -23,6 +23,9 @@ export default function CreateStaffDialog({ open, onOpenChange, onSuccess }: Pro
     role: "operator" as string,
     department: "CNC" as string,
   });
+
+  // Only the super admin can mint new admins
+  const availableRoles = isSuperAdmin ? ROLES : ROLES.filter(r => r !== "admin");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +111,7 @@ export default function CreateStaffDialog({ open, onOpenChange, onSuccess }: Pro
                 onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 className={selectClass}
               >
-                {ROLES.map(r => (
+                {availableRoles.map(r => (
                   <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
                 ))}
               </select>

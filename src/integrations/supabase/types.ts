@@ -10483,6 +10483,7 @@ export type Database = {
       }
       is_cab_company_admin: { Args: { _company_id: string }; Returns: boolean }
       is_cab_company_member: { Args: { _company_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_user_tenant: { Args: { _tenant_id: string }; Returns: boolean }
     }
     Enums: {
@@ -10497,6 +10498,7 @@ export type Database = {
         | "production"
         | "installer"
         | "finance"
+        | "super_admin"
       buylist_category:
         | "panels"
         | "hardware"
@@ -10654,6 +10656,7 @@ export const Constants = {
         "production",
         "installer",
         "finance",
+        "super_admin",
       ],
       buylist_category: [
         "panels",

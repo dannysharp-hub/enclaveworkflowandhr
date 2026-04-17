@@ -174,14 +174,16 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { data: roleData } = await adminClient
+    const { data: callerRoles } = await adminClient
       .from("user_roles")
       .select("role")
-      .eq("user_id", callerId)
-      .eq("role", "admin")
-      .single();
+      .eq("user_id", callerId);
 
-    if (!roleData) {
+    const callerRoleSet = new Set((callerRoles ?? []).map((r: { role: string }) => r.role));
+    const isAdmin = callerRoleSet.has("admin") || callerRoleSet.has("super_admin");
+    const isSuperAdmin = callerRoleSet.has("super_admin");
+
+    if (!isAdmin) {
       return json({ error: "Admin access required" }, 403);
     }
 
@@ -190,6 +192,10 @@ Deno.serve(async (req) => {
       const { email, password, full_name, role, department, company_id } = await req.json();
       if (!email || !password || !full_name || !role) {
         return json({ error: "Missing required fields" }, 400);
+      }
+      // Only the super admin can mint new admins
+      if (role === "admin" && !isSuperAdmin) {
+        return json({ error: "Only the super admin can create admin accounts" }, 403);
       }
 
       const { data: userData, error: createError } =
@@ -296,6 +302,9 @@ Deno.serve(async (req) => {
 
     // ── UPDATE ROLE ──
     if (req.method === "POST" && action === "update-role") {
+      if (!isSuperAdmin) {
+        return json({ error: "Only the super admin can change user roles" }, 403);
+      }
       const { user_id, role } = await req.json();
       if (!user_id || !role) return json({ error: "Missing required fields" }, 400);
 
@@ -419,6 +428,10 @@ Deno.serve(async (req) => {
       const { email, full_name, role, company_id } = await req.json();
       if (!email || !full_name || !role) {
         return json({ error: "Missing required fields" }, 400);
+      }
+      // Only the super admin can mint new admins
+      if (role === "admin" && !isSuperAdmin) {
+        return json({ error: "Only the super admin can invite admin users" }, 403);
       }
 
       // Generate a temporary password — user will reset via the email link
