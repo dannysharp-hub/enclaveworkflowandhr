@@ -119,6 +119,20 @@ Deno.serve(async (req) => {
 
       await adminClient.from("profiles").update(updates).eq("user_id", profile.user_id);
 
+      if (shouldLock) {
+        const { error: banError } = await adminClient.auth.admin.updateUserById(profile.user_id, {
+          ban_duration: "876000h",
+        });
+        if (banError) {
+          console.error("[record-failed-login] auth ban failed:", banError);
+        }
+
+        const { error: signOutError } = await adminClient.auth.admin.signOut(profile.user_id, "global");
+        if (signOutError) {
+          console.error("[record-failed-login] global signOut failed (non-fatal):", signOutError);
+        }
+      }
+
       // If just locked, send notification email to admin
       if (shouldLock && !profile.locked) {
         try {
@@ -138,7 +152,7 @@ Deno.serve(async (req) => {
         } catch { /* fire-and-forget */ }
       }
 
-      return json({ locked: shouldLock, failed_login_attempts: newAttempts });
+      return json({ locked: shouldLock, failed_login_attempts: newAttempts, auth_locked: shouldLock });
     }
 
     // ── Public action: reset-login-attempts (called after successful login) ──
