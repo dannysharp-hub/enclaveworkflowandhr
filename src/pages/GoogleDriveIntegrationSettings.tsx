@@ -361,6 +361,15 @@ export default function GoogleDriveIntegrationSettings() {
         />
       )}
 
+      {/* ─── Folders to skip during sync and costing extraction ─── */}
+      {isConnected && (
+        <IgnoreListConfig
+          key={(settings?.sync_ignore_patterns || []).join("|")}
+          patterns={settings?.sync_ignore_patterns || []}
+          onSave={async (patterns) => { await handleUpdateSetting("sync_ignore_patterns", patterns); }}
+        />
+      )}
+
       {/* ─── Root Folder ─── */}
 
       {isConnected && (
