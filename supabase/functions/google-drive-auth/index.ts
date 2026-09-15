@@ -1108,12 +1108,13 @@ Deno.serve(async (req) => {
         // Link the Drive folder to the matched job (upsert to avoid duplicates)
         const { error: linkErr } = await supabaseAdmin
           .from("cab_job_files")
-          .insert({
+          .upsert({
             company_id: companyId,
             job_id: jobId,
             url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
             file_type: "drive_folder",
-          });
+          }, { onConflict: "job_id,url", ignoreDuplicates: true });
+
 
         if (linkErr) {
           conflicts.push(`Failed to link folder "${folder.name}" to job ${extractedRef}: ${linkErr.message}`);
