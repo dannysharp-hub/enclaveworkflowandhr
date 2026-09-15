@@ -323,8 +323,7 @@ function lastNumberOnRow(row: string[], from = 0): number | null {
 
 function parseCosting(rows: string[][]): Partial<Extracted> {
   const h = findHeaderRow(rows, ["item", "markup"]);
-  const out: Partial<Extracted> = { section_totals: {} };
-  if (h === -1) return { ...out, found_costing_table: false };
+  if (h === -1) return { section_totals: {}, found_costing_table: false };
 
   const header = rows[h];
   const cItem = colIndex(header, ["item"]);
@@ -337,36 +336,38 @@ function parseCosting(rows: string[][]): Partial<Extracted> {
   let quoted: number | null = null;
   let costTotal: number | null = null;
   let profit: number | null = null;
+  let lastSubtotal: { cost: number | null; sell: number | null } | null = null;
 
   for (let i = h + 1; i < rows.length; i++) {
     const row = rows[i];
     const cells = row.map(lc);
-    const joined = cells.join("").trim();
-    if (!joined) continue;
+    if (!cells.join("").trim()) continue;
 
     const catCell = lc(row[cCategory]);
-    const catMatch = CATEGORIES.find((c) => catCell === c || (catCell && c.startsWith(catCell) && catCell.length > 3));
+    const item = cItem >= 0 ? norm(row[cItem]) : "";
+    const catMatch = CATEGORIES.find((c) => catCell === c);
     if (catMatch) currentSection = catMatch;
 
-    // Grand totals
+    // Explicitly labelled grand totals (layouts vary between sheets)
     if (cells.some((c) => c.includes("total sell") || c.includes("total quote"))) {
-      quoted = quoted ?? lastNumberOnRow(row, cItem + 1);
-      continue;
-    }
-    if (cells.some((c) => /^total cost$/.test(c.trim()) || c.includes("total cost of"))) {
-      const n = lastNumberOnRow(row, cItem + 1);
-      if (n !== null && !cells.includes("total cost")) costTotal = costTotal ?? n;
-      else if (n !== null && i > h + 1) costTotal = costTotal ?? n;
+      quoted = quoted ?? lastNumberOnRow(row);
       continue;
     }
     if (cells.some((c) => c.includes("profit"))) {
-      profit = profit ?? lastNumberOnRow(row, cItem + 1);
+      profit = profit ?? lastNumberOnRow(row);
+      continue;
+    }
+
+    // Subtotal row: no category and no item, but figures present
+    if (!catCell && !item) {
+      const cost = cTotalCost >= 0 ? parseNum(row[cTotalCost]) : null;
+      const sell = cTotal >= 0 ? parseNum(row[cTotal]) : null;
+      if (cost !== null || sell !== null) lastSubtotal = { cost, sell };
       continue;
     }
 
     if (!currentSection) continue;
-    const item = cItem >= 0 ? norm(row[cItem]) : "";
-    if (/total/.test(lc(item))) continue;
+    if (/^total/.test(lc(item))) continue;
 
     const cost = cTotalCost >= 0 ? parseNum(row[cTotalCost]) : null;
     if (cost !== null) {
@@ -374,20 +375,8 @@ function parseCosting(rows: string[][]): Partial<Extracted> {
     }
   }
 
-  // Fall back to summing the marked-up Total column for the quote when absent
-  if (quoted === null && cTotal >= 0) {
-    let sum = 0;
-    let any = false;
-    for (let i = h + 1; i < rows.length; i++) {
-      const cells = rows[i].map(lc);
-      if (cells.some((c) => c.includes("profit") || c.includes("total sell"))) continue;
-      const n = parseNum(rows[i][cTotal]);
-      const item = cItem >= 0 ? lc(rows[i][cItem]) : "";
-      if (n !== null && item && !/total/.test(item)) { sum += n; any = true; }
-    }
-    if (any) quoted = sum;
-  }
-
+  if (costTotal === null) costTotal = lastSubtotal?.cost ?? null;
+  if (quoted === null) quoted = lastSubtotal?.sell ?? null;
   if (costTotal === null) {
     const vals = Object.values(sectionTotals);
     if (vals.length) costTotal = vals.reduce((a, b) => a + b, 0);
@@ -407,21 +396,44 @@ function parseCosting(rows: string[][]): Partial<Extracted> {
   };
 }
 
-function extractFromRows(rows: string[][]): Extracted {
-  const purchasing = parsePurchasing(rows);
-  const costing = parseCosting(rows);
+/**
+ * Both tables usually live on different tabs: purchasing on a "Buy List" tab,
+ * costing on a per-room tab. Take purchasing from whichever tab yields the most
+ * lines, and costing from the first tab that actually holds a costing table.
+ */
+function extractFromTabs(tabs: { tab: string; rows: string[][] }[]): { extracted: Extracted; costingTab: string | null } {
+  let lines: PurchasingLine[] = [];
+  let foundPurchasing = false;
+  let costing: Partial<Extracted> | null = null;
+  let costingTab: string | null = null;
+
+  for (const t of tabs) {
+    const p = parsePurchasing(t.rows);
+    if (p.found) {
+      foundPurchasing = true;
+      if (p.lines.length > lines.length) lines = p.lines;
+    }
+    if (!costing) {
+      const c = parseCosting(t.rows);
+      if (c.found_costing_table) { costing = c; costingTab = t.tab; }
+    }
+  }
+
   return {
-    quoted_total: costing.quoted_total ?? null,
-    cost_total: costing.cost_total ?? null,
-    profit_total: costing.profit_total ?? null,
-    materials_subtotal: costing.materials_subtotal ?? null,
-    labour_total: costing.labour_total ?? null,
-    hardware_total: costing.hardware_total ?? null,
-    fixings_total: costing.fixings_total ?? null,
-    section_totals: costing.section_totals ?? {},
-    purchasing_lines: purchasing.lines,
-    found_purchasing_table: purchasing.found,
-    found_costing_table: !!costing.found_costing_table,
+    extracted: {
+      quoted_total: costing?.quoted_total ?? null,
+      cost_total: costing?.cost_total ?? null,
+      profit_total: costing?.profit_total ?? null,
+      materials_subtotal: costing?.materials_subtotal ?? null,
+      labour_total: costing?.labour_total ?? null,
+      hardware_total: costing?.hardware_total ?? null,
+      fixings_total: costing?.fixings_total ?? null,
+      section_totals: costing?.section_totals ?? {},
+      purchasing_lines: lines,
+      found_purchasing_table: foundPurchasing,
+      found_costing_table: !!costing,
+    },
+    costingTab,
   };
 }
 
