@@ -969,3 +969,51 @@ function JobsFolderConfig({ folderId, folderName, onSave }: {
     </div>
   );
 }
+
+function IgnoreListConfig({ patterns, onSave }: {
+  patterns: string[];
+  onSave: (patterns: string[]) => Promise<void>;
+}) {
+  const [text, setText] = useState(patterns.join("\n"));
+  const [saving, setSaving] = useState(false);
+
+  const parsed = text.split("\n").map(p => p.trim()).filter(Boolean);
+  const dirty = parsed.join("|") !== patterns.join("|");
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await onSave(parsed);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
+      <div>
+        <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">Folders To Skip</h4>
+        <p className="text-xs text-muted-foreground mt-1">
+          One pattern per line. Any job folder whose name matches a pattern is skipped by the nightly
+          folder sync and by costing extraction, and never appears in the review queue.
+        </p>
+      </div>
+
+      <textarea
+        className={`${inputClass} min-h-[140px] font-mono`}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder={"^_\ntest\ntemplate"}
+      />
+
+      <button
+        onClick={save}
+        disabled={saving || !dirty}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+        Save Skip List
+      </button>
+    </div>
+  );
+}
