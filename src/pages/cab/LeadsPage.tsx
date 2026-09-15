@@ -158,10 +158,11 @@ export default function LeadsPage() {
           <p className="text-sm text-muted-foreground">{leads.length} active job{leads.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleImportFromDrive} disabled={importing || !companyId}>
+          <Button variant="outline" onClick={handleSyncNow} disabled={importing}>
             {importing ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
-            {importing ? "Importing…" : "Import from Drive"}
+            {importing ? "Syncing…" : "Sync now"}
           </Button>
+
           {canCreateJobs(userRole) && <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> New Job</Button>}
         </div>
       </div>
