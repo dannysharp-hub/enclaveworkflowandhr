@@ -18,6 +18,8 @@ interface DriveSettings {
   status: string;
   projects_root_folder_id: string | null;
   projects_root_folder_name: string | null;
+  jobs_folder_id: string | null;
+  jobs_folder_name: string | null;
   auto_create_jobs_from_folders: boolean;
   auto_index_files: boolean;
   auto_attach_dxfs: boolean;
