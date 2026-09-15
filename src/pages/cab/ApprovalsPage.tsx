@@ -374,6 +374,10 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
+      <DriveSyncCandidates />
+
+
+
       {loading ? (
         <div className="h-40 flex items-center justify-center">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
