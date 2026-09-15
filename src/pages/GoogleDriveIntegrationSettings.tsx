@@ -348,7 +348,21 @@ export default function GoogleDriveIntegrationSettings() {
         )}
       </div>
 
+      {/* ─── Jobs Folder (used by the nightly job folder sync) ─── */}
+      {isConnected && (
+        <JobsFolderConfig
+          key={settings?.jobs_folder_id || "none"}
+          folderId={settings?.jobs_folder_id || ""}
+          folderName={settings?.jobs_folder_name || ""}
+          onSave={async (id, name) => {
+            await handleUpdateSetting("jobs_folder_id", id);
+            await handleUpdateSetting("jobs_folder_name", name);
+          }}
+        />
+      )}
+
       {/* ─── Root Folder ─── */}
+
       {isConnected && (
         <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
           <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">Projects Root Folder</h4>
