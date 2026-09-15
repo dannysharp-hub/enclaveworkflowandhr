@@ -241,6 +241,8 @@ interface Extracted {
   found_purchasing_table: boolean;
   found_costing_table: boolean;
   all_zero: boolean;
+  needs_review: boolean;
+  review_reason: string | null;
 }
 
 interface TabFigures {
@@ -252,7 +254,133 @@ interface TabFigures {
   materials_subtotal: number | null;
   hardware_total: number | null;
   fixings_total: number | null;
+  /** the sheet prices something on this tab */
+  priced: boolean;
+  /** what the rules default to before any human decision */
+  default_counted: boolean;
+  /** what is actually being summed */
   counted: boolean;
+  /** "default" = rule, "saved" = a previous human decision on this folder */
+  decision: "default" | "saved";
+  reason: string | null;
+}
+
+const NUMERIC_KEYS = [
+  "quoted_total", "cost_total", "profit_total",
+  "materials_subtotal", "labour_total", "hardware_total", "fixings_total",
+] as const;
+
+/** Sum only the values the sheets actually state; null stays null when no counted tab states it. */
+function sumBreakdown(breakdown: TabFigures[]): Record<string, number | null> {
+  const counted = breakdown.filter((b) => b.counted);
+  const out: Record<string, number | null> = {};
+  for (const key of NUMERIC_KEYS) {
+    const vals = counted
+      .map((b) => b[key] as number | null)
+      .filter((v): v is number => v !== null);
+    out[key] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100 : null;
+  }
+  return out;
+}
+
+/** Strip a trailing revision / quote-version marker: "_Rev A", "- RevB", "- Q2", "(Rev C)". */
+function revisionMarker(tab: string): { base: string; rank: number | null } {
+  const m = tab.match(/^(.*?)[\s_\-–]*\(?\s*(?:rev(?:ision)?[\s_\-]*([a-z0-9]*)|q\s*(\d+))\s*\)?\s*$/i);
+  if (!m) return { base: tab.trim(), rank: null };
+  const letter = (m[2] || "").trim();
+  const qnum = (m[3] || "").trim();
+  let rank = 1;
+  if (qnum) rank = parseInt(qnum, 10);
+  else if (/^\d+$/.test(letter)) rank = parseInt(letter, 10);
+  else if (letter) rank = letter.toLowerCase().charCodeAt(0) - 96;
+  return { base: m[1].trim(), rank };
+}
+
+const normTab = (s: string) => lc(s).replace(/\s+/g, " ").trim();
+
+/**
+ * Decide which tabs are summed.
+ *  - Unpriced tabs (every quantity zero) are options nobody bought — excluded.
+ *  - Revision / quote-version tabs of the same base name: only the latest is counted.
+ *  - A combined tab priced alongside "... Only" tabs could be a double-count either way,
+ *    so nothing is guessed: the job is flagged and approval is blocked until each tab is set.
+ *  - A saved human decision always wins; a tab with no saved decision on a previously
+ *    reviewed workbook re-flags the job instead of inheriting old decisions.
+ */
+function classifyTabs(
+  breakdown: TabFigures[],
+  saved: Record<string, boolean>,
+): { needs_review: boolean; review_reason: string | null } {
+  for (const b of breakdown) {
+    b.default_counted = b.priced;
+    b.reason = b.priced ? null : "Unpriced — every quantity is zero.";
+  }
+
+  // revision groups (priced tabs only)
+  const priced = breakdown.filter((b) => b.priced);
+  const groups = new Map<string, { b: TabFigures; rank: number | null; order: number }[]>();
+  priced.forEach((b, i) => {
+    const { base, rank } = revisionMarker(b.tab);
+    const key = normTab(base);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push({ b, rank, order: i });
+  });
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    if (!members.some((m) => m.rank !== null)) continue;
+    const winner = members.reduce((best, m) =>
+      (m.rank ?? 0) > (best.rank ?? 0) || ((m.rank ?? 0) === (best.rank ?? 0) && m.order > best.order) ? m : best
+    );
+    for (const m of members) {
+      if (m === winner) continue;
+      m.b.default_counted = false;
+      m.b.reason = `Earlier version — superseded by "${winner.b.tab}".`;
+    }
+  }
+
+  // combined tab vs "... Only" tabs — never guessed
+  const onlyTabs = priced.filter((b) => /\bonly\b/i.test(b.tab));
+  const combined = priced.filter((b) => !/\bonly\b/i.test(b.tab) && b.default_counted);
+  let needsReview = false;
+  let reason: string | null = null;
+  if (onlyTabs.length && combined.length) {
+    needsReview = true;
+    reason =
+      `Possible double-count — needs review: "${combined.map((b) => b.tab).join('", "')}" ` +
+      `is priced alongside ${onlyTabs.map((b) => `"${b.tab}"`).join(", ")}. ` +
+      `Set each tab to counted or excluded before approving.`;
+  }
+
+  // apply saved decisions
+  const savedKeys = Object.keys(saved);
+  for (const b of breakdown) {
+    const hit = savedKeys.find((k) => normTab(k) === normTab(b.tab));
+    if (hit !== undefined) {
+      b.counted = saved[hit];
+      b.decision = "saved";
+      if (b.counted !== b.default_counted) {
+        b.reason = b.counted ? "Included by you." : "Excluded by you.";
+      }
+    } else {
+      b.counted = b.default_counted;
+      b.decision = "default";
+    }
+  }
+
+  if (savedKeys.length) {
+    const fresh = breakdown.filter((b) => b.decision === "default");
+    if (fresh.length) {
+      needsReview = true;
+      reason = `New tab${fresh.length > 1 ? "s" : ""} since your last review: ` +
+        fresh.map((b) => `"${b.tab}"`).join(", ") + ". Confirm the tab list again.";
+    } else if (!fresh.length && onlyTabs.length && combined.length) {
+      // every tab carries an explicit decision — the double-count question is settled
+      needsReview = false;
+      reason = null;
+    }
+  }
+
+  return { needs_review: needsReview, review_reason: reason };
 }
 
 function findHeaderRow(rows: string[][], needles: string[]): number {
@@ -413,21 +541,18 @@ function parseCosting(rows: string[][]): Partial<Extracted> {
 }
 
 /**
- * A workbook holds a purchasing ("Buy List") tab plus one costing tab PER ROOM /
- * ITEM OF WORK. Those tabs are separate work, not alternatives, so every tab with
- * non-zero figures is summed into one job total and the per-tab breakdown is kept.
- * All-zero tabs are priced options nobody bought and are excluded.
+ * A workbook holds a purchasing ("Buy List") tab plus one costing tab per room / item of
+ * work — or, in some workbooks, revisions and "... only" variants of the same work.
+ * classifyTabs() decides which tabs are summed; saved decisions on the folder win.
  */
-function extractFromTabs(tabs: { tab: string; rows: string[][] }[]): { extracted: Extracted; costingTab: string | null } {
+function extractFromTabs(
+  tabs: { tab: string; rows: string[][] }[],
+  saved: Record<string, boolean> = {},
+): { extracted: Extracted; costingTab: string | null } {
   let lines: PurchasingLine[] = [];
   let foundPurchasing = false;
   let foundCosting = false;
   const breakdown: TabFigures[] = [];
-
-  const NUMERIC = [
-    "quoted_total", "cost_total", "profit_total",
-    "materials_subtotal", "labour_total", "hardware_total", "fixings_total",
-  ] as const;
 
   for (const t of tabs) {
     const p = parsePurchasing(t.rows);
@@ -440,9 +565,9 @@ function extractFromTabs(tabs: { tab: string; rows: string[][] }[]): { extracted
     if (!c.found_costing_table) continue;
     foundCosting = true;
 
-    const figures = NUMERIC.map((k) => (c[k] ?? null) as number | null);
+    const figures = NUMERIC_KEYS.map((k) => (c[k] ?? null) as number | null);
     const sectionsNonZero = Object.values(c.section_totals ?? {}).some((v) => v !== 0);
-    const counted = figures.some((v) => v !== null && v !== 0) || sectionsNonZero;
+    const priced = figures.some((v) => v !== null && v !== 0) || sectionsNonZero;
 
     breakdown.push({
       tab: t.tab,
@@ -453,24 +578,23 @@ function extractFromTabs(tabs: { tab: string; rows: string[][] }[]): { extracted
       materials_subtotal: c.materials_subtotal ?? null,
       hardware_total: c.hardware_total ?? null,
       fixings_total: c.fixings_total ?? null,
-      counted,
+      priced,
+      default_counted: priced,
+      counted: priced,
+      decision: "default",
+      reason: null,
     });
   }
 
+  const review = classifyTabs(breakdown, saved);
+  const totals = sumBreakdown(breakdown);
   const counted = breakdown.filter((b) => b.counted);
-
-  // Sum only values the sheets actually state; null stays null when no tab states it.
-  const sum = (key: keyof TabFigures): number | null => {
-    const vals = counted.map((b) => b[key] as number | null).filter((v): v is number => v !== null);
-    if (!vals.length) return null;
-    return Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100;
-  };
 
   const sectionTotals: Record<string, number> = {};
   for (const t of tabs) {
+    if (!counted.some((b) => b.tab === t.tab)) continue;
     const c = parseCosting(t.rows);
     if (!c.found_costing_table) continue;
-    if (!counted.some((b) => b.tab === t.tab)) continue;
     for (const [k, v] of Object.entries(c.section_totals ?? {})) {
       sectionTotals[k] = Math.round(((sectionTotals[k] ?? 0) + v) * 100) / 100;
     }
@@ -478,19 +602,21 @@ function extractFromTabs(tabs: { tab: string; rows: string[][] }[]): { extracted
 
   return {
     extracted: {
-      quoted_total: sum("quoted_total"),
-      cost_total: sum("cost_total"),
-      profit_total: sum("profit_total"),
-      materials_subtotal: sum("materials_subtotal"),
-      labour_total: sum("labour_total"),
-      hardware_total: sum("hardware_total"),
-      fixings_total: sum("fixings_total"),
+      quoted_total: totals.quoted_total,
+      cost_total: totals.cost_total,
+      profit_total: totals.profit_total,
+      materials_subtotal: totals.materials_subtotal,
+      labour_total: totals.labour_total,
+      hardware_total: totals.hardware_total,
+      fixings_total: totals.fixings_total,
       section_totals: sectionTotals,
       tab_breakdown: breakdown,
       purchasing_lines: lines,
       found_purchasing_table: foundPurchasing,
       found_costing_table: foundCosting,
-      all_zero: foundCosting && counted.length === 0,
+      all_zero: foundCosting && breakdown.every((b) => !b.priced),
+      needs_review: review.needs_review,
+      review_reason: review.review_reason,
     },
     costingTab: counted.length
       ? counted.map((b) => b.tab).join(" + ")
@@ -600,6 +726,18 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
   folders = folders.filter((f) => !isIgnored(f.name || "", ignorePatterns));
   result.folders_scanned = folders.length;
 
+  // Previously saved per-tab decisions, reused so the same question is not asked twice
+  const { data: decisionRows } = await admin
+    .from("cab_costing_tab_decisions")
+    .select("folder_name, tab_name, counted")
+    .eq("company_id", companyId);
+  const savedByFolder = new Map<string, Record<string, boolean>>();
+  for (const d of (decisionRows || []) as { folder_name: string; tab_name: string; counted: boolean }[]) {
+    const key = lc(d.folder_name);
+    if (!savedByFolder.has(key)) savedByFolder.set(key, {});
+    savedByFolder.get(key)![d.tab_name] = d.counted;
+  }
+
   const { data: dbJobs, error: jobsErr } = await admin
     .from("cab_jobs").select("id, job_ref").eq("company_id", companyId);
   if (jobsErr) {
@@ -692,7 +830,7 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
         // Fall back to a plain CSV export of the first tab
         tabs = [{ tab: "Sheet 1", rows: parseCsv(await exportCsv(accessToken, chosen.id)) }];
       }
-      const out = extractFromTabs(tabs);
+      const out = extractFromTabs(tabs, savedByFolder.get(lc(folderName)) || {});
       usedTab = out.costingTab;
       if (out.extracted.found_costing_table || out.extracted.purchasing_lines.length) {
         extracted = out.extracted;
@@ -738,10 +876,13 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
             all_zero: extracted.all_zero,
           }
         : {},
+      tab_breakdown: extracted?.tab_breakdown ?? null,
+      needs_review: extracted?.needs_review ?? false,
+      review_reason: extracted?.review_reason ?? null,
       purchasing_lines: extracted?.purchasing_lines ?? [],
       ambiguous_files: others,
       status: !extracted ? "error" : extracted.all_zero ? "not_costed" : "pending",
-      error: notes || null,
+      error: [notes, extracted?.review_reason].filter(Boolean).join(" ") || null,
     }, { onConflict: "company_id,folder_name,source_modified_at", ignoreDuplicates: false });
 
     if (upErr) result.errors.push(`${folderName}: ${upErr.message}`);
@@ -753,7 +894,13 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
 
 /* ─────────────────────────── Commit ─────────────────────────── */
 
-async function commitExtraction(admin: Admin, companyId: string, extractionId: string, userId: string) {
+async function commitExtraction(
+  admin: Admin,
+  companyId: string,
+  extractionId: string,
+  userId: string,
+  tabDecisions?: Record<string, boolean>,
+) {
   const { data: row, error } = await admin
     .from("cab_costing_extractions")
     .select("*")
@@ -765,8 +912,43 @@ async function commitExtraction(admin: Admin, companyId: string, extractionId: s
   if (!row) throw new Error("Extraction not found.");
   if (!row.job_id) throw new Error("This folder is not linked to a job yet.");
 
-  const e = (row.extracted || {}) as Record<string, number | null>;
   const nowIso = new Date().toISOString();
+  const breakdown = ((row.tab_breakdown as TabFigures[] | null) ??
+    ((row.extracted as { tab_breakdown?: TabFigures[] } | null)?.tab_breakdown ?? [])) as TabFigures[];
+
+  // Apply the reviewer's tab choices, then recompute the job total from the counted tabs only.
+  let e = (row.extracted || {}) as Record<string, number | null>;
+  if (breakdown.length) {
+    const decisions = tabDecisions || {};
+    for (const b of breakdown) {
+      const hit = Object.keys(decisions).find((k) => normTab(k) === normTab(b.tab));
+      if (hit !== undefined) {
+        b.counted = decisions[hit];
+        b.decision = "saved";
+      }
+    }
+    if (row.needs_review && breakdown.some((b) => b.decision !== "saved")) {
+      throw new Error("Set every tab to counted or excluded before approving this job.");
+    }
+    const totals = sumBreakdown(breakdown);
+    e = { ...e, ...totals };
+
+    const decided = breakdown.filter((b) => b.decision === "saved");
+    if (decided.length) {
+      const { error: decErr } = await admin.from("cab_costing_tab_decisions").upsert(
+        decided.map((b) => ({
+          company_id: companyId,
+          folder_name: row.folder_name,
+          tab_name: b.tab,
+          counted: b.counted,
+          decided_by: userId,
+          decided_at: nowIso,
+        })),
+        { onConflict: "company_id,folder_name,tab_name" },
+      );
+      if (decErr) throw new Error(`Could not save tab decisions: ${decErr.message}`);
+    }
+  }
 
   const { error: jobErr } = await admin.from("cab_jobs").update({
     quoted_total: e.quoted_total ?? null,
@@ -806,6 +988,11 @@ async function commitExtraction(admin: Admin, companyId: string, extractionId: s
 
   await admin.from("cab_costing_extractions").update({
     status: "approved",
+    extracted: { ...(row.extracted as object || {}), ...e, tab_breakdown: breakdown },
+    tab_breakdown: breakdown.length ? breakdown : null,
+    needs_review: false,
+    review_reason: null,
+    source_tab: breakdown.filter((b) => b.counted).map((b) => b.tab).join(" + ") || row.source_tab,
     reviewed_by: userId,
     reviewed_at: nowIso,
     updated_at: nowIso,
@@ -911,7 +1098,13 @@ Deno.serve(async (req) => {
         .from("cab_company_tenant_map").select("company_id").eq("tenant_id", profile.tenant_id).maybeSingle();
       if (!map?.company_id) return json({ ok: false, error: "No cabinetry company mapped to this workspace." }, 400);
       if (!body.extraction_id) return json({ ok: false, error: "extraction_id is required." }, 400);
-      const out = await commitExtraction(admin, map.company_id as string, String(body.extraction_id), userId);
+      const out = await commitExtraction(
+        admin,
+        map.company_id as string,
+        String(body.extraction_id),
+        userId,
+        (body.tab_decisions as Record<string, boolean> | undefined) || undefined,
+      );
       return json({ ok: true, ...out });
     }
 

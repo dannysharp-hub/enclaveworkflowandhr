@@ -24,6 +24,22 @@ interface PurchasingLine {
   due_date: string | null;
 }
 
+interface TabFigures {
+  tab: string;
+  quoted_total: number | null;
+  cost_total: number | null;
+  profit_total: number | null;
+  labour_total: number | null;
+  materials_subtotal: number | null;
+  hardware_total: number | null;
+  fixings_total: number | null;
+  priced?: boolean;
+  default_counted?: boolean;
+  counted: boolean;
+  decision?: "default" | "saved";
+  reason?: string | null;
+}
+
 interface Extraction {
   id: string;
   job_id: string | null;
@@ -34,6 +50,9 @@ interface Extraction {
   source_modified_at: string | null;
   source_tab: string | null;
   extracted: Record<string, any> | null;
+  tab_breakdown: TabFigures[] | null;
+  needs_review: boolean | null;
+  review_reason: string | null;
   purchasing_lines: PurchasingLine[] | null;
   ambiguous_files: { id: string; name: string; url?: string; modified?: string }[] | null;
   status: string;
@@ -69,6 +88,22 @@ const money = (n: number | null | undefined) =>
     ? "—"
     : `£${Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const tabsOf = (row: Extraction): TabFigures[] =>
+  row.tab_breakdown || (row.extracted?.tab_breakdown as TabFigures[] | undefined) || [];
+
+/** Live job total from the tabs currently marked counted — mirrors the server's sum. */
+function liveTotals(tabs: TabFigures[], choice: Record<string, boolean> | undefined) {
+  const counted = tabs.filter(t => (choice ? choice[t.tab] : t.counted));
+  const out: Record<string, number | null> = {};
+  FIELDS.forEach(({ key }) => {
+    const vals = counted
+      .map(t => (t as any)[key] as number | null)
+      .filter((v): v is number => v !== null && v !== undefined);
+    out[key] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100 : null;
+  });
+  return out;
+}
+
 export default function CostingReview() {
   const { userRole } = useAuth();
   const isAdmin = ["admin", "super_admin"].includes(userRole || "");
@@ -78,6 +113,10 @@ export default function CostingReview() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  // extraction id -> tab name -> counted
+  const [tabChoice, setTabChoice] = useState<Record<string, Record<string, boolean>>>({});
+  // extraction id -> tabs the reviewer has explicitly set
+  const [touched, setTouched] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +128,14 @@ export default function CostingReview() {
 
     const list = (data || []) as unknown as Extraction[];
     setRows(list);
+
+    const choices: Record<string, Record<string, boolean>> = {};
+    list.forEach(r => {
+      const bd = tabsOf(r);
+      if (bd.length) choices[r.id] = Object.fromEntries(bd.map(t => [t.tab, t.counted]));
+    });
+    setTabChoice(choices);
+    setTouched({});
 
     const jobIds = Array.from(new Set(list.map(r => r.job_id).filter(Boolean))) as string[];
     if (jobIds.length) {
@@ -107,11 +154,24 @@ export default function CostingReview() {
 
   useEffect(() => { load(); }, [load]);
 
+  const setTab = (rowId: string, tab: string, counted: boolean) => {
+    setTabChoice(prev => ({ ...prev, [rowId]: { ...(prev[rowId] || {}), [tab]: counted } }));
+    setTouched(prev => ({
+      ...prev,
+      [rowId]: Array.from(new Set([...(prev[rowId] || []), tab])),
+    }));
+  };
+
   const approve = async (row: Extraction) => {
     setBusyId(row.id);
     try {
+      const decisions = tabChoice[row.id];
       const { data, error } = await supabase.functions.invoke("extract-drive-costing", {
-        body: { action: "commit", extraction_id: row.id },
+        body: {
+          action: "commit",
+          extraction_id: row.id,
+          ...(decisions && Object.keys(decisions).length ? { tab_decisions: decisions } : {}),
+        },
       });
       if (error) throw new Error(error.message);
       if (data?.ok === false) throw new Error(data.error || "Could not save these figures");
@@ -165,10 +225,17 @@ export default function CostingReview() {
         const job = row.job_id ? jobs[row.job_id] : null;
         const ex = row.extracted || {};
         const lines = row.purchasing_lines || [];
+        const tabs = tabsOf(row);
+        const choice = tabChoice[row.id];
+        const totals = tabs.length ? liveTotals(tabs, choice) : (ex as Record<string, number | null>);
         const overwrites = FIELDS.filter(
-          f => job && job[f.key] !== null && job[f.key] !== undefined && Number(job[f.key]) !== Number(ex[f.key as string]),
+          f => job && job[f.key] !== null && job[f.key] !== undefined && Number(job[f.key]) !== Number(totals[f.key as string]),
         );
         const isRevision = !!job?.costing_source_filename;
+        const undecided = row.needs_review
+          ? tabs.filter(t => !(touched[row.id] || []).includes(t.tab))
+          : [];
+        const blocked = undecided.length > 0;
 
         return (
           <div key={row.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
@@ -208,6 +275,20 @@ export default function CostingReview() {
               </p>
             )}
 
+            {row.needs_review && (
+              <div className="rounded-md bg-destructive/10 border border-destructive/40 p-2.5">
+                <p className="text-xs font-medium text-destructive flex items-start gap-1.5">
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                  <span>{row.review_reason || "Needs review before approval."}</span>
+                </p>
+                {blocked && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Set each tab below to counted or excluded — {undecided.length} still to set.
+                  </p>
+                )}
+              </div>
+            )}
+
             {!!row.ambiguous_files?.length && (
               <div className="rounded-md bg-warning/10 border border-warning/30 p-2.5 space-y-1">
                 <p className="text-xs font-medium text-warning flex items-center gap-1">
@@ -229,7 +310,7 @@ export default function CostingReview() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {FIELDS.map(f => {
-                const next = ex[f.key as string] ?? null;
+                const next = totals[f.key as string] ?? null;
                 const current = job ? job[f.key] : null;
                 const changed = next !== null && current !== null && current !== undefined && Number(current) !== Number(next);
                 const notStated = f.key === "quoted_total" && next === null;
@@ -251,26 +332,61 @@ export default function CostingReview() {
               })}
             </div>
 
-            {Array.isArray(ex.tab_breakdown) && ex.tab_breakdown.length > 1 && (
+            {tabs.length > 1 && (
               <div className="rounded-md border border-border/60 overflow-hidden">
                 <p className="px-2.5 py-1.5 bg-muted/40 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                  Per-room breakdown — totals above are the sum of the priced rooms
+                  Tabs in this workbook — the totals above update as you include or exclude them
                 </p>
                 <table className="w-full text-xs">
                   <tbody>
-                    {ex.tab_breakdown.map((t: any) => (
-                      <tr key={t.tab} className={cn("border-t border-border/40", !t.counted && "opacity-50")}>
-                        <td className="px-2.5 py-1.5 truncate">{t.tab}</td>
-                        <td className="px-2 py-1.5 font-mono text-right">
-                          {t.quoted_total === null ? "—" : money(t.quoted_total)}
-                        </td>
-                        <td className="px-2 py-1.5 font-mono text-right">{money(t.cost_total)}</td>
-                        <td className="px-2 py-1.5 font-mono text-right">{money(t.profit_total)}</td>
-                        <td className="px-2.5 py-1.5 text-[10px] text-muted-foreground whitespace-nowrap">
-                          {t.counted ? "counted" : "unpriced — skipped"}
-                        </td>
-                      </tr>
-                    ))}
+                    {tabs.map(t => {
+                      const on = choice ? choice[t.tab] : t.counted;
+                      const isTouched = (touched[row.id] || []).includes(t.tab);
+                      return (
+                        <tr key={t.tab} className={cn("border-t border-border/40", !on && "opacity-60")}>
+                          <td className="px-2.5 py-1.5">
+                            <span className="truncate">{t.tab}</span>
+                            {t.reason && (
+                              <span className="block text-[10px] text-muted-foreground">{t.reason}</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 font-mono text-right">
+                            {t.quoted_total === null ? "—" : money(t.quoted_total)}
+                          </td>
+                          <td className="px-2 py-1.5 font-mono text-right">{money(t.cost_total)}</td>
+                          <td className="px-2 py-1.5 font-mono text-right">{money(t.profit_total)}</td>
+                          <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
+                            {isAdmin ? (
+                              <div className="inline-flex rounded-md border border-border overflow-hidden">
+                                <button
+                                  onClick={() => setTab(row.id, t.tab, true)}
+                                  className={cn(
+                                    "px-2 py-0.5 text-[10px]",
+                                    on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                                  )}
+                                >
+                                  Counted
+                                </button>
+                                <button
+                                  onClick={() => setTab(row.id, t.tab, false)}
+                                  className={cn(
+                                    "px-2 py-0.5 text-[10px] border-l border-border",
+                                    !on ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted",
+                                  )}
+                                >
+                                  Excluded
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">{on ? "counted" : "excluded"}</span>
+                            )}
+                            {row.needs_review && !isTouched && (
+                              <span className="block text-[10px] text-destructive mt-0.5">not set</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -321,7 +437,7 @@ export default function CostingReview() {
 
             {isAdmin && (
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => approve(row)} disabled={busyId === row.id || !job}>
+                <Button size="sm" onClick={() => approve(row)} disabled={busyId === row.id || !job || blocked}>
                   {busyId === row.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Approve
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => reject(row)} disabled={busyId === row.id}>

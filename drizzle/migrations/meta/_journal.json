@@ -15,6 +15,13 @@
       "when": 1789489606847,
       "tag": "0001_costing_extraction",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789493987092,
+      "tag": "0002_costing_tab_decisions",
+      "breakpoints": true
     }
   ]
 }
