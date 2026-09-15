@@ -1035,7 +1035,9 @@ export type Database = {
           folder_url: string | null
           id: string
           job_id: string | null
+          needs_review: boolean
           purchasing_lines: Json
+          review_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           source_file_id: string | null
@@ -1043,6 +1045,7 @@ export type Database = {
           source_modified_at: string | null
           source_tab: string | null
           status: string
+          tab_breakdown: Json | null
           updated_at: string
         }
         Insert: {
@@ -1056,7 +1059,9 @@ export type Database = {
           folder_url?: string | null
           id?: string
           job_id?: string | null
+          needs_review?: boolean
           purchasing_lines?: Json
+          review_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           source_file_id?: string | null
@@ -1064,6 +1069,7 @@ export type Database = {
           source_modified_at?: string | null
           source_tab?: string | null
           status?: string
+          tab_breakdown?: Json | null
           updated_at?: string
         }
         Update: {
@@ -1077,7 +1083,9 @@ export type Database = {
           folder_url?: string | null
           id?: string
           job_id?: string | null
+          needs_review?: boolean
           purchasing_lines?: Json
+          review_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           source_file_id?: string | null
@@ -1085,6 +1093,7 @@ export type Database = {
           source_modified_at?: string | null
           source_tab?: string | null
           status?: string
+          tab_breakdown?: Json | null
           updated_at?: string
         }
         Relationships: [
@@ -1103,6 +1112,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cab_costing_tab_decisions: {
+        Row: {
+          company_id: string
+          counted: boolean
+          created_at: string
+          decided_at: string
+          decided_by: string | null
+          folder_name: string
+          id: string
+          tab_name: string
+        }
+        Insert: {
+          company_id: string
+          counted: boolean
+          created_at?: string
+          decided_at?: string
+          decided_by?: string | null
+          folder_name: string
+          id?: string
+          tab_name: string
+        }
+        Update: {
+          company_id?: string
+          counted?: boolean
+          created_at?: string
+          decided_at?: string
+          decided_by?: string | null
+          folder_name?: string
+          id?: string
+          tab_name?: string
+        }
+        Relationships: []
       }
       cab_customer_auth_links: {
         Row: {
