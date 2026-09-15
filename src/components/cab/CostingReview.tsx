@@ -84,7 +84,7 @@ export default function CostingReview() {
     const { data } = await supabase
       .from("cab_costing_extractions")
       .select("*")
-      .in("status", ["pending", "error", "not_found"])
+      .in("status", ["pending", "error", "not_found", "not_costed"])
       .order("created_at", { ascending: false });
 
     const list = (data || []) as unknown as Extraction[];
