@@ -20,6 +20,7 @@ interface DriveSettings {
   projects_root_folder_name: string | null;
   jobs_folder_id: string | null;
   jobs_folder_name: string | null;
+  sync_ignore_patterns: string[] | null;
   auto_create_jobs_from_folders: boolean;
   auto_index_files: boolean;
   auto_attach_dxfs: boolean;
@@ -358,6 +359,15 @@ export default function GoogleDriveIntegrationSettings() {
             await handleUpdateSetting("jobs_folder_id", id);
             await handleUpdateSetting("jobs_folder_name", name);
           }}
+        />
+      )}
+
+      {/* ─── Folders to skip during sync and costing extraction ─── */}
+      {isConnected && (
+        <IgnoreListConfig
+          key={(settings?.sync_ignore_patterns || []).join("|")}
+          patterns={settings?.sync_ignore_patterns || []}
+          onSave={async (patterns) => { await handleUpdateSetting("sync_ignore_patterns", patterns); }}
         />
       )}
 

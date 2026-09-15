@@ -1023,6 +1023,87 @@ export type Database = {
           },
         ]
       }
+      cab_costing_extractions: {
+        Row: {
+          ambiguous_files: Json
+          company_id: string
+          created_at: string
+          error: string | null
+          extracted: Json
+          folder_id: string | null
+          folder_name: string
+          folder_url: string | null
+          id: string
+          job_id: string | null
+          purchasing_lines: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_file_id: string | null
+          source_filename: string | null
+          source_modified_at: string | null
+          source_tab: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ambiguous_files?: Json
+          company_id: string
+          created_at?: string
+          error?: string | null
+          extracted?: Json
+          folder_id?: string | null
+          folder_name: string
+          folder_url?: string | null
+          id?: string
+          job_id?: string | null
+          purchasing_lines?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_file_id?: string | null
+          source_filename?: string | null
+          source_modified_at?: string | null
+          source_tab?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ambiguous_files?: Json
+          company_id?: string
+          created_at?: string
+          error?: string | null
+          extracted?: Json
+          folder_id?: string | null
+          folder_name?: string
+          folder_url?: string | null
+          id?: string
+          job_id?: string | null
+          purchasing_lines?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_file_id?: string | null
+          source_filename?: string | null
+          source_modified_at?: string | null
+          source_tab?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_costing_extractions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_costing_extractions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_customer_auth_links: {
         Row: {
           auth_user_id: string
@@ -1500,6 +1581,72 @@ export type Database = {
           },
         ]
       }
+      cab_job_purchasing_lines: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string
+          due_date: string | null
+          id: string
+          job_id: string
+          line_hash: string | null
+          line_total: number | null
+          product_url: string | null
+          qty: number | null
+          source_filename: string | null
+          supplier: string | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description: string
+          due_date?: string | null
+          id?: string
+          job_id: string
+          line_hash?: string | null
+          line_total?: number | null
+          product_url?: string | null
+          qty?: number | null
+          source_filename?: string | null
+          supplier?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string
+          due_date?: string | null
+          id?: string
+          job_id?: string
+          line_hash?: string | null
+          line_total?: number | null
+          product_url?: string | null
+          qty?: number | null
+          source_filename?: string | null
+          supplier?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_job_purchasing_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cab_job_purchasing_lines_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cab_job_sequences: {
         Row: {
           company_id: string
@@ -1550,6 +1697,9 @@ export type Database = {
           completion_certificate_url: string | null
           contract_currency: string | null
           contract_value: number | null
+          cost_total: number | null
+          costing_extracted_at: string | null
+          costing_source_filename: string | null
           created_at: string
           current_stage_key: string | null
           customer_id: string
@@ -1572,10 +1722,12 @@ export type Database = {
           fitter_signature_url: string | null
           fitter_signed_at: string | null
           fitter_signed_by: string | null
+          fixings_total: number | null
           forecast_cost_total: number | null
           forecast_margin_pct: number | null
           ghl_contact_id: string | null
           ghl_opportunity_id: string | null
+          hardware_total: number | null
           id: string
           install_assigned_to: string | null
           install_completed_at: string | null
@@ -1588,13 +1740,17 @@ export type Database = {
           install_window_start: string | null
           job_ref: string
           job_title: string
+          labour_total: number | null
           legacy_job_id: string | null
+          materials_subtotal: number | null
           production_stage: string | null
           production_stage_key: string
           profit_last_calculated_at: string | null
+          profit_total: number | null
           progress_payment_amount: number | null
           progress_payment_paid_at: string | null
           property_address_json: Json | null
+          quoted_total: number | null
           room_type: string | null
           sign_off_completed_at: string | null
           sign_off_signature_url: string | null
@@ -1633,6 +1789,9 @@ export type Database = {
           completion_certificate_url?: string | null
           contract_currency?: string | null
           contract_value?: number | null
+          cost_total?: number | null
+          costing_extracted_at?: string | null
+          costing_source_filename?: string | null
           created_at?: string
           current_stage_key?: string | null
           customer_id: string
@@ -1655,10 +1814,12 @@ export type Database = {
           fitter_signature_url?: string | null
           fitter_signed_at?: string | null
           fitter_signed_by?: string | null
+          fixings_total?: number | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
+          hardware_total?: number | null
           id?: string
           install_assigned_to?: string | null
           install_completed_at?: string | null
@@ -1671,13 +1832,17 @@ export type Database = {
           install_window_start?: string | null
           job_ref: string
           job_title: string
+          labour_total?: number | null
           legacy_job_id?: string | null
+          materials_subtotal?: number | null
           production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
+          profit_total?: number | null
           progress_payment_amount?: number | null
           progress_payment_paid_at?: string | null
           property_address_json?: Json | null
+          quoted_total?: number | null
           room_type?: string | null
           sign_off_completed_at?: string | null
           sign_off_signature_url?: string | null
@@ -1716,6 +1881,9 @@ export type Database = {
           completion_certificate_url?: string | null
           contract_currency?: string | null
           contract_value?: number | null
+          cost_total?: number | null
+          costing_extracted_at?: string | null
+          costing_source_filename?: string | null
           created_at?: string
           current_stage_key?: string | null
           customer_id?: string
@@ -1738,10 +1906,12 @@ export type Database = {
           fitter_signature_url?: string | null
           fitter_signed_at?: string | null
           fitter_signed_by?: string | null
+          fixings_total?: number | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
           ghl_opportunity_id?: string | null
+          hardware_total?: number | null
           id?: string
           install_assigned_to?: string | null
           install_completed_at?: string | null
@@ -1754,13 +1924,17 @@ export type Database = {
           install_window_start?: string | null
           job_ref?: string
           job_title?: string
+          labour_total?: number | null
           legacy_job_id?: string | null
+          materials_subtotal?: number | null
           production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
+          profit_total?: number | null
           progress_payment_amount?: number | null
           progress_payment_paid_at?: string | null
           property_address_json?: Json | null
+          quoted_total?: number | null
           room_type?: string | null
           sign_off_completed_at?: string | null
           sign_off_signature_url?: string | null
@@ -4624,6 +4798,7 @@ export type Database = {
           shared_media_folder_id: string | null
           shared_media_folder_name: string | null
           status: string
+          sync_ignore_patterns: string[] | null
           sync_mode: string
           tenant_id: string
           updated_at: string
@@ -4662,6 +4837,7 @@ export type Database = {
           shared_media_folder_id?: string | null
           shared_media_folder_name?: string | null
           status?: string
+          sync_ignore_patterns?: string[] | null
           sync_mode?: string
           tenant_id: string
           updated_at?: string
@@ -4700,6 +4876,7 @@ export type Database = {
           shared_media_folder_id?: string | null
           shared_media_folder_name?: string | null
           status?: string
+          sync_ignore_patterns?: string[] | null
           sync_mode?: string
           tenant_id?: string
           updated_at?: string

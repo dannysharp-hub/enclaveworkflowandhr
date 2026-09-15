@@ -847,7 +847,7 @@ Deno.serve(async (req) => {
     // ─── UPDATE SETTINGS ───
     if (action === "update_settings") {
       const allowedFields = [
-        "jobs_folder_id", "jobs_folder_name",
+        "jobs_folder_id", "jobs_folder_name", "sync_ignore_patterns",
         "auto_create_jobs_from_folders", "auto_index_files", "auto_attach_dxfs",
         "folder_name_pattern", "job_number_parse_regex", "sync_mode",
         "polling_interval_minutes", "auto_upload_exports",
