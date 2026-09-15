@@ -3902,6 +3902,51 @@ export type Database = {
           },
         ]
       }
+      drive_sync_candidates: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_job_id: string | null
+          folder_id: string
+          folder_name: string
+          folder_url: string | null
+          id: string
+          job_ref: string | null
+          last_seen_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_job_id?: string | null
+          folder_id: string
+          folder_name: string
+          folder_url?: string | null
+          id?: string
+          job_ref?: string | null
+          last_seen_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_job_id?: string | null
+          folder_id?: string
+          folder_name?: string
+          folder_url?: string | null
+          id?: string
+          job_ref?: string | null
+          last_seen_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       drive_sync_queue: {
         Row: {
           action: string
@@ -4569,6 +4614,8 @@ export type Database = {
           include_subfolders: boolean
           is_connected: boolean
           job_number_parse_regex: string
+          jobs_folder_id: string | null
+          jobs_folder_name: string | null
           last_error_message: string | null
           last_sync_at: string | null
           polling_interval_minutes: number
@@ -4605,6 +4652,8 @@ export type Database = {
           include_subfolders?: boolean
           is_connected?: boolean
           job_number_parse_regex?: string
+          jobs_folder_id?: string | null
+          jobs_folder_name?: string | null
           last_error_message?: string | null
           last_sync_at?: string | null
           polling_interval_minutes?: number
@@ -4641,6 +4690,8 @@ export type Database = {
           include_subfolders?: boolean
           is_connected?: boolean
           job_number_parse_regex?: string
+          jobs_folder_id?: string | null
+          jobs_folder_name?: string | null
           last_error_message?: string | null
           last_sync_at?: string | null
           polling_interval_minutes?: number

@@ -18,6 +18,8 @@ interface DriveSettings {
   status: string;
   projects_root_folder_id: string | null;
   projects_root_folder_name: string | null;
+  jobs_folder_id: string | null;
+  jobs_folder_name: string | null;
   auto_create_jobs_from_folders: boolean;
   auto_index_files: boolean;
   auto_attach_dxfs: boolean;
@@ -346,7 +348,21 @@ export default function GoogleDriveIntegrationSettings() {
         )}
       </div>
 
+      {/* ─── Jobs Folder (used by the nightly job folder sync) ─── */}
+      {isConnected && (
+        <JobsFolderConfig
+          key={settings?.jobs_folder_id || "none"}
+          folderId={settings?.jobs_folder_id || ""}
+          folderName={settings?.jobs_folder_name || ""}
+          onSave={async (id, name) => {
+            await handleUpdateSetting("jobs_folder_id", id);
+            await handleUpdateSetting("jobs_folder_name", name);
+          }}
+        />
+      )}
+
       {/* ─── Root Folder ─── */}
+
       {isConnected && (
         <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
           <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">Projects Root Folder</h4>
@@ -859,6 +875,86 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
             value && "translate-x-5"
           )}
         />
+      </button>
+    </div>
+  );
+}
+
+/* ─── Jobs Folder Config (source folder for the job folder sync) ─── */
+
+function JobsFolderConfig({ folderId, folderName, onSave }: {
+  folderId: string;
+  folderName: string;
+  onSave: (id: string, name: string) => Promise<void>;
+}) {
+  const [id, setId] = useState(folderId);
+  const [name, setName] = useState(folderName);
+  const [saving, setSaving] = useState(false);
+
+  const dirty = id.trim() !== folderId || name.trim() !== folderName;
+
+  const save = async () => {
+    if (!id.trim()) {
+      toast({ title: "Folder ID required", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(id.trim(), name.trim() || "_Jobs");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel rounded-lg p-5 space-y-4 max-w-2xl">
+      <div>
+        <h4 className="font-mono text-xs font-bold text-foreground uppercase tracking-wider">Jobs Folder</h4>
+        <p className="text-xs text-muted-foreground mt-1">
+          The Drive folder holding one subfolder per job. Used by the nightly folder sync and the
+          Sync now button on the Jobs page.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className={labelClass}>Folder ID</label>
+          <input
+            className={inputClass}
+            value={id}
+            onChange={e => setId(e.target.value)}
+            placeholder="1AbC…"
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Display Name</label>
+          <input
+            className={inputClass}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="_Jobs"
+          />
+        </div>
+      </div>
+
+      {id.trim() && (
+        <a
+          href={`https://drive.google.com/drive/folders/${id.trim()}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+        >
+          <FolderOpen size={12} /> Open in Drive
+        </a>
+      )}
+
+      <button
+        onClick={save}
+        disabled={saving || !dirty}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+        Save Jobs Folder
       </button>
     </div>
   );

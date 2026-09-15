@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
 import { getCabCompanyId, generateJobRef, insertCabEvent } from "@/lib/cabHelpers";
 import { deleteCabJob } from "@/lib/cabJobDelete";
@@ -106,173 +107,35 @@ export default function LeadsPage() {
     return map;
   }, [allActiveJobs, duplicateCustomerIds]);
 
-  const handleImportFromDrive = async () => {
-    if (!companyId) return;
+  // Runs the whole sync server-side. Never creates jobs or customers —
+  // unmatched Drive folders go to Approvals for review.
+  const handleSyncNow = async () => {
     setImporting(true);
     try {
-      // Step 1: Find the _Jobs folder via edge function (single call, no pagination)
-      const { data: jobsFolderData, error: findErr } = await supabase.functions.invoke("google-drive-auth", {
-        body: { action: "find_jobs_folder" },
+      const { data, error } = await supabase.functions.invoke("drive-folder-sync", { body: {} });
+
+      if (error) {
+        const details = error instanceof FunctionsHttpError
+          ? await error.context.text()
+          : error.message;
+        throw new Error(details || error.message);
+      }
+      if (data && data.ok === false) {
+        throw new Error(data.error || (data.errors || []).join("; ") || "Sync failed");
+      }
+
+      toast({
+        title: "Drive sync complete",
+        description: `${data.linked} folder(s) linked · ${data.candidates} awaiting review · ${data.missing} job(s) with no folder`,
       });
-      if (findErr) throw findErr;
-      if (jobsFolderData?.error) throw new Error(jobsFolderData.error);
-
-      const jobsFolderId = jobsFolderData.folder_id;
-      console.log(`[Drive Import] Found _Jobs folder: ${jobsFolderId}`);
-
-      // Step 2: Paginate ALL subfolders client-side
-      const allFolders: { id: string; name: string; webViewLink?: string }[] = [];
-      let pageToken: string | null = null;
-      let pageNum = 0;
-      do {
-        pageNum++;
-        console.log(`[Drive Import] Fetching page ${pageNum}, pageToken=${pageToken || "START"}`);
-        const { data: pageData, error: pageErr } = await supabase.functions.invoke("google-drive-auth", {
-          body: { action: "list_drive_folders_page", parent_id: jobsFolderId, page_token: pageToken },
-        });
-        if (pageErr) throw pageErr;
-        if (pageData?.error) throw new Error(pageData.error);
-
-        const files = pageData.files || [];
-        console.log(`[Drive Import] Page ${pageNum}: ${files.length} folders, hasNext: ${!!pageData.next_page_token}`);
-        allFolders.push(...files);
-        pageToken = pageData.next_page_token || null;
-      } while (pageToken);
-
-      console.log(`[Drive Import] Total folders found: ${allFolders.length}`);
-      console.log('[Drive Import] All folder names collected:', allFolders.map(f => f.name));
-
-      // Step 3: Load existing cab_jobs and do matching client-side
-      const { data: dbJobs } = await (supabase.from("cab_jobs") as any)
-        .select("id, job_ref")
-        .eq("company_id", companyId);
-      const jobs = (dbJobs || []) as { id: string; job_ref: string }[];
-      console.log(`[Drive Import] job_refs in DB (${jobs.length}):`, jobs.map(j => j.job_ref));
-
-      // Step 4: Match, create, or skip
-      let matched = 0;
-      let created = 0;
-      const skippedDetails: { folder: string; reason: string }[] = [];
-      const conflicts: string[] = [];
-
-      for (const folder of allFolders) {
-        const folderName = folder.name.trim();
-        if (!folderName) {
-          skippedDetails.push({ folder: folder.name, reason: "empty_ref" });
-          continue;
-        }
-
-        const numMatch = folderName.match(/^(\d+)/);
-        const numPrefix = numMatch ? parseInt(numMatch[1], 10) : null;
-
-        const match = jobs.find(j => j.job_ref.toLowerCase() === folderName.toLowerCase());
-
-        if (match) {
-          const { error: linkErr } = await (supabase.from("cab_job_files") as any).insert({
-            company_id: companyId,
-            job_id: match.id,
-            url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
-            file_type: "drive_folder",
-          });
-          if (linkErr) {
-            conflicts.push(`Failed to link "${folder.name}": ${linkErr.message}`);
-            continue;
-          }
-          matched++;
-          continue;
-        }
-
-        // No match — auto-create if numeric prefix >= 046
-        if (numPrefix === null || numPrefix < 46) {
-          skippedDetails.push({ folder: folder.name, reason: numPrefix === null ? "no_numeric_prefix" : `prefix_${numPrefix}_below_046` });
-          continue;
-        }
-
-        const underscoreIdx = folderName.indexOf("_");
-        const rawDisplayName = underscoreIdx >= 0 ? folderName.slice(underscoreIdx + 1) : folderName;
-        const jobTitle = rawDisplayName
-          .replace(/([a-z])([A-Z])/g, "$1 $2")
-          .replace(/_/g, " ")
-          .trim();
-
-        try {
-          // Look up or create customer
-          const { data: existingCust } = await (supabase.from("cab_customers") as any)
-            .select("id")
-            .eq("company_id", companyId)
-            .ilike("first_name", jobTitle)
-            .limit(1)
-            .maybeSingle();
-
-          let customerId: string;
-          if (existingCust?.id) {
-            customerId = existingCust.id;
-          } else {
-            const { data: newCust, error: custErr } = await (supabase.from("cab_customers") as any)
-              .insert({ company_id: companyId, first_name: jobTitle, last_name: "" })
-              .select("id")
-              .single();
-            if (custErr) throw custErr;
-            customerId = newCust.id;
-          }
-
-          const { data: newJob, error: jobErr } = await (supabase.from("cab_jobs") as any)
-            .insert({
-              company_id: companyId,
-              job_ref: folderName,
-              job_title: jobTitle,
-              current_stage_key: "lead",
-              customer_id: customerId,
-              status: "lead",
-            })
-            .select("id")
-            .single();
-          if (jobErr) throw jobErr;
-
-          await (supabase.from("cab_job_files") as any).insert({
-            company_id: companyId,
-            job_id: newJob.id,
-            url: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
-            file_type: "drive_folder",
-          });
-
-          // Auto-create Drive folder, then generate Job Card PDF
-          supabase.functions.invoke("google-drive-auth", {
-            body: { action: "create_cab_job_folder", cab_job_id: newJob.id },
-          }).then(() => {
-            supabase.functions.invoke("google-drive-auth", {
-              body: { action: "generate_job_card", cab_job_id: newJob.id },
-            }).catch(() => {});
-          }).catch(() => {});
-
-          created++;
-          console.log(`[Drive Import] Created job "${folderName}" → ${newJob.id}`);
-        } catch (createErr: any) {
-          conflicts.push(`Failed to create "${folder.name}": ${createErr.message}`);
-        }
-      }
-
-      console.log(`[Drive Import] Summary: ${matched} linked, ${created} created, ${skippedDetails.length} skipped`);
-
-      if (matched === 0 && created === 0 && conflicts.length === 0) {
-        const skipReasons = skippedDetails.slice(0, 10).map((s) => `• ${s.folder}: ${s.reason}`).join("\n");
-        toast({
-          title: "No folders matched or created",
-          description: `Found ${allFolders.length} folder(s) in _Jobs. ${skippedDetails.length} skipped:\n${skipReasons || "None"}`,
-        });
-      } else {
-        toast({
-          title: `${matched} linked, ${created} created, ${skippedDetails.length} skipped`,
-          description: `${allFolders.length} total folders scanned.${conflicts.length > 0 ? ` ${conflicts.length} conflict(s)` : ""}`,
-        });
-        load();
-      }
+      load();
     } catch (err: any) {
-      toast({ title: "Drive import failed", description: err.message, variant: "destructive" });
+      toast({ title: "Drive sync failed", description: err.message, variant: "destructive" });
     } finally {
       setImporting(false);
     }
   };
+
 
   const handleDeleteLead = useCallback(async () => {
     if (!deleteLead) return;
@@ -296,10 +159,11 @@ export default function LeadsPage() {
           <p className="text-sm text-muted-foreground">{leads.length} active job{leads.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleImportFromDrive} disabled={importing || !companyId}>
+          <Button variant="outline" onClick={handleSyncNow} disabled={importing}>
             {importing ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
-            {importing ? "Importing…" : "Import from Drive"}
+            {importing ? "Syncing…" : "Sync now"}
           </Button>
+
           {canCreateJobs(userRole) && <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> New Job</Button>}
         </div>
       </div>
