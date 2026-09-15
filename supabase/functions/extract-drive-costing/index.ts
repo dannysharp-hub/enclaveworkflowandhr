@@ -381,7 +381,9 @@ function parseCosting(rows: string[][]): Partial<Extracted> {
     const vals = Object.values(sectionTotals);
     if (vals.length) costTotal = vals.reduce((a, b) => a + b, 0);
   }
-  if (profit === null && quoted !== null && costTotal !== null) profit = quoted - costTotal;
+  // Never derive figures the sheet does not state. In particular the footer
+  // total excludes the Time section (markup 1), so cost + profit is NOT the
+  // quoted sell price — leave quoted_total null when the sheet omits it.
 
   return {
     section_totals: sectionTotals,
