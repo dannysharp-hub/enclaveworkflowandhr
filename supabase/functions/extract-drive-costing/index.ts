@@ -236,9 +236,23 @@ interface Extracted {
   hardware_total: number | null;
   fixings_total: number | null;
   section_totals: Record<string, number>;
+  tab_breakdown: TabFigures[];
   purchasing_lines: PurchasingLine[];
   found_purchasing_table: boolean;
   found_costing_table: boolean;
+  all_zero: boolean;
+}
+
+interface TabFigures {
+  tab: string;
+  quoted_total: number | null;
+  cost_total: number | null;
+  profit_total: number | null;
+  labour_total: number | null;
+  materials_subtotal: number | null;
+  hardware_total: number | null;
+  fixings_total: number | null;
+  counted: boolean;
 }
 
 function findHeaderRow(rows: string[][], needles: string[]): number {
