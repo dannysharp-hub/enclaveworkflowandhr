@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.send-ballpark-email]
 verify_jwt = false
+
+[functions.extract-drive-costing]
+verify_jwt = false

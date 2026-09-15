@@ -20,6 +20,7 @@ interface DriveSettings {
   projects_root_folder_name: string | null;
   jobs_folder_id: string | null;
   jobs_folder_name: string | null;
+  sync_ignore_patterns: string[] | null;
   auto_create_jobs_from_folders: boolean;
   auto_index_files: boolean;
   auto_attach_dxfs: boolean;
