@@ -619,23 +619,27 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
     }));
     if (others.length) result.ambiguous++;
 
-    // ── read and parse ──
+    // ── read and parse (whole workbook: tables sit on different tabs) ──
     let extracted: Extracted | null = null;
-    let usedTab = "Sheet 1";
+    let usedTab: string | null = null;
     let parseError: string | null = null;
     try {
-      const csv = await exportCsv(accessToken, chosen.id);
-      const rows = parseCsv(csv);
-      const first = extractFromRows(rows);
-      if (first.found_costing_table) {
-        extracted = first;
-      } else {
-        const tabs = await exportAllTabs(accessToken, chosen.id);
-        for (const t of tabs) {
-          const e = extractFromRows(t.rows);
-          if (e.found_costing_table) { extracted = e; usedTab = t.tab; break; }
+      let tabs: { tab: string; rows: string[][] }[];
+      try {
+        tabs = await exportAllTabs(accessToken, chosen.id);
+      } catch {
+        // Fall back to a plain CSV export of the first tab
+        tabs = [{ tab: "Sheet 1", rows: parseCsv(await exportCsv(accessToken, chosen.id)) }];
+      }
+      const out = extractFromTabs(tabs);
+      usedTab = out.costingTab;
+      if (out.extracted.found_costing_table || out.extracted.purchasing_lines.length) {
+        extracted = out.extracted;
+        if (!out.extracted.found_costing_table) {
+          parseError = "No costing table found — purchasing lines only.";
         }
-        if (!extracted) parseError = "No costing table found in any tab of this sheet.";
+      } else {
+        parseError = "No costing or purchasing table found in this sheet.";
       }
     } catch (err) {
       parseError = err instanceof Error ? err.message : String(err);
