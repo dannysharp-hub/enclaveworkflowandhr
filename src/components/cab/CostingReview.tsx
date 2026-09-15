@@ -336,14 +336,18 @@ export default function CostingReview() {
       {problems.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4 space-y-2">
           <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            No costing sheet found / could not be read ({problems.length})
+            Not costed / no sheet found / could not be read ({problems.length})
           </p>
           <div className="space-y-1">
             {problems.map(p => (
               <div key={p.id} className="flex items-center justify-between gap-3 text-xs">
                 <span className="font-mono text-foreground truncate">{p.folder_name}</span>
                 <span className="text-muted-foreground truncate">
-                  {p.status === "not_found" ? "No costing sheet found" : p.error || "Could not be read"}
+                  {p.status === "not_found"
+                    ? "No costing sheet found"
+                    : p.status === "not_costed"
+                      ? "Not yet costed — every tab priced at zero"
+                      : p.error || "Could not be read"}
                 </span>
               </div>
             ))}
