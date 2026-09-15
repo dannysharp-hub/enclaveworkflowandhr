@@ -236,9 +236,23 @@ interface Extracted {
   hardware_total: number | null;
   fixings_total: number | null;
   section_totals: Record<string, number>;
+  tab_breakdown: TabFigures[];
   purchasing_lines: PurchasingLine[];
   found_purchasing_table: boolean;
   found_costing_table: boolean;
+  all_zero: boolean;
+}
+
+interface TabFigures {
+  tab: string;
+  quoted_total: number | null;
+  cost_total: number | null;
+  profit_total: number | null;
+  labour_total: number | null;
+  materials_subtotal: number | null;
+  hardware_total: number | null;
+  fixings_total: number | null;
+  counted: boolean;
 }
 
 function findHeaderRow(rows: string[][], needles: string[]): number {
@@ -381,7 +395,9 @@ function parseCosting(rows: string[][]): Partial<Extracted> {
     const vals = Object.values(sectionTotals);
     if (vals.length) costTotal = vals.reduce((a, b) => a + b, 0);
   }
-  if (profit === null && quoted !== null && costTotal !== null) profit = quoted - costTotal;
+  // Never derive figures the sheet does not state. In particular the footer
+  // total excludes the Time section (markup 1), so cost + profit is NOT the
+  // quoted sell price — leave quoted_total null when the sheet omits it.
 
   return {
     section_totals: sectionTotals,
@@ -397,15 +413,21 @@ function parseCosting(rows: string[][]): Partial<Extracted> {
 }
 
 /**
- * Both tables usually live on different tabs: purchasing on a "Buy List" tab,
- * costing on a per-room tab. Take purchasing from whichever tab yields the most
- * lines, and costing from the first tab that actually holds a costing table.
+ * A workbook holds a purchasing ("Buy List") tab plus one costing tab PER ROOM /
+ * ITEM OF WORK. Those tabs are separate work, not alternatives, so every tab with
+ * non-zero figures is summed into one job total and the per-tab breakdown is kept.
+ * All-zero tabs are priced options nobody bought and are excluded.
  */
 function extractFromTabs(tabs: { tab: string; rows: string[][] }[]): { extracted: Extracted; costingTab: string | null } {
   let lines: PurchasingLine[] = [];
   let foundPurchasing = false;
-  let costing: Partial<Extracted> | null = null;
-  let costingTab: string | null = null;
+  let foundCosting = false;
+  const breakdown: TabFigures[] = [];
+
+  const NUMERIC = [
+    "quoted_total", "cost_total", "profit_total",
+    "materials_subtotal", "labour_total", "hardware_total", "fixings_total",
+  ] as const;
 
   for (const t of tabs) {
     const p = parsePurchasing(t.rows);
@@ -413,27 +435,66 @@ function extractFromTabs(tabs: { tab: string; rows: string[][] }[]): { extracted
       foundPurchasing = true;
       if (p.lines.length > lines.length) lines = p.lines;
     }
-    if (!costing) {
-      const c = parseCosting(t.rows);
-      if (c.found_costing_table) { costing = c; costingTab = t.tab; }
+
+    const c = parseCosting(t.rows);
+    if (!c.found_costing_table) continue;
+    foundCosting = true;
+
+    const figures = NUMERIC.map((k) => (c[k] ?? null) as number | null);
+    const sectionsNonZero = Object.values(c.section_totals ?? {}).some((v) => v !== 0);
+    const counted = figures.some((v) => v !== null && v !== 0) || sectionsNonZero;
+
+    breakdown.push({
+      tab: t.tab,
+      quoted_total: c.quoted_total ?? null,
+      cost_total: c.cost_total ?? null,
+      profit_total: c.profit_total ?? null,
+      labour_total: c.labour_total ?? null,
+      materials_subtotal: c.materials_subtotal ?? null,
+      hardware_total: c.hardware_total ?? null,
+      fixings_total: c.fixings_total ?? null,
+      counted,
+    });
+  }
+
+  const counted = breakdown.filter((b) => b.counted);
+
+  // Sum only values the sheets actually state; null stays null when no tab states it.
+  const sum = (key: keyof TabFigures): number | null => {
+    const vals = counted.map((b) => b[key] as number | null).filter((v): v is number => v !== null);
+    if (!vals.length) return null;
+    return Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100;
+  };
+
+  const sectionTotals: Record<string, number> = {};
+  for (const t of tabs) {
+    const c = parseCosting(t.rows);
+    if (!c.found_costing_table) continue;
+    if (!counted.some((b) => b.tab === t.tab)) continue;
+    for (const [k, v] of Object.entries(c.section_totals ?? {})) {
+      sectionTotals[k] = Math.round(((sectionTotals[k] ?? 0) + v) * 100) / 100;
     }
   }
 
   return {
     extracted: {
-      quoted_total: costing?.quoted_total ?? null,
-      cost_total: costing?.cost_total ?? null,
-      profit_total: costing?.profit_total ?? null,
-      materials_subtotal: costing?.materials_subtotal ?? null,
-      labour_total: costing?.labour_total ?? null,
-      hardware_total: costing?.hardware_total ?? null,
-      fixings_total: costing?.fixings_total ?? null,
-      section_totals: costing?.section_totals ?? {},
+      quoted_total: sum("quoted_total"),
+      cost_total: sum("cost_total"),
+      profit_total: sum("profit_total"),
+      materials_subtotal: sum("materials_subtotal"),
+      labour_total: sum("labour_total"),
+      hardware_total: sum("hardware_total"),
+      fixings_total: sum("fixings_total"),
+      section_totals: sectionTotals,
+      tab_breakdown: breakdown,
       purchasing_lines: lines,
       found_purchasing_table: foundPurchasing,
-      found_costing_table: !!costing,
+      found_costing_table: foundCosting,
+      all_zero: foundCosting && counted.length === 0,
     },
-    costingTab,
+    costingTab: counted.length
+      ? counted.map((b) => b.tab).join(" + ")
+      : breakdown.length ? breakdown.map((b) => b.tab).join(" + ") : null,
   };
 }
 
@@ -645,6 +706,13 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
       parseError = err instanceof Error ? err.message : String(err);
     }
 
+    if (extracted?.all_zero) {
+      parseError = "Not yet costed — every tab is priced at zero quantity.";
+    }
+    if (extracted && extracted.found_costing_table && extracted.quoted_total === null) {
+      parseError = [parseError, "Sell not filled in on sheet."].filter(Boolean).join(" ");
+    }
+
     const notes = [matchNote, parseError].filter(Boolean).join(" ");
     const { error: upErr } = await admin.from("cab_costing_extractions").upsert({
       company_id: companyId,
@@ -666,11 +734,13 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
             hardware_total: extracted.hardware_total,
             fixings_total: extracted.fixings_total,
             section_totals: extracted.section_totals,
+            tab_breakdown: extracted.tab_breakdown,
+            all_zero: extracted.all_zero,
           }
         : {},
       purchasing_lines: extracted?.purchasing_lines ?? [],
       ambiguous_files: others,
-      status: extracted ? "pending" : "error",
+      status: !extracted ? "error" : extracted.all_zero ? "not_costed" : "pending",
       error: notes || null,
     }, { onConflict: "company_id,folder_name,source_modified_at", ignoreDuplicates: false });
 
