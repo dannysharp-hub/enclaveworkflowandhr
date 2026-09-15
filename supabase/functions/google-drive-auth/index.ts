@@ -1198,9 +1198,20 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Hardcoded _Jobs folder ID
-      const JOBS_FOLDER_ID = "1FfyX8aL26pX3aLAvw2I7LWgGL4EjdMa7";
+      // _Jobs folder from settings
+      const { data: jobsSettings } = await supabaseAdmin
+        .from("google_drive_integration_settings")
+        .select("jobs_folder_id")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (!jobsSettings?.jobs_folder_id) {
+        return new Response(JSON.stringify({ error: "No Jobs folder configured. Set the Jobs folder ID in Google Drive settings." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const JOBS_FOLDER_ID = jobsSettings.jobs_folder_id as string;
       const accessToken = await getAccessToken();
+
 
       // Search for the exact folder name inside _Jobs
       const searchQuery = `'${JOBS_FOLDER_ID}' in parents and name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
