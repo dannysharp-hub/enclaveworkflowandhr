@@ -765,6 +765,26 @@ Deno.serve(async (req) => {
       const { data: t } = await admin
         .from("google_drive_integration_settings").select("tenant_id").eq("is_connected", true).limit(1).maybeSingle();
       const at = await getAccessToken(admin, t!.tenant_id as string);
+      if (body.per_tab) {
+        const tabs = await exportAllTabs(at, String(body.file_id));
+        return json({
+          ok: true,
+          tabs: tabs.map((x) => {
+            const c = parseCosting(x.rows);
+            const p = parsePurchasing(x.rows);
+            return {
+              tab: x.tab,
+              costing: !!c.found_costing_table,
+              purchasing_lines: p.found ? p.lines.length : 0,
+              quoted_total: c.quoted_total ?? null,
+              cost_total: c.cost_total ?? null,
+              profit_total: c.profit_total ?? null,
+              labour_total: c.labour_total ?? null,
+              materials_subtotal: c.materials_subtotal ?? null,
+            };
+          }),
+        });
+      }
       if (body.all_tabs) {
         const tabs = await exportAllTabs(at, String(body.file_id));
         return json({
