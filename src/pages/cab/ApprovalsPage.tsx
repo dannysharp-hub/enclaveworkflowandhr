@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { CheckCircle2, XCircle, Clock, FileText, Send, ClipboardCheck, Banknote, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import DriveSyncCandidates from "@/components/cab/DriveSyncCandidates";
 
 const ACTION_LABELS: Record<string, string> = {
   job_edit: "Job Edit",
