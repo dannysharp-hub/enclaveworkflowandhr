@@ -292,10 +292,12 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "No workspace found for this account." }, 400);
     }
 
-    const { data: roleRow } = await admin
-      .from("user_roles").select("role").eq("user_id", userId).maybeSingle();
-    const role = (roleRow?.role as string) || "viewer";
-    if (!["admin", "supervisor"].includes(role)) {
+    // A user may hold several roles — read them all, not a single row.
+    const { data: roleRows } = await admin
+      .from("user_roles").select("role").eq("user_id", userId);
+    const roles = ((roleRows || []) as { role: string }[]).map(r => r.role);
+    const allowed = ["admin", "super_admin", "supervisor"];
+    if (!roles.some(r => allowed.includes(r))) {
       return json({ ok: false, error: "Admin or supervisor required." }, 403);
     }
 
