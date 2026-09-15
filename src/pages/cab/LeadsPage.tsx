@@ -136,6 +136,35 @@ export default function LeadsPage() {
     }
   };
 
+  // Reads each job folder's costing sheet into a staging area for review.
+  // Nothing is written to a job until it is approved on the Approvals page.
+  const handleExtractCostings = async () => {
+    setExtracting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-drive-costing", { body: {} });
+
+      if (error) {
+        const details = error instanceof FunctionsHttpError
+          ? await error.context.text()
+          : error.message;
+        throw new Error(details || error.message);
+      }
+      if (data && data.ok === false) {
+        throw new Error(data.error || (data.errors || []).join("; ") || "Extraction failed");
+      }
+
+      toast({
+        title: "Costings read",
+        description: `${data.staged} ready for review · ${data.ambiguous} with more than one sheet · ${data.not_found} with no costing sheet`,
+      });
+    } catch (err: any) {
+      toast({ title: "Costing extraction failed", description: err.message, variant: "destructive" });
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+
 
   const handleDeleteLead = useCallback(async () => {
     if (!deleteLead) return;
