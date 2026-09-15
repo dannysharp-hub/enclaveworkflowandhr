@@ -231,13 +231,18 @@ export default function CostingReview() {
               {FIELDS.map(f => {
                 const next = ex[f.key as string] ?? null;
                 const current = job ? job[f.key] : null;
-                const changed = current !== null && current !== undefined && Number(current) !== Number(next);
+                const changed = next !== null && current !== null && current !== undefined && Number(current) !== Number(next);
+                const notStated = f.key === "quoted_total" && next === null;
                 return (
                   <div key={f.key} className="rounded-md bg-muted/30 p-2">
                     <p className="text-[10px] font-mono uppercase text-muted-foreground">{f.label}</p>
-                    <p className={cn("text-sm font-mono font-bold", changed ? "text-warning" : "text-foreground")}>
-                      {money(next as number | null)}
-                    </p>
+                    {notStated ? (
+                      <p className="text-[11px] text-warning leading-tight mt-0.5">Sell not filled in on sheet</p>
+                    ) : (
+                      <p className={cn("text-sm font-mono font-bold", changed ? "text-warning" : "text-foreground")}>
+                        {money(next as number | null)}
+                      </p>
+                    )}
                     {changed && (
                       <p className="text-[10px] font-mono text-muted-foreground line-through">{money(current as number)}</p>
                     )}
@@ -245,6 +250,31 @@ export default function CostingReview() {
                 );
               })}
             </div>
+
+            {Array.isArray(ex.tab_breakdown) && ex.tab_breakdown.length > 1 && (
+              <div className="rounded-md border border-border/60 overflow-hidden">
+                <p className="px-2.5 py-1.5 bg-muted/40 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                  Per-room breakdown — totals above are the sum of the priced rooms
+                </p>
+                <table className="w-full text-xs">
+                  <tbody>
+                    {ex.tab_breakdown.map((t: any) => (
+                      <tr key={t.tab} className={cn("border-t border-border/40", !t.counted && "opacity-50")}>
+                        <td className="px-2.5 py-1.5 truncate">{t.tab}</td>
+                        <td className="px-2 py-1.5 font-mono text-right">
+                          {t.quoted_total === null ? "—" : money(t.quoted_total)}
+                        </td>
+                        <td className="px-2 py-1.5 font-mono text-right">{money(t.cost_total)}</td>
+                        <td className="px-2 py-1.5 font-mono text-right">{money(t.profit_total)}</td>
+                        <td className="px-2.5 py-1.5 text-[10px] text-muted-foreground whitespace-nowrap">
+                          {t.counted ? "counted" : "unpriced — skipped"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-3">
               <button
