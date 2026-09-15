@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -708,6 +708,68 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "cab_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cab_approval_requests: {
+        Row: {
+          action_type: string
+          company_id: string
+          created_at: string
+          id: string
+          notification_dismissed_by_requester: boolean
+          payload_json: Json | null
+          rejection_reason: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          summary: string
+          target_id: string
+          target_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          company_id: string
+          created_at?: string
+          id?: string
+          notification_dismissed_by_requester?: boolean
+          payload_json?: Json | null
+          rejection_reason?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          summary: string
+          target_id: string
+          target_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          notification_dismissed_by_requester?: boolean
+          payload_json?: Json | null
+          rejection_reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          summary?: string
+          target_id?: string
+          target_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cab_approval_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1485,15 +1547,31 @@ export type Database = {
           budget_overheads: number | null
           budget_subcontract: number | null
           company_id: string
+          completion_certificate_url: string | null
           contract_currency: string | null
           contract_value: number | null
           created_at: string
           current_stage_key: string | null
           customer_id: string
           customer_signoff_at: string | null
+          deposit_amount: number | null
+          deposit_paid_at: string | null
+          drive_folder_id: string | null
+          drive_folder_name: string | null
+          dry_fit_completed: boolean | null
+          dry_fit_completed_at: string | null
+          dry_fit_photo_urls: string[] | null
           estimated_labour_hours: number | null
           estimated_next_action_at: string | null
           estimated_remaining_cost: number | null
+          final_payment_amount: number | null
+          final_payment_paid_at: string | null
+          final_signoff_url: string | null
+          fitter_checklist_json: Json | null
+          fitter_notes: string | null
+          fitter_signature_url: string | null
+          fitter_signed_at: string | null
+          fitter_signed_by: string | null
           forecast_cost_total: number | null
           forecast_margin_pct: number | null
           ghl_contact_id: string | null
@@ -1514,11 +1592,16 @@ export type Database = {
           production_stage: string | null
           production_stage_key: string
           profit_last_calculated_at: string | null
+          progress_payment_amount: number | null
+          progress_payment_paid_at: string | null
           property_address_json: Json | null
           room_type: string | null
           sign_off_completed_at: string | null
           sign_off_signature_url: string | null
           sign_off_token: string | null
+          site_visit_2_completed: boolean | null
+          site_visit_2_date: string | null
+          site_visit_2_notes: string | null
           state: string | null
           status: string
           target_margin_pct: number | null
@@ -1547,15 +1630,31 @@ export type Database = {
           budget_overheads?: number | null
           budget_subcontract?: number | null
           company_id: string
+          completion_certificate_url?: string | null
           contract_currency?: string | null
           contract_value?: number | null
           created_at?: string
           current_stage_key?: string | null
           customer_id: string
           customer_signoff_at?: string | null
+          deposit_amount?: number | null
+          deposit_paid_at?: string | null
+          drive_folder_id?: string | null
+          drive_folder_name?: string | null
+          dry_fit_completed?: boolean | null
+          dry_fit_completed_at?: string | null
+          dry_fit_photo_urls?: string[] | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null
+          final_payment_amount?: number | null
+          final_payment_paid_at?: string | null
+          final_signoff_url?: string | null
+          fitter_checklist_json?: Json | null
+          fitter_notes?: string | null
+          fitter_signature_url?: string | null
+          fitter_signed_at?: string | null
+          fitter_signed_by?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
@@ -1576,11 +1675,16 @@ export type Database = {
           production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
+          progress_payment_amount?: number | null
+          progress_payment_paid_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
           sign_off_completed_at?: string | null
           sign_off_signature_url?: string | null
           sign_off_token?: string | null
+          site_visit_2_completed?: boolean | null
+          site_visit_2_date?: string | null
+          site_visit_2_notes?: string | null
           state?: string | null
           status?: string
           target_margin_pct?: number | null
@@ -1609,15 +1713,31 @@ export type Database = {
           budget_overheads?: number | null
           budget_subcontract?: number | null
           company_id?: string
+          completion_certificate_url?: string | null
           contract_currency?: string | null
           contract_value?: number | null
           created_at?: string
           current_stage_key?: string | null
           customer_id?: string
           customer_signoff_at?: string | null
+          deposit_amount?: number | null
+          deposit_paid_at?: string | null
+          drive_folder_id?: string | null
+          drive_folder_name?: string | null
+          dry_fit_completed?: boolean | null
+          dry_fit_completed_at?: string | null
+          dry_fit_photo_urls?: string[] | null
           estimated_labour_hours?: number | null
           estimated_next_action_at?: string | null
           estimated_remaining_cost?: number | null
+          final_payment_amount?: number | null
+          final_payment_paid_at?: string | null
+          final_signoff_url?: string | null
+          fitter_checklist_json?: Json | null
+          fitter_notes?: string | null
+          fitter_signature_url?: string | null
+          fitter_signed_at?: string | null
+          fitter_signed_by?: string | null
           forecast_cost_total?: number | null
           forecast_margin_pct?: number | null
           ghl_contact_id?: string | null
@@ -1638,11 +1758,16 @@ export type Database = {
           production_stage?: string | null
           production_stage_key?: string
           profit_last_calculated_at?: string | null
+          progress_payment_amount?: number | null
+          progress_payment_paid_at?: string | null
           property_address_json?: Json | null
           room_type?: string | null
           sign_off_completed_at?: string | null
           sign_off_signature_url?: string | null
           sign_off_token?: string | null
+          site_visit_2_completed?: boolean | null
+          site_visit_2_date?: string | null
+          site_visit_2_notes?: string | null
           state?: string | null
           status?: string
           target_margin_pct?: number | null
@@ -2068,6 +2193,7 @@ export type Database = {
           job_id: string
           price_max: number | null
           price_min: number | null
+          quote_price: number | null
           scope_markdown: string | null
           scope_summary: string | null
           sent_at: string | null
@@ -2089,6 +2215,7 @@ export type Database = {
           job_id: string
           price_max?: number | null
           price_min?: number | null
+          quote_price?: number | null
           scope_markdown?: string | null
           scope_summary?: string | null
           sent_at?: string | null
@@ -2110,6 +2237,7 @@ export type Database = {
           job_id?: string
           price_max?: number | null
           price_min?: number | null
+          quote_price?: number | null
           scope_markdown?: string | null
           scope_summary?: string | null
           sent_at?: string | null
@@ -7699,11 +7827,15 @@ export type Database = {
           emergency_contact_phone: string | null
           emergency_contact_relationship: string | null
           employment_type: string
+          failed_login_attempts: number
           full_name: string
           holiday_allowance_days: number
           holiday_balance_days: number
           hourly_rate: number | null
           id: string
+          last_active_at: string | null
+          locked: boolean
+          locked_at: string | null
           ni_number: string | null
           passport_number: string | null
           pay_type: string
@@ -7728,11 +7860,15 @@ export type Database = {
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           employment_type?: string
+          failed_login_attempts?: number
           full_name: string
           holiday_allowance_days?: number
           holiday_balance_days?: number
           hourly_rate?: number | null
           id?: string
+          last_active_at?: string | null
+          locked?: boolean
+          locked_at?: string | null
           ni_number?: string | null
           passport_number?: string | null
           pay_type?: string
@@ -7757,11 +7893,15 @@ export type Database = {
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           employment_type?: string
+          failed_login_attempts?: number
           full_name?: string
           holiday_allowance_days?: number
           holiday_balance_days?: number
           hourly_rate?: number | null
           id?: string
+          last_active_at?: string | null
+          locked?: boolean
+          locked_at?: string | null
           ni_number?: string | null
           passport_number?: string | null
           pay_type?: string
@@ -8698,6 +8838,60 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_tasks: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          executed_at: string | null
+          id: string
+          job_id: string | null
+          payload_json: Json | null
+          scheduled_for: string
+          status: string
+          task_type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          job_id?: string | null
+          payload_json?: Json | null
+          scheduled_for: string
+          status?: string
+          task_type: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          job_id?: string | null
+          payload_json?: Json | null
+          scheduled_for?: string
+          status?: string
+          task_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "cab_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_tasks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "cab_jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -10105,6 +10299,51 @@ export type Database = {
           },
         ]
       }
+      user_activity_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          metadata_json: Json | null
+          resource_id: string | null
+          resource_name: string | null
+          resource_type: string | null
+          tenant_id: string | null
+          user_id: string
+          user_name: string | null
+          user_role: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata_json?: Json | null
+          resource_id?: string | null
+          resource_name?: string | null
+          resource_type?: string | null
+          tenant_id?: string | null
+          user_id: string
+          user_name?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata_json?: Json | null
+          resource_id?: string | null
+          resource_name?: string | null
+          resource_type?: string | null
+          tenant_id?: string | null
+          user_id?: string
+          user_name?: string | null
+          user_role?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -10244,6 +10483,7 @@ export type Database = {
       }
       is_cab_company_admin: { Args: { _company_id: string }; Returns: boolean }
       is_cab_company_member: { Args: { _company_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_user_tenant: { Args: { _tenant_id: string }; Returns: boolean }
     }
     Enums: {
@@ -10258,6 +10498,7 @@ export type Database = {
         | "production"
         | "installer"
         | "finance"
+        | "super_admin"
       buylist_category:
         | "panels"
         | "hardware"
@@ -10292,12 +10533,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -10321,11 +10562,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -10346,11 +10587,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -10371,11 +10612,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -10388,11 +10629,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -10415,6 +10656,7 @@ export const Constants = {
         "production",
         "installer",
         "finance",
+        "super_admin",
       ],
       buylist_category: [
         "panels",
