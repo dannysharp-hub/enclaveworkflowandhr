@@ -744,6 +744,15 @@ Deno.serve(async (req) => {
     const hasUserToken = !!authHeader?.startsWith("Bearer ") &&
       authHeader.replace("Bearer ", "") !== Deno.env.get("SUPABASE_ANON_KEY");
 
+    // Temporary diagnostic: return the raw CSV of one sheet so the parser can be tuned.
+    if (body.action === "debug_csv" && body.file_id) {
+      const { data: t } = await admin
+        .from("google_drive_integration_settings").select("tenant_id").eq("is_connected", true).limit(1).maybeSingle();
+      const at = await getAccessToken(admin, t!.tenant_id as string);
+      const csv = await exportCsv(at, String(body.file_id));
+      return json({ ok: true, csv });
+    }
+
     // Scheduled run: stage only, never commit
     if (body.scheduled === true || !hasUserToken) {
       const { data: tenants } = await admin
