@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
 import { getCabCompanyId, generateJobRef, insertCabEvent } from "@/lib/cabHelpers";
 import { deleteCabJob } from "@/lib/cabJobDelete";
