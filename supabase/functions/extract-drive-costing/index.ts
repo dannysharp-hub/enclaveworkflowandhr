@@ -706,6 +706,13 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
       parseError = err instanceof Error ? err.message : String(err);
     }
 
+    if (extracted?.all_zero) {
+      parseError = "Not yet costed — every tab is priced at zero quantity.";
+    }
+    if (extracted && extracted.found_costing_table && extracted.quoted_total === null) {
+      parseError = [parseError, "Sell not filled in on sheet."].filter(Boolean).join(" ");
+    }
+
     const notes = [matchNote, parseError].filter(Boolean).join(" ");
     const { error: upErr } = await admin.from("cab_costing_extractions").upsert({
       company_id: companyId,
@@ -727,11 +734,13 @@ async function extractTenant(admin: Admin, tenantId: string): Promise<RunResult>
             hardware_total: extracted.hardware_total,
             fixings_total: extracted.fixings_total,
             section_totals: extracted.section_totals,
+            tab_breakdown: extracted.tab_breakdown,
+            all_zero: extracted.all_zero,
           }
         : {},
       purchasing_lines: extracted?.purchasing_lines ?? [],
       ambiguous_files: others,
-      status: extracted ? "pending" : "error",
+      status: !extracted ? "error" : extracted.all_zero ? "not_costed" : "pending",
       error: notes || null,
     }, { onConflict: "company_id,folder_name,source_modified_at", ignoreDuplicates: false });
 
