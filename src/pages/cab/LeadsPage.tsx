@@ -194,6 +194,12 @@ export default function LeadsPage() {
             {importing ? "Syncing…" : "Sync now"}
           </Button>
 
+          <Button variant="outline" onClick={handleExtractCostings} disabled={extracting}>
+            {extracting ? <Loader2 size={16} className="animate-spin" /> : <Calculator size={16} />}
+            {extracting ? "Reading…" : "Extract costings"}
+          </Button>
+
+
           {canCreateJobs(userRole) && <Button onClick={() => setDialogOpen(true)}><Plus size={16} /> New Job</Button>}
         </div>
       </div>
